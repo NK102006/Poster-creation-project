@@ -1,6 +1,7 @@
 // src/components/PosterGenerator.jsx
 import { useState, useRef } from 'react';
 import { POSTER_THERAPIES, POSTER_THEMES, DEFAULT_DOCTOR_LOGO, renderPosterToCanvas } from './Poster';
+import LogoCanvas from './LogoCanvas';
 import styles from './PosterGenerator.module.css';
 
 export default function PosterGenerator({
@@ -57,19 +58,35 @@ export default function PosterGenerator({
   };
 
   const handleContinueToTherapy = () => {
+    const hasLogo = Boolean(logoFile || logoPreview || doctor?.logo);
+
     if (!formData.name?.trim() || !formData.contactnumber?.trim()) {
-      setStepError('Please enter both Doctor Name and WhatsApp Contact Number to continue.');
+      setStepError('Please enter All the details');
       return;
     }
+
+    if (!hasLogo) {
+      setStepError('Please upload a doctor photo or clinic logo before continuing.');
+      return;
+    }
+
     setStepError(null);
     setCurrentStep(2);
   };
 
   const checkCanNavigate = (targetStep) => {
+    const hasLogo = Boolean(logoFile || logoPreview || doctor?.logo);
+
     if (targetStep > 1 && (!formData.name?.trim() || !formData.contactnumber?.trim())) {
       setStepError('Please enter both Doctor Name and WhatsApp Contact Number first.');
       return false;
     }
+
+    if (targetStep > 1 && !hasLogo) {
+      setStepError('Please upload a doctor photo or clinic logo before continuing.');
+      return false;
+    }
+
     setStepError(null);
     return true;
   };
@@ -305,7 +322,7 @@ export default function PosterGenerator({
 
             <div className={styles.formGroup}>
               <label className={styles.formLabel}>
-                Doctor Photo or Clinic Logo <span className={styles.optionalTag}>(Optional)</span>
+                Doctor Photo or Clinic Logo <span className={styles.requiredStar}>*</span>
               </label>
 
               <label className={styles.fileDrop} htmlFor="step-doc-logo">
@@ -317,6 +334,7 @@ export default function PosterGenerator({
                   accept="image/*"
                   className={styles.fileInput}
                   onChange={handleFileChange}
+                  required
                 />
               </label>
 
@@ -336,6 +354,9 @@ export default function PosterGenerator({
                   </button>
                 </div>
               )}
+
+              {/* Interactive Logo Positioning Canvas */}
+              <LogoCanvas logoSrc={logoPreview} />
             </div>
           </div>
 

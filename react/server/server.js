@@ -3,10 +3,17 @@ import cors from 'cors';
 import mongoose from 'mongoose';
 import multer from 'multer';
 import dotenv from 'dotenv';
+import session from 'express-session';
 
 dotenv.config();
 
 const app = express();
+app.use(session({
+  secret: 'Secret',
+  resave: false,
+  saveUninitialized: false,
+}));
+
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 25 * 1024 * 1024 }, // 25MB limit for high-res posters
@@ -28,7 +35,6 @@ const doctorSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 const userSchema = new mongoose.Schema({
-  id: { type: mongoose.Schema.Types.Mixed },
   empid: { type: mongoose.Schema.Types.Mixed },
 }, { strict: false, timestamps: true });
 
@@ -71,48 +77,15 @@ function formatDoctor(doc) {
   };
 }
 
-// Seed default test user and doctor if none exist
-async function seedInitialData() {
-  try {
-    const existingUser = await User.findOne({
-      $or: [{ id: 1001 }, { empid: '101' }, { id: '101' }]
-    });
-    if (!existingUser) {
-      await User.create({ id: 1001, empid: '101' });
-      console.log('🌱 Seeded default user');
-    }
-
-    const doctorCount = await Doctor.countDocuments();
-    if (doctorCount === 0) {
-      await Doctor.create({
-        name: 'Dr. Sarah Jenkins, MD',
-        contactnumber: 9876543210,
-        logo: null,
-      });
-      console.log('🌱 Seeded default doctor: Dr. Sarah Jenkins, MD');
-    }
-  } catch (err) {
-    console.warn('⚠️ Seeding check failed (non-critical):', err.message);
-  }
-}
-
 // Routes
 app.post('/api/login', async (req, res) => {
   const { id } = req.body;
 
   try {
     const numId = Number(id);
-    const strId = String(id ?? '').trim();
-
-    if (!strId) {
-      return res.status(400).json({ success: false, message: 'Employee ID is required' });
-    }
-
     const user = await User.findOne({
       $or: [
         { id: numId },
-        { id: strId },
-        { empid: strId },
         { empid: numId },
       ]
     });
@@ -130,6 +103,7 @@ app.post('/api/login', async (req, res) => {
     console.error('Login error:', error);
     return res.status(500).json({ success: false, message: 'Server error during login' });
   }
+  
 });
 
 // Get current/latest doctor profile
@@ -172,6 +146,10 @@ app.post('/api/doctors', upload.any(), async (req, res) => {
   if (!poster && req.body.poster && typeof req.body.poster === 'string' && req.body.poster.startsWith('data:')) {
     const base64Data = req.body.poster.replace(/^data:image\/\w+;base64,/, '');
     poster = Buffer.from(base64Data, 'base64');
+  }
+
+  if (!logo) {
+    return res.status(400).json({ success: false, message: 'Doctor logo is required.' });
   }
 
   try {
@@ -224,9 +202,6 @@ const startServer = async () => {
   try {
     await mongoose.connect(MONGODB_URI);
     console.log(`Connected to MongoDB at ${MONGODB_URI}`);
-
-    await seedInitialData();
-
     app.listen(PORT, () => {
       console.log(`Server is running on port ${PORT}`);
     });

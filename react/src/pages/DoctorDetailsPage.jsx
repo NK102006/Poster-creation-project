@@ -24,6 +24,9 @@ export default function DoctorDetailsPage({ user, onLogout }) {
           if (res.doctor.logo) {
             setLogoPreview(res.doctor.logo);
           }
+          setLogoFile(null);
+          setFormData({ name: '', contactnumber: '' });
+          setLogoPreview('');
         }
       } catch (err) {
         console.warn('Doctor fetch notice:', err);
@@ -84,7 +87,7 @@ export default function DoctorDetailsPage({ user, onLogout }) {
         <div className={styles.userNav}>
           <div className={styles.userBadge}>
             <span className={styles.statusDot} />
-            <span>Employee #{user?.id || '1001'}</span>
+            <span>Employee</span>
           </div>
           <button
             type="button"

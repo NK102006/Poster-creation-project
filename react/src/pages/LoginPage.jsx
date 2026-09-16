@@ -10,9 +10,6 @@ export default function LoginPage({ onLoginSuccess }) {
       <aside className={styles.brandPanel} aria-hidden="true">
         <div>
           <span className={styles.wordmark}>MedPortal</span>
-          <p className={styles.tagline}>
-            Your prescriptions, appointments, and care team — in one place.
-          </p>
         </div>
       </aside>
 
