@@ -1,0 +1,73 @@
+.page {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: 5fr 7fr;
+}
+
+.brandPanel {
+  background: linear-gradient(160deg, var(--color-primary), #16362f);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 48px;
+  color: #ffffff;
+}
+
+.wordmark {
+  font-family: Georgia, serif;
+  font-size: 28px;
+  font-weight: 600;
+}
+
+.tagline {
+  max-width: 340px;
+  margin-top: 20px;
+  font-family: Georgia, serif;
+  font-style: italic;
+  font-size: 18px;
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.88);
+}
+
+.formPanel {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32px;
+}
+
+.formCard {
+  width: 100%;
+  max-width: 380px;
+}
+
+.formCard h1 {
+  font-family: Georgia, serif;
+  font-size: 26px;
+  margin: 0 0 8px;
+}
+
+.subheading {
+  margin: 0 0 32px;
+  color: var(--color-text-muted);
+  font-size: 15px;
+}
+
+@media (max-width: 768px) {
+  .page {
+    grid-template-columns: 1fr;
+  }
+
+  .brandPanel {
+    min-height: 120px;
+    padding: 28px 24px;
+  }
+
+  .tagline {
+    display: none;
+  }
+
+  .formPanel {
+    padding: 24px;
+  }
+}

@@ -1,0 +1,9 @@
+.alert {
+  padding: 12px 14px;
+  border-radius: var(--radius-sm, 8px);
+  font-size: 14px;
+  line-height: 1.4;
+  background: var(--color-error-bg);
+  color: var(--color-error);
+  border: 1px solid rgba(179, 38, 30, 0.25);
+}

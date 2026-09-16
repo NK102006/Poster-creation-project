@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dynamic Pharma Poster Template</title>
+    <style>
+        /* ==========================================
+           THEME DEFINITIONS 
+           To change the poster's visual theme, simply change the 
+           class name on the '.poster-container' element below. 
+           ========================================== */
+
+        /* 1. Theme Blue (Original Cool Blue) */
+        .theme-blue {
+            --bg-gradient: linear-gradient(135deg, #eef7fc 0%, #d2e4f5 100%);
+            --header-bg: #0056b3;
+            --accent-color: #007bff;
+            --badge-bg: #0056b3;
+            --badge-text: #ffffff;
+            --card-glow: rgba(0, 86, 179, 0.1);
+            --footer-bg: #0f2942;
+            --footer-accent: #28a745;
+            --text-title: #0f2942;
+        }
+
+        /* 2. Theme Warm Red (Rich Crimson/Orange) */
+        .theme-warm-red {
+            --bg-gradient: linear-gradient(135deg, #fff3f3 0%, #fbe3e3 50%, #f3c2c2 100%);
+            --header-bg: #c92a2a;
+            --accent-color: #ff6b6b;
+            --badge-bg: #9c0c0c;
+            --badge-text: #ffffff;
+            --card-glow: rgba(201, 42, 42, 0.1);
+            --footer-bg: #4a0e17;
+            --footer-accent: #ffa94d;
+            --text-title: #4a0e17;
+        }
+
+        /* 3. Theme Green (Emerald / Teal) */
+        .theme-green {
+            --bg-gradient: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 60%, #bbf7d0 100%);
+            --header-bg: #0f5132;
+            --accent-color: #198754;
+            --badge-bg: #0f5132;
+            --badge-text: #ffffff;
+            --card-glow: rgba(15, 81, 50, 0.15);
+            --footer-bg: #0b2211;
+            --footer-accent: #34d399;
+            --text-title: #0f5132;
+        }
+
+        /* 4. Theme Purple (Royal Indigo) */
+        .theme-purple {
+            --bg-gradient: linear-gradient(135deg, #f5f3ff 0%, #ede9fe 60%, #ddd6fe 100%);
+            --header-bg: #4c1d95;
+            --accent-color: #7c3aed;
+            --badge-bg: #4c1d95;
+            --badge-text: #ffffff;
+            --card-glow: rgba(76, 29, 149, 0.15);
+            --footer-bg: #1e1b4b;
+            --footer-accent: #a78bfa;
+            --text-title: #311062;
+        }
+
+
+        /* ==========================================
+           BASE LAYOUT & DESIGN STYLES
+           ========================================== */
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f0f2f5;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        /* Responsive Poster Outer Shell */
+        .poster-container {
+            width: 100%;
+            max-width: 600px;
+            aspect-ratio: 4 / 5;
+            background: var(--bg-gradient);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            border-radius: 12px;
+            transition: all 0.4s ease;
+        }
+
+        /* Pattern overlay for textured backgrounds */
+        .poster-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            opacity: 0.05;
+            background-image: url('https://www.transparenttextures.com/patterns/cubes.png');
+            pointer-events: none;
+        }
+
+        /* Header Area */
+        .poster-header {
+            position: relative;
+            z-index: 1;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            padding: 30px 40px;
+            border-bottom: 5px solid var(--header-bg);
+        }
+
+        .doctor-logo {
+            max-width: 120px;
+            height: 80px;
+            background-color: #ffffff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 8px;
+            overflow: hidden;
+            border: 1px solid rgba(0,0,0,0.08);
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+        }
+
+        .doctor-logo img {
+            max-width: 90%;
+            max-height: 90%;
+            object-fit: contain;
+        }
+
+        .poster-date {
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: var(--header-bg);
+            background-color: var(--card-glow);
+            padding: 8px 16px;
+            border-radius: 20px;
+            text-transform: uppercase;
+        }
+
+        /* Main Content Area */
+        .poster-body {
+            position: relative;
+            z-index: 1;
+            flex-grow: 1;
+            padding: 40px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+        }
+
+        /* Therapy Type Badge */
+        .therapy-type {
+            background-color: var(--badge-bg);
+            color: var(--badge-text);
+            font-size: 1.4rem;
+            font-weight: bold;
+            padding: 12px 30px;
+            border-radius: 30px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 25px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        .poster-title {
+            font-size: 2.3rem;
+            color: var(--text-title);
+            margin-bottom: 15px;
+            line-height: 1.25;
+            font-weight: 800;
+        }
+
+        .poster-subtitle {
+            font-size: 1.2rem;
+            color: #444;
+            max-width: 80%;
+            line-height: 1.5;
+        }
+
+        /* Footer Area */
+        .poster-footer {
+            position: relative;
+            z-index: 1;
+            background-color: var(--footer-bg);
+            color: white;
+            padding: 25px 40px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-top: 4px solid var(--footer-accent);
+        }
+
+        .doctor-info {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .doctor-name {
+            font-size: 1.6rem;
+            font-weight: bold;
+            color: #ffffff;
+        }
+
+        .doctor-title {
+            font-size: 0.95rem;
+            opacity: 0.8;
+        }
+
+        .doctor-whatsapp {
+            font-size: 1.3rem;
+            color: var(--footer-accent);
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .whatsapp-icon {
+            font-size: 1.5rem;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- 
+      EDIT THEME CLASS IN THE CONTAINER BELOW:
+      Available: theme-blue, theme-warm-red, theme-green, theme-purple (or any customized theme added above)
+    -->
+    <div class="poster-container [INSERT_THEME_CLASS_HERE: theme-blue | theme-warm-red | theme-green | theme-purple]">
+        
+        <!-- Texture Pattern Overlay -->
+        <div class="poster-overlay"></div>
+        
+        <!-- HEADER: Logo and Date -->
+        <div class="poster-header">
+            <div class="doctor-logo">
+                <!-- EDIT LOGO URL BELOW -->
+                <img src="[INSERT_DOCTOR_LOGO_URL_HERE]" alt="Doctor Logo">
+            </div>
+            <!-- EDIT DATE BELOW -->
+            <div class="poster-date">DATE: [INSERT_DATE_HERE]</div>
+        </div>
+
+        <!-- BODY: Therapy Type and Content -->
+        <div class="poster-body">
+            <!-- EDIT THERAPY TYPE BELOW (e.g., INFERTILITY, DIABETES, CARDIO, HYPERTENSION) -->
+            <div class="therapy-type">THERAPY TYPE: [INSERT_THERAPY_TYPE_HERE]</div>
+            
+            <h1 class="poster-title">Take Care of Your Heart</h1>
+            <p class="poster-subtitle">Simple steps today, healthier beats tomorrow.</p>
+        </div>
+
+        <!-- FOOTER: Doctor Name and Contact -->
+        <div class="poster-footer">
+            <div class="doctor-info">
+                <!-- EDIT DOCTOR NAME BELOW -->
+                <div class="doctor-name">Dr. [INSERT_DOCTOR_NAME_HERE]</div>
+                <div class="doctor-title">Consultant Specialist</div>
+            </div>
+            
+            <!-- EDIT WHATSAPP NUMBER BELOW -->
+            <div class="doctor-whatsapp">
+                <span class="whatsapp-icon">📞</span> [INSERT_WHATSAPP_NUMBER_HERE]
+            </div>
+        </div>
+
+    </div>
+
+</body>
+</html>

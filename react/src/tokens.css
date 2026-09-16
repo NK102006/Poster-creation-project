@@ -1,0 +1,38 @@
+:root {
+  --color-bg: #f4f6f5;
+  --color-surface: #ffffff;
+  --color-primary: #1f4b44;
+  --color-primary-hover: #16362f;
+  --color-primary-contrast: #ffffff;
+  --color-accent: #c68a3b;
+  --color-text: #1b2430;
+  --color-text-muted: #5b6572;
+  --color-border: #d8dedc;
+  --color-error: #b3261e;
+  --color-error-bg: #fbeae9;
+
+  --font-body: Inter, -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-display: Lora, Georgia, serif;
+
+  --radius-sm: 8px;
+  --radius-md: 14px;
+
+  --shadow-card: 0 24px 48px -24px rgba(15, 35, 30, 0.35);
+  --focus-ring: 0 0 0 3px rgba(31, 75, 68, 0.35);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-body);
+  color: var(--color-text);
+  background: var(--color-bg);
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
