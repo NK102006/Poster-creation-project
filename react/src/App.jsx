@@ -2,50 +2,34 @@ import { useEffect, useState } from 'react';
 import LoginPage from './pages/LoginPage.jsx';
 import DoctorDetailsPage from './pages/DoctorDetailsPage.jsx';
 
-const STORAGE_KEY = 'medportal-current-user';
+function getViewFromUrl() {
+  const params = new URLSearchParams(window.location.search);
+  return params.get('view') === 'doctor' ? 'doctor' : 'login';
+}
 
 export default function App() {
   const [currentUser, setCurrentUser] = useState(() => {
-    try {
-      const savedUser = localStorage.getItem(STORAGE_KEY);
-      return savedUser ? JSON.parse(savedUser) : null;
-    } catch {
-      return null;
-    }
+    return getViewFromUrl() === 'doctor' ? { id: 101 } : null;
   });
 
-  const [screen, setScreen] = useState(() => {
-    try {
-      return localStorage.getItem(STORAGE_KEY) ? 'doctor' : 'login';
-    } catch {
-      return 'login';
-    }
-  });
-
-  useEffect(() => {
-    try {
-      if (currentUser) {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(currentUser));
-        setScreen('doctor');
-      } else {
-        localStorage.removeItem(STORAGE_KEY);
-        setScreen('login');
-      }
-    } catch {
-      // Ignore storage failures in private mode or restricted browsers.
-    }
-  }, [currentUser]);
+  const showDoctorView = currentUser || getViewFromUrl() === 'doctor';
 
   const handleLoginSuccess = (user) => {
     setCurrentUser(user);
+    const nextUrl = new URL(window.location.href);
+    nextUrl.searchParams.set('view', 'doctor');
+    window.history.replaceState({}, '', nextUrl);
   };
 
   const handleLogout = () => {
     setCurrentUser(null);
+    const nextUrl = new URL(window.location.href);
+    nextUrl.searchParams.set('view', 'login');
+    window.history.replaceState({}, '', nextUrl);
   };
 
-  if (screen === 'doctor' && currentUser) {
-    return <DoctorDetailsPage user={currentUser} onLogout={handleLogout} />;
+  if (showDoctorView) {
+    return <DoctorDetailsPage user={currentUser || { id: 101 }} onLogout={handleLogout} />;
   }
 
   return <LoginPage onLoginSuccess={handleLoginSuccess} />;

@@ -16,7 +16,6 @@ export default function LoginPage({ onLoginSuccess }) {
       <main className={styles.formPanel}>
         <div className={styles.formCard}>
           <h1>Welcome back</h1>
-          <p className={styles.subheading}>Sign in to your account to continue.</p>
 
           {success && (
             <p role="status" style={{ color: 'var(--color-primary)', fontWeight: 600 }}>
