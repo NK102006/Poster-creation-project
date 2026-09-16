@@ -35,6 +35,7 @@ export default function PosterGenerator({
     POSTER_THERAPIES.find((t) => t.id === selectedTherapyId) || POSTER_THERAPIES[0];
   const selectedTheme =
     POSTER_THEMES.find((t) => t.id === selectedThemeId) || POSTER_THEMES[0];
+  const isStepComplete = (step) => currentStep > step;
 
   // Whenever user changes therapy, suggest the recommended theme
   const handleSelectTherapy = (therapy) => {
@@ -195,68 +196,47 @@ export default function PosterGenerator({
       {/* Hidden canvas for high-resolution 1200x1500 poster generation */}
       <canvas ref={canvasRef} style={{ display: 'none' }} />
 
-      <div className={styles.header}>
-        <h2 className={styles.title}>Dynamic Pharma Poster Studio</h2>
-        <p className={styles.subtitle}>
-          Complete doctor details, select therapy and theme, preview live, and generate high-resolution posters with automatic saving.
-        </p>
-      </div>
+      <div className={styles.shell}>
+        <aside className={styles.sidebar} aria-label="Poster setup steps">
+          <div className={styles.stepper} role="tablist">
+            <button
+              type="button"
+              className={`${styles.stepTab} ${currentStep === 1 ? styles.stepTabActive : ''} ${isStepComplete(1) ? styles.stepTabComplete : ''}`}
+              onClick={() => setCurrentStep(1)}
+            >
+              <span className={styles.stepNumber}>{isStepComplete(1) ? '✓' : '1'}</span>
+              <span>Doctor Details</span>
+            </button>
 
-      {/* 4-Step Flow Stepper */}
-      <div className={styles.stepper} role="tablist">
-        <button
-          type="button"
-          className={`${styles.stepTab} ${currentStep === 1 ? styles.stepTabActive : ''}`}
-          onClick={() => setCurrentStep(1)}
-        >
-          <span className={styles.stepNumber}>1</span>
-          <span>1. Doctor Details</span>
-        </button>
+            <button
+              type="button"
+              className={`${styles.stepTab} ${currentStep === 2 ? styles.stepTabActive : ''} ${isStepComplete(2) ? styles.stepTabComplete : ''}`}
+              onClick={() => {
+                if (checkCanNavigate(2)) setCurrentStep(2);
+              }}
+            >
+              <span className={styles.stepNumber}>{isStepComplete(2) ? '✓' : '2'}</span>
+              <span>Select Therapy</span>
+            </button>
 
-        <button
-          type="button"
-          className={`${styles.stepTab} ${currentStep === 2 ? styles.stepTabActive : ''}`}
-          onClick={() => {
-            if (checkCanNavigate(2)) setCurrentStep(2);
-          }}
-        >
-          <span className={styles.stepNumber}>2</span>
-          <span>2. Select Therapy</span>
-        </button>
+            <button
+              type="button"
+              className={`${styles.stepTab} ${currentStep === 3 ? styles.stepTabActive : ''} ${isStepComplete(3) ? styles.stepTabComplete : ''}`}
+              onClick={() => {
+                if (checkCanNavigate(3)) setCurrentStep(3);
+              }}
+            >
+              <span className={styles.stepNumber}>{isStepComplete(3) ? '✓' : '3'}</span>
+              <span>Select Theme</span>
+            </button>
 
-        <button
-          type="button"
-          className={`${styles.stepTab} ${currentStep === 3 ? styles.stepTabActive : ''}`}
-          onClick={() => {
-            if (checkCanNavigate(3)) setCurrentStep(3);
-          }}
-        >
-          <span className={styles.stepNumber}>3</span>
-          <span>3. Select Theme</span>
-        </button>
-
-        <button
-          type="button"
-          className={`${styles.stepTab} ${currentStep === 4 ? styles.stepTabActive : ''}`}
-          onClick={() => {
-            if (checkCanNavigate(4)) setCurrentStep(4);
-          }}
-        >
-          <span className={styles.stepNumber}>4</span>
-          <span>4. Preview & Download</span>
-        </button>
-      </div>
-
-      {/* STEP 1: Enter Doctor Details */}
-      {currentStep === 1 && (
-        <div className={styles.stepContent}>
-          <div>
-            <h3 className={styles.sectionHeading}>Step 1: Enter Doctor Details</h3>
-            <p className={styles.sectionDesc}>
-              Enter the doctor's name, WhatsApp contact number, and clinic photo/logo to appear on the posters:
-            </p>
           </div>
+        </aside>
 
+        <div className={styles.content}>
+          {/* STEP 1: Enter Doctor Details */}
+          {currentStep === 1 && (
+            <div className={styles.stepContent}>
           {stepError && (
             <div className={styles.stepAlert} role="alert">
               <span>⚠️</span>
@@ -353,16 +333,9 @@ export default function PosterGenerator({
         </div>
       )}
 
-      {/* STEP 2: Select Therapy */}
-      {currentStep === 2 && (
-        <div className={styles.stepContent}>
-          <div>
-            <h3 className={styles.sectionHeading}>Step 2: Select Therapy</h3>
-            <p className={styles.sectionDesc}>
-              Choose from Infertility, Diabetes, Cardio, or Hypertension:
-            </p>
-          </div>
-
+          {/* STEP 2: Select Therapy */}
+          {currentStep === 2 && (
+            <div className={styles.stepContent}>
           <div className={styles.therapyGrid}>
             {POSTER_THERAPIES.map((item) => {
               const isSelected = item.id === selectedTherapyId;
@@ -377,7 +350,6 @@ export default function PosterGenerator({
                 >
                   <span className={styles.therapyIcon}>{item.icon}</span>
                   <h4 className={styles.therapyTitle}>{item.name}</h4>
-                  <p className={styles.therapyTagline}>{item.subtitle}</p>
                   {isSelected && <span className={styles.activeCheck}>✓</span>}
                 </div>
               );
@@ -403,163 +375,102 @@ export default function PosterGenerator({
         </div>
       )}
 
-      {/* STEP 3: Select Theme */}
-      {currentStep === 3 && (
-        <div className={styles.stepContent}>
-          <div>
-            <h3 className={styles.sectionHeading}>Step 3: Select Theme</h3>
-            <p className={styles.sectionDesc}>
-              Choose the visual color theme for the <strong>{selectedTherapy.name}</strong> poster:
-            </p>
-          </div>
+          {/* STEP 3: Select Theme */}
+          {currentStep === 3 && (
+            <div className={styles.stepContent}>
+              <div className={styles.themeGrid}>
+                {POSTER_THEMES.map((theme) => {
+                  const isSelected = theme.id === selectedThemeId;
+                  return (
+                    <div
+                      key={theme.id}
+                      className={`${styles.themeCard} ${isSelected ? styles.themeCardActive : ''}`}
+                      onClick={() => setSelectedThemeId(theme.id)}
+                      role="button"
+                      tabIndex={0}
+                      onKeyDown={(e) => e.key === 'Enter' && setSelectedThemeId(theme.id)}
+                    >
+                      <div className={styles.themePalette}>
+                        <div className={styles.paletteSlice} style={{ background: theme.headerBg }} />
+                      </div>
+                      <div className={styles.themeMeta}>
+                        <h5 className={styles.themeName}>{theme.name}</h5>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
 
-          <div className={styles.themeGrid}>
-            {POSTER_THEMES.map((theme) => {
-              const isSelected = theme.id === selectedThemeId;
-              return (
-                <div
-                  key={theme.id}
-                  className={`${styles.themeCard} ${isSelected ? styles.themeCardActive : ''}`}
-                  onClick={() => setSelectedThemeId(theme.id)}
-                  role="button"
-                  tabIndex={0}
-                  onKeyDown={(e) => e.key === 'Enter' && setSelectedThemeId(theme.id)}
-                >
-                  <div className={styles.themePalette}>
-                    <div className={styles.paletteSlice} style={{ background: theme.headerBg }} />
-                    <div className={styles.paletteSlice} style={{ background: theme.accentColor }} />
-                    <div className={styles.paletteSlice} style={{ background: theme.footerAccent }} />
-                    <div className={styles.paletteSlice} style={{ background: theme.footerBg }} />
-                  </div>
-                  <div className={styles.themeMeta}>
-                    <h5 className={styles.themeName}>{theme.name}</h5>
-                    <p className={styles.themeDescription}>{theme.description}</p>
+              <div className={styles.previewLayout}>
+                <div className={styles.mockupColumn}>
+                  <div className={`${styles.posterContainer} ${getThemeClass(selectedThemeId)}`}>
+                    <div className={styles.posterOverlay}></div>
+                    <div className={styles.posterHeader}>
+                      <div className={styles.doctorLogo}>
+                        <img src={activeLogo} alt="Doctor Logo" />
+                      </div>
+                      <div className={styles.posterDate}>DATE: {todayFormatted}</div>
+                    </div>
+
+                    <div className={styles.posterBody}>
+                      <div className={styles.therapyType}>
+                        THERAPY TYPE: {selectedTherapy.badge}
+                      </div>
+                      <h1 className={styles.posterTitle}>{selectedTherapy.title}</h1>
+                      <p className={styles.posterSubtitle}>{selectedTherapy.subtitle}</p>
+                    </div>
+
+                    <div className={styles.posterFooter}>
+                      <div className={styles.doctorInfo}>
+                        <div className={styles.doctorName}>{formattedDoctorName}</div>
+                        <div className={styles.doctorTitle}>Consultant Specialist</div>
+                      </div>
+
+                      <div className={styles.doctorWhatsapp}>
+                        <span className={styles.whatsappIcon}>📞</span> {whatsappNumber}
+                      </div>
+                    </div>
                   </div>
                 </div>
-              );
-            })}
-          </div>
 
-          <div className={styles.navRow}>
-            <button
-              type="button"
-              className={styles.secondaryBtn}
-              onClick={() => setCurrentStep(2)}
-            >
-              ← Back to Therapy
-            </button>
-            <button
-              type="button"
-              className={styles.primaryBtn}
-              onClick={() => setCurrentStep(4)}
-            >
-              Preview Poster →
-            </button>
-          </div>
-        </div>
-      )}
+                <div className={styles.controlColumn}>
+                  <div className={styles.actionCard}>
+                    <h4 className={styles.actionTitle}>Generate JPG Poster</h4>
 
-      {/* STEP 4: Preview with Doctor Details & Download */}
-      {currentStep === 4 && (
-        <div className={styles.stepContent}>
-          <div>
-            <h3 className={styles.sectionHeading}>Step 4: Poster Live Preview</h3>
-            <p className={styles.sectionDesc}>
-              Review the live poster with doctor details and branding, and click generate to download.
-            </p>
-          </div>
+                    {downloadSuccess && (
+                      <div className={styles.successAlert} role="status">
+                        <span>✅</span>
+                        <span>Poster successfully downloaded! Changes automatically saved.</span>
+                      </div>
+                    )}
 
-          <div className={styles.previewLayout}>
-            {/* Left: EXACT TEMPLATE PREVIEW */}
-            <div className={styles.mockupColumn}>
-              <div className={`${styles.posterContainer} ${getThemeClass(selectedThemeId)}`}>
-                {/* Pattern Overlay */}
-                <div className={styles.posterOverlay}></div>
-
-                {/* HEADER: Logo and Date */}
-                <div className={styles.posterHeader}>
-                  <div className={styles.doctorLogo}>
-                    <img src={activeLogo} alt="Doctor Logo" />
-                  </div>
-                  <div className={styles.posterDate}>DATE: {todayFormatted}</div>
-                </div>
-
-                {/* BODY: Therapy Type and Content */}
-                <div className={styles.posterBody}>
-                  <div className={styles.therapyType}>
-                    THERAPY TYPE: {selectedTherapy.badge}
-                  </div>
-                  <h1 className={styles.posterTitle}>{selectedTherapy.title}</h1>
-                  <p className={styles.posterSubtitle}>{selectedTherapy.subtitle}</p>
-                </div>
-
-                {/* FOOTER: Doctor Name and Contact */}
-                <div className={styles.posterFooter}>
-                  <div className={styles.doctorInfo}>
-                    <div className={styles.doctorName}>{formattedDoctorName}</div>
-                    <div className={styles.doctorTitle}>Consultant Specialist</div>
-                  </div>
-
-                  <div className={styles.doctorWhatsapp}>
-                    <span className={styles.whatsappIcon}>📞</span> {whatsappNumber}
+                    <button
+                      type="button"
+                      className={styles.generateBtn}
+                      onClick={handleGenerateAndDownload}
+                      disabled={isGenerating}
+                      id="generate-download-poster-button"
+                    >
+                      <span>{isGenerating ? 'Rendering & Saving…' : '⬇ Generate & Download JPG Poster'}</span>
+                    </button>
                   </div>
                 </div>
               </div>
-            </div>
 
-            {/* Right: Actions & Download CTA */}
-            <div className={styles.controlColumn}>
-              <div className={styles.actionCard}>
-                <h4 className={styles.actionTitle}>Generate JPG Poster</h4>
-                <p className={styles.actionSubtitle}>
-                  Ready to download in high-resolution JPG format (1200 × 1500 px).
-                </p>
-
-                {downloadSuccess && (
-                  <div className={styles.successAlert} role="status">
-                    <span>✅</span>
-                    <span>Poster successfully downloaded! Changes automatically saved.</span>
-                  </div>
-                )}
-
+              <div className={styles.navRow}>
                 <button
                   type="button"
-                  className={styles.generateBtn}
-                  onClick={handleGenerateAndDownload}
-                  disabled={isGenerating}
-                  id="generate-download-poster-button"
+                  className={styles.secondaryBtn}
+                  onClick={() => setCurrentStep(2)}
                 >
-                  <span>{isGenerating ? 'Rendering & Saving…' : '⬇ Generate & Download JPG Poster'}</span>
+                  ← Back to Therapy
                 </button>
-
-                <div className={styles.navRow}>
-                  <button
-                    type="button"
-                    className={styles.secondaryBtn}
-                    onClick={() => setCurrentStep(3)}
-                  >
-                    ← Change Theme
-                  </button>
-                  <button
-                    type="button"
-                    className={styles.secondaryBtn}
-                    onClick={() => setCurrentStep(2)}
-                  >
-                    Change Therapy
-                  </button>
-                  <button
-                    type="button"
-                    className={styles.secondaryBtn}
-                    onClick={() => setCurrentStep(1)}
-                  >
-                    Edit Doctor Info
-                  </button>
-                </div>
+                <div />
               </div>
             </div>
-          </div>
+          )}
         </div>
-      )}
+      </div>
     </section>
   );
 }

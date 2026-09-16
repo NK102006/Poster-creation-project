@@ -5,7 +5,10 @@ import styles from './DoctorDetailsPage.module.css';
 
 export default function DoctorDetailsPage({ user, onLogout }) {
   const [doctor, setDoctor] = useState(null);
-  const [formData, setFormData] = useState({ name: '', contactnumber: '' });
+  const [formData, setFormData] = useState({
+    name: '',
+    contactnumber: '',
+  });
   const [logoFile, setLogoFile] = useState(null);
   const [logoPreview, setLogoPreview] = useState(null);
 
@@ -101,9 +104,6 @@ export default function DoctorDetailsPage({ user, onLogout }) {
       <main className={styles.main}>
         <div className={styles.hero}>
           <h1 className={styles.heroTitle}>Doctor Portal & Poster Studio</h1>
-          <p className={styles.heroSubtitle}>
-            Enter doctor details, choose therapy and theme, and download high-resolution posters with automatic saving.
-          </p>
         </div>
 
         {/* Unified 4-Step Poster Studio */}

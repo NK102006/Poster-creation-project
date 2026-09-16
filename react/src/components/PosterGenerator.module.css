@@ -3,60 +3,65 @@
 .container {
   width: 100%;
   margin-top: 0;
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  padding: 32px;
-  box-shadow: 0 4px 20px rgba(15, 35, 30, 0.05);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.88), rgba(248, 250, 249, 0.94));
+  border: 1px solid rgba(17, 24, 39, 0.05);
+  border-radius: 24px;
+  padding: 18px;
+  box-shadow: 0 16px 40px rgba(20, 32, 29, 0.05);
+  backdrop-filter: blur(10px);
 }
 
-.header {
-  margin-bottom: 28px;
+.shell {
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr);
+  gap: 20px;
+  align-items: flex-start;
 }
 
-.title {
-  font-family: Georgia, serif;
-  font-size: 26px;
-  font-weight: 700;
-  color: var(--color-text);
-  margin: 0 0 6px;
+.sidebar {
+  position: sticky;
+  top: 20px;
 }
 
-.subtitle {
-  font-size: 14px;
-  color: var(--color-text-muted);
-  margin: 0;
-}
-
-/* Stepper Tabs */
 .stepper {
   display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 32px;
-  border-bottom: 1px solid var(--color-border);
-  padding-bottom: 16px;
-  overflow-x: auto;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px;
+  background: transparent;
+  border: none;
 }
 
 .stepTab {
   display: flex;
   align-items: center;
-  gap: 8px;
-  background: none;
-  border: none;
-  padding: 8px 18px;
-  border-radius: 20px;
+  gap: 10px;
+  width: 100%;
+  background: transparent;
+  border: 1px solid transparent;
+  padding: 12px 12px;
+  border-radius: 14px;
   font-size: 14px;
   font-weight: 600;
   color: var(--color-text-muted);
   cursor: pointer;
   transition: all 0.2s ease;
-  white-space: nowrap;
+  text-align: left;
+}
+
+.stepTab:hover {
+  background: rgba(31, 75, 68, 0.025);
 }
 
 .stepTabActive {
-  background: rgba(31, 75, 68, 0.1);
+  background: rgba(255, 255, 255, 0.9);
+  border-color: rgba(31, 75, 68, 0.08);
+  color: var(--color-primary);
+  box-shadow: 0 10px 24px rgba(20, 38, 34, 0.04);
+}
+
+.stepTabComplete {
+  background: rgba(41, 108, 90, 0.05);
   color: var(--color-primary);
 }
 
@@ -65,16 +70,25 @@
   place-items: center;
   width: 24px;
   height: 24px;
-  border-radius: 50%;
-  background: #e2e8e5;
+  border-radius: 8px;
+  background: #e4e9e7;
   color: var(--color-text-muted);
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 700;
+  flex-shrink: 0;
 }
 
-.stepTabActive .stepNumber {
+.stepTabActive .stepNumber,
+.stepTabComplete .stepNumber {
   background: var(--color-primary);
   color: #fff;
+}
+
+.content {
+  min-width: 0;
+  min-height: 620px;
+  display: flex;
+  flex-direction: column;
 }
 
 /* Step Content Sections */
@@ -99,11 +113,11 @@
 
 /* Step 1: Doctor Details Form */
 .docFormCard {
-  background: #ffffff;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  padding: 24px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03);
+  background: rgba(255, 255, 255, 0.7);
+  border: 1px solid rgba(17, 24, 39, 0.06);
+  border-radius: 22px;
+  padding: 28px;
+  box-shadow: 0 18px 28px rgba(17, 33, 30, 0.02);
 }
 
 .formGrid {
@@ -299,26 +313,26 @@
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  padding: 22px 20px;
-  border-radius: var(--radius-sm);
-  border: 2px solid var(--color-border);
-  background: #ffffff;
+  padding: 24px 20px;
+  border-radius: 18px;
+  border: 1px solid rgba(17, 24, 39, 0.06);
+  background: rgba(255, 255, 255, 0.7);
   cursor: pointer;
   text-align: left;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: all 0.2s ease;
   position: relative;
 }
 
 .therapyCard:hover {
-  border-color: #a4b5af;
-  transform: translateY(-2px);
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.05);
+  border-color: rgba(31, 75, 68, 0.15);
+  transform: translateY(-1px);
+  box-shadow: 0 14px 26px rgba(17, 33, 30, 0.04);
 }
 
 .therapyCardActive {
-  border-color: var(--color-primary);
-  background: #f4f8f6;
-  box-shadow: 0 0 0 1px var(--color-primary), 0 8px 20px rgba(31, 75, 68, 0.08);
+  border-color: rgba(31, 75, 68, 0.22);
+  background: rgba(236, 246, 242, 0.9);
+  box-shadow: 0 16px 28px rgba(31, 75, 68, 0.07);
 }
 
 .therapyIcon {
@@ -364,10 +378,10 @@
 }
 
 .themeCard {
-  border: 2px solid var(--color-border);
-  border-radius: var(--radius-sm);
+  border: 1px solid rgba(17, 24, 39, 0.06);
+  border-radius: 18px;
   padding: 18px;
-  background: #ffffff;
+  background: rgba(255, 255, 255, 0.76);
   cursor: pointer;
   transition: all 0.2s ease;
   display: flex;
@@ -376,13 +390,13 @@
 }
 
 .themeCard:hover {
-  border-color: #9cb0a8;
+  border-color: rgba(31, 75, 68, 0.12);
   transform: translateY(-1px);
 }
 
 .themeCardActive {
-  border-color: var(--color-primary);
-  box-shadow: 0 0 0 2px rgba(31, 75, 68, 0.2);
+  border-color: rgba(31, 75, 68, 0.22);
+  box-shadow: 0 14px 26px rgba(17, 33, 30, 0.05);
 }
 
 .themePalette {
@@ -661,14 +675,14 @@
 }
 
 .actionCard {
-  background: #ffffff;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  padding: 24px;
+  background: rgba(255, 255, 255, 0.7);
+  border: 1px solid rgba(17, 24, 39, 0.06);
+  border-radius: 22px;
+  padding: 22px;
   display: flex;
   flex-direction: column;
   gap: 16px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
+  box-shadow: 0 12px 24px rgba(17, 33, 30, 0.03);
 }
 
 .actionTitle {
@@ -692,16 +706,16 @@
   justify-content: center;
   gap: 10px;
   width: 100%;
-  padding: 16px;
-  background: var(--color-primary);
+  padding: 16px 20px;
+  background: linear-gradient(135deg, var(--color-primary), #16362f);
   color: #ffffff;
   border: none;
-  border-radius: var(--radius-sm);
+  border-radius: 14px;
   font-size: 15.5px;
   font-weight: 700;
   cursor: pointer;
   transition: all 0.2s ease;
-  box-shadow: 0 4px 14px rgba(31, 75, 68, 0.25);
+  box-shadow: 0 12px 20px rgba(17, 42, 37, 0.18);
 }
 
 .generateBtn:hover:not(:disabled) {
@@ -756,19 +770,20 @@
 }
 
 .primaryBtn {
-  background: var(--color-primary);
+  background: linear-gradient(135deg, var(--color-primary), #16362f);
   border: none;
-  padding: 10px 22px;
-  border-radius: var(--radius-sm);
+  padding: 12px 22px;
+  border-radius: 12px;
   font-size: 14px;
-  font-weight: 600;
+  font-weight: 700;
   color: #ffffff;
   cursor: pointer;
   transition: all 0.15s ease;
+  box-shadow: 0 12px 24px rgba(17, 42, 37, 0.12);
 }
 
 .primaryBtn:hover {
-  background: var(--color-primary-hover);
+  background: linear-gradient(135deg, #16362f, var(--color-primary));
 }
 
 @media (max-width: 900px) {
