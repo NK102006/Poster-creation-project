@@ -7,10 +7,6 @@ react/server/node_modules/
 dist/
 react/dist/
 
-# env files
-.env
-.env.*
-! .env.example
 
 # logs
 npm-debug.log*
