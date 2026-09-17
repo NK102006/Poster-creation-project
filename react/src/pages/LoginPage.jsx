@@ -7,19 +7,18 @@ export default function LoginPage({ onLoginSuccess }) {
 
   return (
     <div className={styles.page}>
-      <aside className={styles.brandPanel} aria-hidden="true">
-        <div>
+      <main className={styles.centerStage}>
+        <div className={styles.brandMark}>
+          <span className={styles.logoIcon}>M</span>
           <span className={styles.wordmark}>MedPortal</span>
         </div>
-      </aside>
 
-      <main className={styles.formPanel}>
         <div className={styles.formCard}>
           <h1>Welcome back</h1>
 
           {success && (
-            <p role="status" style={{ color: 'var(--color-primary)', fontWeight: 600 }}>
-              Login successful. Authentication verified.
+            <p className={styles.successNote} role="status">
+              Login successful.
             </p>
           )}
 

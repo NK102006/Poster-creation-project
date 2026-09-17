@@ -4,6 +4,12 @@ import { POSTER_THERAPIES, POSTER_THEMES, DEFAULT_DOCTOR_LOGO, renderPosterToCan
 import LogoCanvas from './LogoCanvas';
 import styles from './PosterGenerator.module.css';
 
+const STEPS = [
+  { id: 1, label: 'Doctor Details', short: 'Details' },
+  { id: 2, label: 'Design', short: 'Design' },
+  { id: 3, label: 'Preview', short: 'Preview' },
+];
+
 export default function PosterGenerator({
   formData = { name: '', contactnumber: '' },
   setFormData,
@@ -21,7 +27,6 @@ export default function PosterGenerator({
   const [downloadSuccess, setDownloadSuccess] = useState(false);
   const [stepError, setStepError] = useState(null);
 
-  // Automatic today's date formatted (e.g. "SEP 11, 2026")
   const todayFormatted = new Date()
     .toLocaleDateString('en-US', {
       month: 'short',
@@ -38,7 +43,6 @@ export default function PosterGenerator({
     POSTER_THEMES.find((t) => t.id === selectedThemeId) || POSTER_THEMES[0];
   const isStepComplete = (step) => currentStep > step;
 
-  // Whenever user changes therapy, suggest the recommended theme
   const handleSelectTherapy = (therapy) => {
     setSelectedTherapyId(therapy.id);
     setSelectedThemeId(therapy.recommendedTheme);
@@ -58,11 +62,11 @@ export default function PosterGenerator({
     setLogoPreview?.(null);
   };
 
-  const handleContinueToTherapy = () => {
+  const handleContinueToDesign = () => {
     const hasLogo = Boolean(logoFile || logoPreview || doctor?.logo);
 
     if (!formData.name?.trim() || !formData.contactnumber?.trim()) {
-      setStepError('Please enter All the details');
+      setStepError('Please enter all the details');
       return;
     }
 
@@ -88,6 +92,11 @@ export default function PosterGenerator({
       return false;
     }
 
+    if (targetStep > 2 && (!selectedTherapyId || !selectedThemeId)) {
+      setStepError('Please choose a therapy and theme before previewing.');
+      return false;
+    }
+
     setStepError(null);
     return true;
   };
@@ -97,7 +106,6 @@ export default function PosterGenerator({
   const whatsappNumber = formData.contactnumber?.trim() || doctor?.contactnumber || 'Contact for Consultation';
   const activeLogo = logoPreview || doctor?.logo || DEFAULT_DOCTOR_LOGO;
 
-  // Map theme id to CSS module class
   const getThemeClass = (id) => {
     switch (id) {
       case 'theme-warm-red':
@@ -112,7 +120,6 @@ export default function PosterGenerator({
     }
   };
 
-  // High-Resolution Generate & Download Handler
   const handleGenerateAndDownload = async () => {
     try {
       setIsGenerating(true);
@@ -138,19 +145,16 @@ export default function PosterGenerator({
         .replace(/_+/g, '_');
       const fileName = `Poster_${selectedTherapy.name}_${cleanDocName}.jpg`;
 
-      // Create high-res poster Blob for MongoDB database storage
       const posterBlob = await new Promise((resolve) => {
         canvas.toBlob(resolve, 'image/jpeg', 0.95);
       });
 
-      // Automatically trigger background save of doctor details AND poster in database upon download
       if (onAutoSave) {
         onAutoSave(formData, logoFile, posterBlob).catch((err) => {
           console.warn('Auto save notice:', err);
         });
       }
 
-      // Download poster
       try {
         const dataUrl = canvas.toDataURL('image/jpeg', 0.95);
         const link = document.createElement('a');
@@ -210,287 +214,296 @@ export default function PosterGenerator({
 
   return (
     <section className={styles.container} id="poster-studio-section">
-      {/* Hidden canvas for high-resolution 1200x1500 poster generation */}
       <canvas ref={canvasRef} style={{ display: 'none' }} />
 
-      <div className={styles.shell}>
-        <aside className={styles.sidebar} aria-label="Poster setup steps">
-          <div className={styles.stepper} role="tablist">
-            <button
-              type="button"
-              className={`${styles.stepTab} ${currentStep === 1 ? styles.stepTabActive : ''} ${isStepComplete(1) ? styles.stepTabComplete : ''}`}
-              onClick={() => setCurrentStep(1)}
-            >
-              <span className={styles.stepNumber}>{isStepComplete(1) ? '✓' : '1'}</span>
-              <span>Doctor Details</span>
-            </button>
-
-            <button
-              type="button"
-              className={`${styles.stepTab} ${currentStep === 2 ? styles.stepTabActive : ''} ${isStepComplete(2) ? styles.stepTabComplete : ''}`}
-              onClick={() => {
-                if (checkCanNavigate(2)) setCurrentStep(2);
-              }}
-            >
-              <span className={styles.stepNumber}>{isStepComplete(2) ? '✓' : '2'}</span>
-              <span>Select Therapy</span>
-            </button>
-
-            <button
-              type="button"
-              className={`${styles.stepTab} ${currentStep === 3 ? styles.stepTabActive : ''} ${isStepComplete(3) ? styles.stepTabComplete : ''}`}
-              onClick={() => {
-                if (checkCanNavigate(3)) setCurrentStep(3);
-              }}
-            >
-              <span className={styles.stepNumber}>{isStepComplete(3) ? '✓' : '3'}</span>
-              <span>Select Theme</span>
-            </button>
-
-          </div>
-        </aside>
-
-        <div className={styles.content}>
-          {/* STEP 1: Enter Doctor Details */}
-          {currentStep === 1 && (
-            <div className={styles.stepContent}>
-          {stepError && (
-            <div className={styles.stepAlert} role="alert">
-              <span>⚠️</span>
-              <span>{stepError}</span>
-            </div>
-          )}
-
-          <div className={styles.docFormCard}>
-            <div className={styles.formGrid}>
-              <div className={styles.formGroup}>
-                <label className={styles.formLabel} htmlFor="step-doc-name">
-                  Doctor Full Name <span className={styles.requiredStar}>*</span>
-                </label>
-                <input
-                  id="step-doc-name"
-                  type="text"
-                  placeholder="e.g. Dr. Emily Watson, MD"
-                  className={styles.inputField}
-                  value={formData.name}
-                  onChange={(e) => {
-                    setFormData?.((prev) => ({ ...prev, name: e.target.value }));
-                    if (stepError) setStepError(null);
-                  }}
-                  required
-                />
-              </div>
-
-              <div className={styles.formGroup}>
-                <label className={styles.formLabel} htmlFor="step-doc-contact">
-                  WhatsApp Contact Number <span className={styles.requiredStar}>*</span>
-                </label>
-                <input
-                  id="step-doc-contact"
-                  type="tel"
-                  placeholder="e.g. 919876543210"
-                  className={styles.inputField}
-                  value={formData.contactnumber}
-                  onChange={(e) => {
-                    setFormData?.((prev) => ({ ...prev, contactnumber: e.target.value }));
-                    if (stepError) setStepError(null);
-                  }}
-                  required
-                />
-              </div>
-            </div>
-
-            <div className={styles.formGroup}>
-              <label className={styles.formLabel}>
-                Doctor Photo or Clinic Logo <span className={styles.requiredStar}>*</span>
-              </label>
-
-              <label className={styles.fileDrop} htmlFor="step-doc-logo">
-                <span className={styles.fileDropTitle}>📷 Click to upload photo or logo</span>
-                <p className={styles.fileDropText}>Supports PNG, JPG, WEBP formats</p>
-                <input
-                  id="step-doc-logo"
-                  type="file"
-                  accept="image/*"
-                  className={styles.fileInput}
-                  onChange={handleFileChange}
-                  required
-                />
-              </label>
-
-              {logoPreview && (
-                <div className={styles.filePreviewWrap}>
-                  <img src={logoPreview} alt="Doctor Logo Preview" className={styles.fileThumb} />
-                  <div className={styles.fileDetails}>
-                    <span className={styles.fileName}>{logoFile?.name || 'Selected Doctor Logo'}</span>
-                    <span className={styles.fileHint}>Will be embedded on all generated posters</span>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={handleRemoveLogo}
-                    className={styles.removeFileBtn}
-                  >
-                    Remove
-                  </button>
-                </div>
-              )}
-
-              {/* Interactive Logo Positioning Canvas */}
-              <LogoCanvas logoSrc={logoPreview} />
-            </div>
-          </div>
-
-          <div className={styles.navRow}>
-            <div />
-            <button
-              type="button"
-              className={styles.primaryBtn}
-              onClick={handleContinueToTherapy}
-              id="continue-to-therapy-button"
-            >
-              Continue to Select Therapy →
-            </button>
-          </div>
+      <nav className={styles.topStepper} aria-label="Poster setup steps">
+        <div className={styles.progressTrack} aria-hidden="true">
+          <div
+            className={styles.progressFill}
+            style={{ width: `${((currentStep - 1) / (STEPS.length - 1)) * 100}%` }}
+          />
         </div>
-      )}
 
-          {/* STEP 2: Select Therapy */}
-          {currentStep === 2 && (
-            <div className={styles.stepContent}>
-          <div className={styles.therapyGrid}>
-            {POSTER_THERAPIES.map((item) => {
-              const isSelected = item.id === selectedTherapyId;
-              return (
-                <div
-                  key={item.id}
-                  className={`${styles.therapyCard} ${isSelected ? styles.therapyCardActive : ''}`}
-                  onClick={() => handleSelectTherapy(item)}
-                  role="button"
-                  tabIndex={0}
-                  onKeyDown={(e) => e.key === 'Enter' && handleSelectTherapy(item)}
-                >
-                  <span className={styles.therapyIcon}>{item.icon}</span>
-                  <h4 className={styles.therapyTitle}>{item.name}</h4>
-                  {isSelected && <span className={styles.activeCheck}>✓</span>}
-                </div>
-              );
-            })}
-          </div>
-
-          <div className={styles.navRow}>
-            <button
-              type="button"
-              className={styles.secondaryBtn}
-              onClick={() => setCurrentStep(1)}
-            >
-              ← Back to Doctor Details
-            </button>
-            <button
-              type="button"
-              className={styles.primaryBtn}
-              onClick={() => setCurrentStep(3)}
-            >
-              Continue to Select Theme →
-            </button>
-          </div>
+        <div className={styles.stepRow} role="tablist">
+          {STEPS.map((step) => {
+            const active = currentStep === step.id;
+            const complete = isStepComplete(step.id);
+            return (
+              <button
+                key={step.id}
+                type="button"
+                role="tab"
+                aria-selected={active}
+                className={`${styles.stepTab} ${active ? styles.stepTabActive : ''} ${complete ? styles.stepTabComplete : ''}`}
+                onClick={() => {
+                  if (checkCanNavigate(step.id)) setCurrentStep(step.id);
+                }}
+              >
+                <span className={styles.stepNumber}>{complete ? '✓' : step.id}</span>
+                <span className={styles.stepLabel}>{step.label}</span>
+              </button>
+            );
+          })}
         </div>
-      )}
+      </nav>
 
-          {/* STEP 3: Select Theme */}
-          {currentStep === 3 && (
-            <div className={styles.stepContent}>
-              <div className={styles.themeGrid}>
-                {POSTER_THEMES.map((theme) => {
-                  const isSelected = theme.id === selectedThemeId;
-                  return (
-                    <div
-                      key={theme.id}
-                      className={`${styles.themeCard} ${isSelected ? styles.themeCardActive : ''}`}
-                      onClick={() => setSelectedThemeId(theme.id)}
-                      role="button"
-                      tabIndex={0}
-                      onKeyDown={(e) => e.key === 'Enter' && setSelectedThemeId(theme.id)}
-                    >
-                      <div className={styles.themePalette}>
-                        <div className={styles.paletteSlice} style={{ background: theme.headerBg }} />
-                      </div>
-                      <div className={styles.themeMeta}>
-                        <h5 className={styles.themeName}>{theme.name}</h5>
-                      </div>
-                    </div>
-                  );
-                })}
+      <div className={styles.content}>
+        {currentStep === 1 && (
+          <div className={styles.stepContent}>
+            <header className={styles.stepIntro}>
+              <h2 className={styles.stepHeading}>Doctor details</h2>
+            </header>
+
+            {stepError && (
+              <div className={styles.stepAlert} role="alert">
+                <span>{stepError}</span>
+              </div>
+            )}
+
+            <div className={styles.docFormCard}>
+              <div className={styles.formGrid}>
+                <div className={styles.formGroup}>
+                  <label className={styles.formLabel} htmlFor="step-doc-name">
+                    Doctor full name <span className={styles.requiredStar}>*</span>
+                  </label>
+                  <input
+                    id="step-doc-name"
+                    type="text"
+                    placeholder="e.g. Dr. Emily Watson, MD"
+                    className={styles.inputField}
+                    value={formData.name}
+                    onChange={(e) => {
+                      setFormData?.((prev) => ({ ...prev, name: e.target.value }));
+                      if (stepError) setStepError(null);
+                    }}
+                    required
+                  />
+                </div>
+
+                <div className={styles.formGroup}>
+                  <label className={styles.formLabel} htmlFor="step-doc-contact">
+                    WhatsApp contact number <span className={styles.requiredStar}>*</span>
+                  </label>
+                  <input
+                    id="step-doc-contact"
+                    type="tel"
+                    placeholder="e.g. 919876543210"
+                    className={styles.inputField}
+                    value={formData.contactnumber}
+                    onChange={(e) => {
+                      setFormData?.((prev) => ({ ...prev, contactnumber: e.target.value }));
+                      if (stepError) setStepError(null);
+                    }}
+                    required
+                  />
+                </div>
               </div>
 
-              <div className={styles.previewLayout}>
-                <div className={styles.mockupColumn}>
-                  <div className={`${styles.posterContainer} ${getThemeClass(selectedThemeId)}`}>
-                    <div className={styles.posterOverlay}></div>
-                    <div className={styles.posterHeader}>
-                      <div className={styles.doctorLogo}>
-                        <img src={activeLogo} alt="Doctor Logo" />
-                      </div>
-                      <div className={styles.posterDate}>DATE: {todayFormatted}</div>
+              <div className={styles.formGroup}>
+                <label className={styles.formLabel}>
+                  Doctor photo or clinic logo <span className={styles.requiredStar}>*</span>
+                </label>
+
+                <label className={styles.fileDrop} htmlFor="step-doc-logo">
+                  <span className={styles.fileDropTitle}>Click to upload</span>
+                  <input
+                    id="step-doc-logo"
+                    type="file"
+                    accept="image/*"
+                    className={styles.fileInput}
+                    onChange={handleFileChange}
+                    required
+                  />
+                </label>
+
+                {logoPreview && (
+                  <div className={styles.filePreviewWrap}>
+                    <img src={logoPreview} alt="Doctor Logo Preview" className={styles.fileThumb} />
+                    <div className={styles.fileDetails}>
+                      <span className={styles.fileName}>{logoFile?.name || 'Selected logo'}</span>
                     </div>
-
-                    <div className={styles.posterBody}>
-                      <div className={styles.therapyType}>
-                        THERAPY TYPE: {selectedTherapy.badge}
-                      </div>
-                      <h1 className={styles.posterTitle}>{selectedTherapy.title}</h1>
-                      <p className={styles.posterSubtitle}>{selectedTherapy.subtitle}</p>
-                    </div>
-
-                    <div className={styles.posterFooter}>
-                      <div className={styles.doctorInfo}>
-                        <div className={styles.doctorName}>{formattedDoctorName}</div>
-                        <div className={styles.doctorTitle}>Consultant Specialist</div>
-                      </div>
-
-                      <div className={styles.doctorWhatsapp}>
-                        <span className={styles.whatsappIcon}>📞</span> {whatsappNumber}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className={styles.controlColumn}>
-                  <div className={styles.actionCard}>
-                    <h4 className={styles.actionTitle}>Generate JPG Poster</h4>
-
-                    {downloadSuccess && (
-                      <div className={styles.successAlert} role="status">
-                        <span>✅</span>
-                        <span>Poster successfully downloaded! Changes automatically saved.</span>
-                      </div>
-                    )}
-
-                    <button
-                      type="button"
-                      className={styles.generateBtn}
-                      onClick={handleGenerateAndDownload}
-                      disabled={isGenerating}
-                      id="generate-download-poster-button"
-                    >
-                      <span>{isGenerating ? 'Rendering & Saving…' : '⬇ Generate & Download JPG Poster'}</span>
+                    <button type="button" onClick={handleRemoveLogo} className={styles.removeFileBtn}>
+                      Remove
                     </button>
                   </div>
+                )}
+
+                <LogoCanvas logoSrc={logoPreview} />
+              </div>
+            </div>
+
+            <div className={styles.navRow}>
+              <div />
+              <button
+                type="button"
+                className={styles.primaryBtn}
+                onClick={handleContinueToDesign}
+                id="continue-to-therapy-button"
+              >
+                Continue to Design
+              </button>
+            </div>
+          </div>
+        )}
+
+        {currentStep === 2 && (
+          <div className={styles.stepContent}>
+            <header className={styles.stepIntro}>
+              <h2 className={styles.stepHeading}>Design</h2>
+            </header>
+
+            <div className={styles.atelier}>
+              <div className={styles.atelierBlock}>
+                <div className={styles.atelierHeader}>
+                  <h3 className={styles.atelierTitle}>Therapy area</h3>
+                </div>
+
+                <div className={styles.therapyOrbit} role="listbox" aria-label="Therapy area">
+                  {POSTER_THERAPIES.map((item, index) => {
+                    const isSelected = item.id === selectedTherapyId;
+                    return (
+                      <button
+                        key={item.id}
+                        type="button"
+                        role="option"
+                        aria-selected={isSelected}
+                        className={`${styles.therapyTile} ${isSelected ? styles.therapyTileActive : ''}`}
+                        style={{ '--tile-delay': `${index * 40}ms` }}
+                        onClick={() => handleSelectTherapy(item)}
+                      >
+                        <span className={styles.therapyGlow} aria-hidden="true" />
+                        <span className={styles.therapyIcon}>{item.icon}</span>
+                        <span className={styles.therapyName}>{item.name}</span>
+                        {isSelected && <span className={styles.selectedMark}>Selected</span>}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
 
-              <div className={styles.navRow}>
-                <button
-                  type="button"
-                  className={styles.secondaryBtn}
-                  onClick={() => setCurrentStep(2)}
-                >
-                  ← Back to Therapy
-                </button>
-                <div />
+              <div className={styles.atelierDivider} aria-hidden="true">
+                <span />
+              </div>
+
+              <div className={styles.atelierBlock}>
+                <div className={styles.atelierHeader}>
+                  <h3 className={styles.atelierTitle}>Colour theme</h3>
+                </div>
+
+                <div className={styles.themeJewels} role="listbox" aria-label="Colour theme">
+                  {POSTER_THEMES.map((theme) => {
+                    const isSelected = theme.id === selectedThemeId;
+                    return (
+                      <button
+                        key={theme.id}
+                        type="button"
+                        role="option"
+                        aria-selected={isSelected}
+                        className={`${styles.themeJewel} ${isSelected ? styles.themeJewelActive : ''}`}
+                        onClick={() => setSelectedThemeId(theme.id)}
+                      >
+                        <span
+                          className={styles.jewelFace}
+                          style={{
+                            background: `linear-gradient(145deg, ${theme.headerBg}, ${theme.footerBg})`,
+                            boxShadow: `inset 0 0 0 1px rgba(255,255,255,0.18), 0 12px 28px ${theme.cardGlow}`,
+                          }}
+                        />
+                        <span className={styles.jewelMeta}>
+                          <span className={styles.jewelName}>{theme.name}</span>
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className={styles.selectionSummary}>
+                <p className={styles.summaryValue}>
+                  {selectedTherapy.name}
+                  <span aria-hidden="true"> · </span>
+                  {selectedTheme.name}
+                </p>
               </div>
             </div>
-          )}
-        </div>
+
+            <div className={styles.navRow}>
+              <button type="button" className={styles.secondaryBtn} onClick={() => setCurrentStep(1)}>
+                Back
+              </button>
+              <button
+                type="button"
+                className={styles.primaryBtn}
+                onClick={() => {
+                  if (checkCanNavigate(3)) setCurrentStep(3);
+                }}
+              >
+                Preview poster
+              </button>
+            </div>
+          </div>
+        )}
+
+        {currentStep === 3 && (
+          <div className={styles.stepContent}>
+            <header className={styles.stepIntro}>
+              <h2 className={styles.stepHeading}>Preview</h2>
+            </header>
+
+            <div className={styles.previewStage}>
+              <div className={`${styles.posterContainer} ${getThemeClass(selectedThemeId)}`}>
+                <div className={styles.posterOverlay} />
+                <div className={styles.posterHeader}>
+                  <div className={styles.doctorLogo}>
+                    <img src={activeLogo} alt="Doctor Logo" />
+                  </div>
+                  <div className={styles.posterDate}>DATE: {todayFormatted}</div>
+                </div>
+
+                <div className={styles.posterBody}>
+                  <div className={styles.therapyType}>THERAPY TYPE: {selectedTherapy.badge}</div>
+                  <h1 className={styles.posterTitle}>{selectedTherapy.title}</h1>
+                  <p className={styles.posterSubtitle}>{selectedTherapy.subtitle}</p>
+                </div>
+
+                <div className={styles.posterFooter}>
+                  <div className={styles.doctorInfo}>
+                    <div className={styles.doctorName}>{formattedDoctorName}</div>
+                    <div className={styles.doctorTitle}>Consultant Specialist</div>
+                  </div>
+                  <div className={styles.doctorWhatsapp}>
+                    <span className={styles.whatsappIcon}>📞</span> {whatsappNumber}
+                  </div>
+                </div>
+              </div>
+
+              <div className={styles.previewActions}>
+                {downloadSuccess && (
+                  <div className={styles.successAlert} role="status">
+                    Poster downloaded successfully.
+                  </div>
+                )}
+
+                <button
+                  type="button"
+                  className={styles.generateBtn}
+                  onClick={handleGenerateAndDownload}
+                  disabled={isGenerating}
+                  id="generate-download-poster-button"
+                >
+                  {isGenerating ? 'Rendering…' : 'Generate & download JPG'}
+                </button>
+              </div>
+            </div>
+
+            <div className={styles.navRow}>
+              <button type="button" className={styles.secondaryBtn} onClick={() => setCurrentStep(2)}>
+                Back to Design
+              </button>
+              <div />
+            </div>
+          </div>
+        )}
       </div>
     </section>
   );

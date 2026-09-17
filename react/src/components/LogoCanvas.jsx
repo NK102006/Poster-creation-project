@@ -1,24 +1,20 @@
 // src/components/LogoCanvas.jsx
-// Circular interactive canvas — user drags the photo to position it inside the circle
+// Circular interactive canvas — drag to move, slider to zoom (center fixed)
 import { useRef, useState, useEffect, useCallback } from 'react';
 import styles from './LogoCanvas.module.css';
 
-const CANVAS_SIZE = 300; // square canvas, circle inscribed
+const CANVAS_SIZE = 300;
 const RADIUS = CANVAS_SIZE / 2;
 
 export default function LogoCanvas({ logoSrc, onChange }) {
   const canvasRef = useRef(null);
   const [logoImg, setLogoImg] = useState(null);
-
-  // Logo position & scale within the canvas
   const [logoPos, setLogoPos] = useState({ x: 0, y: 0 });
   const [logoScale, setLogoScale] = useState(1);
-
-  // Drag state
+  const [baseScale, setBaseScale] = useState(1);
   const [dragging, setDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
 
-  // Load the logo image whenever the source changes
   useEffect(() => {
     if (!logoSrc) {
       setLogoImg(null);
@@ -28,10 +24,9 @@ export default function LogoCanvas({ logoSrc, onChange }) {
     img.crossOrigin = 'anonymous';
     img.onload = () => {
       setLogoImg(img);
-      // Scale image to cover the circle
       const scale = Math.max(CANVAS_SIZE / img.width, CANVAS_SIZE / img.height);
+      setBaseScale(scale);
       setLogoScale(scale);
-      // Center the image
       setLogoPos({
         x: (CANVAS_SIZE - img.width * scale) / 2,
         y: (CANVAS_SIZE - img.height * scale) / 2,
@@ -40,22 +35,18 @@ export default function LogoCanvas({ logoSrc, onChange }) {
     img.src = logoSrc;
   }, [logoSrc]);
 
-  // Draw the canvas
   const draw = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
 
-    // Clear everything
     ctx.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
 
-    // Draw circular clip region
     ctx.save();
     ctx.beginPath();
     ctx.arc(RADIUS, RADIUS, RADIUS, 0, Math.PI * 2);
     ctx.clip();
 
-    // Checkerboard background inside circle
     const tileSize = 10;
     for (let row = 0; row < CANVAS_SIZE / tileSize; row++) {
       for (let col = 0; col < CANVAS_SIZE / tileSize; col++) {
@@ -64,38 +55,27 @@ export default function LogoCanvas({ logoSrc, onChange }) {
       }
     }
 
-    // Draw the logo image inside the circle
     if (logoImg) {
       const drawW = logoImg.width * logoScale;
       const drawH = logoImg.height * logoScale;
       ctx.drawImage(logoImg, logoPos.x, logoPos.y, drawW, drawH);
-    } else {
-      // Placeholder text
-      ctx.fillStyle = '#bbb';
-      ctx.font = '13px "Segoe UI", sans-serif';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText('Upload a logo above', RADIUS, RADIUS - 10);
-      ctx.fillText('to position it here', RADIUS, RADIUS + 10);
     }
 
-    ctx.restore(); // release clip
+    ctx.restore();
 
-    // Draw circular border ring on top
     ctx.save();
     ctx.beginPath();
     ctx.arc(RADIUS, RADIUS, RADIUS - 1.5, 0, Math.PI * 2);
-    ctx.strokeStyle = logoImg ? 'rgba(0, 123, 255, 0.6)' : 'rgba(0, 0, 0, 0.12)';
+    ctx.strokeStyle = logoImg ? 'rgba(198, 164, 106, 0.75)' : 'rgba(0, 0, 0, 0.12)';
     ctx.lineWidth = 3;
     ctx.stroke();
     ctx.restore();
 
-    // If dragging, show a subtle inner highlight
     if (dragging && logoImg) {
       ctx.save();
       ctx.beginPath();
       ctx.arc(RADIUS, RADIUS, RADIUS - 4, 0, Math.PI * 2);
-      ctx.strokeStyle = 'rgba(0, 123, 255, 0.25)';
+      ctx.strokeStyle = 'rgba(198, 164, 106, 0.35)';
       ctx.lineWidth = 2;
       ctx.setLineDash([6, 4]);
       ctx.stroke();
@@ -107,7 +87,6 @@ export default function LogoCanvas({ logoSrc, onChange }) {
     draw();
   }, [draw]);
 
-  // Export the circular cropped logo whenever position changes
   useEffect(() => {
     if (!logoImg || !onChange) return;
     const timeout = setTimeout(() => {
@@ -126,7 +105,6 @@ export default function LogoCanvas({ logoSrc, onChange }) {
     return () => clearTimeout(timeout);
   }, [logoImg, logoPos, logoScale, onChange]);
 
-  // --- Pointer helpers ---
   const getMousePos = (e) => {
     const canvas = canvasRef.current;
     const rect = canvas.getBoundingClientRect();
@@ -143,6 +121,19 @@ export default function LogoCanvas({ logoSrc, onChange }) {
     return dx * dx + dy * dy <= RADIUS * RADIUS;
   };
 
+  const applyScaleKeepingCenter = (nextScale) => {
+    const prev = logoScale || 1;
+    const ratio = nextScale / prev;
+    setLogoScale(nextScale);
+    setLogoPos((p) => ({
+      x: RADIUS - (RADIUS - p.x) * ratio,
+      y: RADIUS - (RADIUS - p.y) * ratio,
+    }));
+  };
+
+  const minScale = baseScale * 0.4;
+  const maxScale = baseScale * 4;
+
   const handlePointerDown = (e) => {
     if (!logoImg) return;
     const { mx, my } = getMousePos(e);
@@ -157,7 +148,6 @@ export default function LogoCanvas({ logoSrc, onChange }) {
     if (!logoImg) return;
     const { mx, my } = getMousePos(e);
 
-    // Cursor
     canvasRef.current.style.cursor =
       isInsideCircle(mx, my) ? (dragging ? 'grabbing' : 'grab') : 'default';
 
@@ -174,55 +164,28 @@ export default function LogoCanvas({ logoSrc, onChange }) {
     canvasRef.current?.releasePointerCapture(e.pointerId);
   };
 
-  // Zoom with mouse wheel / trackpad scroll
-  const handleWheel = (e) => {
+  const handleZoomChange = (e) => {
     if (!logoImg) return;
-    e.preventDefault();
-    const { mx, my } = getMousePos(e);
-
-    setLogoScale((prev) => {
-      const minScale = Math.max(CANVAS_SIZE / logoImg.width, CANVAS_SIZE / logoImg.height) * 0.4;
-      const maxScale = Math.max(CANVAS_SIZE / logoImg.width, CANVAS_SIZE / logoImg.height) * 4;
-      const delta = e.deltaY > 0 ? -0.02 : 0.02;
-      const next = Math.min(maxScale, Math.max(minScale, prev + delta));
-
-      // Zoom towards cursor position
-      const ratio = next / prev;
-      setLogoPos((p) => ({
-        x: mx - (mx - p.x) * ratio,
-        y: my - (my - p.y) * ratio,
-      }));
-
-      return next;
-    });
+    const next = Number(e.target.value);
+    applyScaleKeepingCenter(next);
   };
 
-  // Attach wheel listener with { passive: false } to allow preventDefault
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    canvas.addEventListener('wheel', handleWheel, { passive: false });
-    return () => canvas.removeEventListener('wheel', handleWheel);
-  });
-
-  // Reset to center
-  const handleReset = () => {
+  const handleZoomOut = () => {
     if (!logoImg) return;
-    const scale = Math.max(CANVAS_SIZE / logoImg.width, CANVAS_SIZE / logoImg.height);
-    setLogoScale(scale);
-    setLogoPos({
-      x: (CANVAS_SIZE - logoImg.width * scale) / 2,
-      y: (CANVAS_SIZE - logoImg.height * scale) / 2,
-    });
+    const next = Math.max(minScale, logoScale - (maxScale - minScale) * 0.05);
+    applyScaleKeepingCenter(next);
   };
+
+  const handleZoomIn = () => {
+    if (!logoImg) return;
+    const next = Math.min(maxScale, logoScale + (maxScale - minScale) * 0.05);
+    applyScaleKeepingCenter(next);
+  };
+
+  if (!logoSrc) return null;
 
   return (
     <div className={styles.wrapper}>
-      <div className={styles.canvasLabel}>
-        <span className={styles.labelIcon}>🖼️</span>
-        <span>Position Your Logo</span>
-      </div>
-
       <div className={styles.circleContainer}>
         <canvas
           ref={canvasRef}
@@ -237,14 +200,35 @@ export default function LogoCanvas({ logoSrc, onChange }) {
       </div>
 
       {logoImg && (
-        <button type="button" className={styles.resetBtn} onClick={handleReset}>
-          ↺ Reset
-        </button>
+        <div className={styles.zoomBar}>
+          <button
+            type="button"
+            className={styles.zoomBtn}
+            onClick={handleZoomOut}
+            aria-label="Zoom out"
+          >
+            −
+          </button>
+          <input
+            type="range"
+            className={styles.zoomSlider}
+            min={minScale}
+            max={maxScale}
+            step={(maxScale - minScale) / 100}
+            value={logoScale}
+            onChange={handleZoomChange}
+            aria-label="Zoom"
+          />
+          <button
+            type="button"
+            className={styles.zoomBtn}
+            onClick={handleZoomIn}
+            aria-label="Zoom in"
+          >
+            +
+          </button>
+        </div>
       )}
-
-      <span className={styles.hint}>
-        {logoImg ? 'Drag to move · Scroll to zoom' : 'Upload a logo above to begin'}
-      </span>
     </div>
   );
 }

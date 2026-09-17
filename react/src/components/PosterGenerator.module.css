@@ -2,122 +2,163 @@
 
 .container {
   width: 100%;
-  margin-top: 0;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.88), rgba(248, 250, 249, 0.94));
-  border: 1px solid rgba(17, 24, 39, 0.05);
-  border-radius: 24px;
-  padding: 18px;
-  box-shadow: 0 16px 40px rgba(20, 32, 29, 0.05);
-  backdrop-filter: blur(10px);
+  max-width: 880px;
+  margin: 0 auto;
 }
 
-.shell {
-  display: grid;
-  grid-template-columns: 220px minmax(0, 1fr);
-  gap: 20px;
-  align-items: flex-start;
+.topStepper {
+  margin-bottom: 28px;
+  text-align: center;
 }
 
-.sidebar {
-  position: sticky;
-  top: 20px;
+.progressTrack {
+  height: 3px;
+  border-radius: 999px;
+  background: rgba(243, 235, 224, 0.12);
+  overflow: hidden;
+  margin-bottom: 18px;
 }
 
-.stepper {
+.progressFill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--color-accent), var(--color-accent-soft));
+  border-radius: inherit;
+  transition: width 0.45s ease;
+}
+
+.stepRow {
   display: flex;
-  flex-direction: column;
-  gap: 6px;
-  padding: 10px;
-  background: transparent;
-  border: none;
+  justify-content: center;
+  gap: 10px;
+  flex-wrap: wrap;
 }
 
 .stepTab {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   gap: 10px;
-  width: 100%;
-  background: transparent;
-  border: 1px solid transparent;
-  padding: 12px 12px;
-  border-radius: 14px;
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--color-text-muted);
+  background: rgba(243, 235, 224, 0.04);
+  border: 1px solid rgba(243, 235, 224, 0.1);
+  padding: 10px 16px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-text-muted-dark);
   cursor: pointer;
-  transition: all 0.2s ease;
-  text-align: left;
+  transition: all 0.22s ease;
+  font-family: var(--font-body);
 }
 
 .stepTab:hover {
-  background: rgba(31, 75, 68, 0.025);
+  border-color: rgba(198, 164, 106, 0.35);
+  color: var(--color-text-on-dark);
 }
 
 .stepTabActive {
-  background: rgba(255, 255, 255, 0.9);
-  border-color: rgba(31, 75, 68, 0.08);
-  color: var(--color-primary);
-  box-shadow: 0 10px 24px rgba(20, 38, 34, 0.04);
+  background: linear-gradient(135deg, rgba(198, 164, 106, 0.18), rgba(243, 235, 224, 0.08));
+  border-color: rgba(198, 164, 106, 0.55);
+  color: var(--color-accent-soft);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.18);
 }
 
 .stepTabComplete {
-  background: rgba(41, 108, 90, 0.05);
-  color: var(--color-primary);
+  color: var(--color-accent-soft);
 }
 
 .stepNumber {
   display: grid;
   place-items: center;
-  width: 24px;
-  height: 24px;
-  border-radius: 8px;
-  background: #e4e9e7;
-  color: var(--color-text-muted);
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: rgba(243, 235, 224, 0.12);
+  color: inherit;
   font-size: 11px;
   font-weight: 700;
-  flex-shrink: 0;
 }
 
 .stepTabActive .stepNumber,
 .stepTabComplete .stepNumber {
-  background: var(--color-primary);
-  color: #fff;
+  background: var(--color-accent);
+  color: #1a2a25;
+}
+
+.stepLabel {
+  letter-spacing: 0.01em;
+}
+
+.stepCaption {
+  margin: 14px 0 0;
+  font-size: 12.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-text-muted-dark);
 }
 
 .content {
   min-width: 0;
-  min-height: 620px;
-  display: flex;
-  flex-direction: column;
 }
 
-/* Step Content Sections */
 .stepContent {
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: 28px;
+  align-items: stretch;
+  animation: riseIn 0.45s ease;
 }
 
-.sectionHeading {
-  font-size: 18px;
-  font-weight: 700;
-  color: var(--color-text);
-  margin: 0 0 4px;
+@keyframes riseIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
-.sectionDesc {
-  font-size: 13.5px;
-  color: var(--color-text-muted);
-  margin: 0 0 16px;
+.stepIntro {
+  text-align: center;
+  max-width: 520px;
+  margin: 0 auto;
 }
 
-/* Step 1: Doctor Details Form */
+.eyebrow {
+  margin: 0 0 8px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--color-accent);
+}
+
+.stepHeading {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: clamp(2rem, 4vw, 2.75rem);
+  font-weight: 600;
+  line-height: 1.1;
+  color: var(--color-text-on-dark);
+  letter-spacing: -0.02em;
+}
+
+.stepDesc {
+  margin: 12px 0 0;
+  font-size: 15px;
+  line-height: 1.55;
+  color: var(--color-text-muted-dark);
+  font-weight: 300;
+}
+
 .docFormCard {
-  background: rgba(255, 255, 255, 0.7);
-  border: 1px solid rgba(17, 24, 39, 0.06);
-  border-radius: 22px;
-  padding: 28px;
-  box-shadow: 0 18px 28px rgba(17, 33, 30, 0.02);
+  background:
+    linear-gradient(180deg, rgba(243, 235, 224, 0.97), rgba(239, 230, 216, 0.94));
+  border: 1px solid rgba(198, 164, 106, 0.22);
+  border-radius: var(--radius-lg);
+  padding: 32px;
+  box-shadow: var(--shadow-card), var(--shadow-glow);
+  color: var(--color-text);
 }
 
 .formGrid {
@@ -129,16 +170,14 @@
 @media (max-width: 640px) {
   .formGrid {
     grid-template-columns: 1fr;
-    gap: 16px;
   }
 }
 
 .formGroup {
   display: flex;
   flex-direction: column;
-  gap: 7px;
+  gap: 8px;
   margin-bottom: 20px;
-  position: relative;
   width: 100%;
 }
 
@@ -146,46 +185,37 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 13.5px;
+  font-size: 12.5px;
   font-weight: 600;
-  color: var(--color-text);
-  letter-spacing: -0.01em;
-  user-select: none;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-primary);
 }
 
 .requiredStar {
   color: var(--color-error);
-  font-weight: 700;
-}
-
-.optionalTag {
-  color: var(--color-text-muted);
-  font-size: 12px;
-  font-weight: normal;
 }
 
 .inputField {
   width: 100%;
-  box-sizing: border-box;
-  padding: 12px 14px;
-  border: 1.5px solid var(--color-border);
+  padding: 13px 15px;
+  border: 1.5px solid rgba(36, 71, 62, 0.16);
   border-radius: var(--radius-sm);
-  font-size: 14px;
+  font-size: 15px;
   color: var(--color-text);
-  background-color: #ffffff;
+  background: #fffdf9;
   outline: none;
   transition: border-color 0.18s ease, box-shadow 0.18s ease;
-  font-family: inherit;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+  font-family: var(--font-body);
 }
 
 .inputField:hover {
-  border-color: #b4bfbc;
+  border-color: rgba(36, 71, 62, 0.28);
 }
 
 .inputField:focus {
   border-color: var(--color-primary);
-  box-shadow: 0 0 0 3px rgba(31, 75, 68, 0.15);
+  box-shadow: var(--focus-ring);
 }
 
 .fileDrop {
@@ -195,29 +225,25 @@
   justify-content: center;
   gap: 8px;
   width: 100%;
-  box-sizing: border-box;
-  padding: 24px 20px;
-  border: 2px dashed var(--color-border);
-  border-radius: var(--radius-sm);
+  padding: 28px 20px;
+  border: 1.5px dashed rgba(36, 71, 62, 0.28);
+  border-radius: var(--radius-md);
   text-align: center;
   cursor: pointer;
-  background: #f9fbfb;
-  transition: border-color 0.2s ease, background-color 0.2s ease, box-shadow 0.2s ease;
+  background: rgba(36, 71, 62, 0.04);
+  transition: border-color 0.2s ease, background-color 0.2s ease, transform 0.2s ease;
 }
 
 .fileDrop:hover {
-  border-color: var(--color-primary);
-  background: #f0f7f4;
-  box-shadow: 0 4px 12px rgba(31, 75, 68, 0.05);
+  border-color: var(--color-accent);
+  background: rgba(198, 164, 106, 0.08);
+  transform: translateY(-1px);
 }
 
 .fileDropTitle {
   font-size: 14px;
   font-weight: 600;
   color: var(--color-primary);
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
 }
 
 .fileInput {
@@ -228,7 +254,6 @@
   font-size: 12.5px;
   color: var(--color-text-muted);
   margin: 0;
-  line-height: 1.4;
 }
 
 .filePreviewWrap {
@@ -236,9 +261,9 @@
   align-items: center;
   gap: 12px;
   margin-top: 12px;
-  padding: 10px 14px;
-  background: #f0f6f4;
-  border: 1px solid #d2e4dc;
+  padding: 12px 14px;
+  background: rgba(36, 71, 62, 0.06);
+  border: 1px solid rgba(36, 71, 62, 0.12);
   border-radius: var(--radius-sm);
 }
 
@@ -247,7 +272,6 @@
   height: 44px;
   border-radius: 8px;
   object-fit: cover;
-  border: 1px solid rgba(0, 0, 0, 0.08);
 }
 
 .fileDetails {
@@ -278,164 +302,273 @@
   cursor: pointer;
   font-size: 12.5px;
   font-weight: 600;
-  padding: 4px 8px;
-  border-radius: 4px;
-  transition: background-color 0.15s ease;
-}
-
-.removeFileBtn:hover {
-  background-color: var(--color-error-bg);
-  text-decoration: underline;
+  font-family: var(--font-body);
 }
 
 .stepAlert {
-  display: flex;
-  align-items: center;
-  gap: 10px;
   padding: 12px 16px;
-  background-color: var(--color-error-bg);
+  background: var(--color-error-bg);
   color: var(--color-error);
-  border: 1px solid #ffcdd2;
+  border: 1px solid rgba(196, 91, 74, 0.25);
   border-radius: var(--radius-sm);
   font-size: 13.5px;
   font-weight: 500;
+  text-align: center;
 }
 
-/* Therapy Cards Grid (Step 2) */
-.therapyGrid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+/* Design atelier */
+.atelier {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+  background:
+    linear-gradient(165deg, rgba(26, 51, 44, 0.92), rgba(19, 40, 33, 0.96));
+  border: 1px solid rgba(198, 164, 106, 0.22);
+  border-radius: var(--radius-lg);
+  padding: 28px 24px 24px;
+  box-shadow: var(--shadow-card);
+}
+
+.atelierBlock {
+  display: flex;
+  flex-direction: column;
   gap: 16px;
-  margin-bottom: 24px;
 }
 
-.therapyCard {
+.atelierHeader {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.atelierTitle {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1.55rem;
+  font-weight: 600;
+  color: var(--color-text-on-dark);
+}
+
+.atelierHint {
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--color-accent);
+}
+
+.atelierDivider {
+  display: flex;
+  justify-content: center;
+}
+
+.atelierDivider span {
+  width: min(220px, 40%);
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(198, 164, 106, 0.55), transparent);
+}
+
+.therapyOrbit {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.therapyTile {
+  position: relative;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  padding: 24px 20px;
-  border-radius: 18px;
-  border: 1px solid rgba(17, 24, 39, 0.06);
-  background: rgba(255, 255, 255, 0.7);
-  cursor: pointer;
+  gap: 6px;
   text-align: left;
-  transition: all 0.2s ease;
-  position: relative;
+  padding: 22px 18px 18px;
+  min-height: 110px;
+  border-radius: 22px;
+  border: 1px solid rgba(243, 235, 224, 0.12);
+  background:
+    linear-gradient(160deg, rgba(243, 235, 224, 0.08), rgba(243, 235, 224, 0.02));
+  color: var(--color-text-on-dark);
+  cursor: pointer;
+  transition: transform 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease;
+  font-family: var(--font-body);
+  animation: tileIn 0.5s ease both;
+  animation-delay: var(--tile-delay, 0ms);
 }
 
-.therapyCard:hover {
-  border-color: rgba(31, 75, 68, 0.15);
-  transform: translateY(-1px);
-  box-shadow: 0 14px 26px rgba(17, 33, 30, 0.04);
+@keyframes tileIn {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
-.therapyCardActive {
-  border-color: rgba(31, 75, 68, 0.22);
-  background: rgba(236, 246, 242, 0.9);
-  box-shadow: 0 16px 28px rgba(31, 75, 68, 0.07);
+.therapyTile:hover {
+  transform: translateY(-3px);
+  border-color: rgba(198, 164, 106, 0.4);
+}
+
+.therapyTileActive {
+  border-color: rgba(198, 164, 106, 0.75);
+  box-shadow:
+    0 18px 36px rgba(0, 0, 0, 0.28),
+    inset 0 0 0 1px rgba(198, 164, 106, 0.25);
+  background:
+    linear-gradient(160deg, rgba(198, 164, 106, 0.18), rgba(243, 235, 224, 0.05));
+}
+
+.therapyGlow {
+  position: absolute;
+  inset: auto -20% -40% auto;
+  width: 140px;
+  height: 140px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(198, 164, 106, 0.22), transparent 70%);
+  pointer-events: none;
 }
 
 .therapyIcon {
-  font-size: 32px;
-  margin-bottom: 12px;
+  font-size: 28px;
+  line-height: 1;
+  margin-bottom: 4px;
 }
 
-.therapyTitle {
-  font-size: 18px;
-  font-weight: 700;
-  color: var(--color-text);
-  margin: 0 0 4px;
+.therapyName {
+  font-family: var(--font-display);
+  font-size: 1.45rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
 }
 
-.therapyTagline {
+.therapyLine {
   font-size: 12.5px;
-  color: var(--color-text-muted);
   line-height: 1.4;
-  margin: 0;
+  color: var(--color-text-muted-dark);
+  max-width: 92%;
 }
 
-.activeCheck {
+.selectedMark {
   position: absolute;
   top: 14px;
   right: 14px;
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  background: var(--color-primary);
-  color: #ffffff;
-  display: grid;
-  place-items: center;
-  font-size: 12px;
+  font-size: 10px;
   font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #1a2a25;
+  background: var(--color-accent);
+  padding: 4px 8px;
+  border-radius: 999px;
 }
 
-/* Theme Selector Grid (Step 2) */
-.themeGrid {
+.themeJewels {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 16px;
-  margin-bottom: 24px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
 }
 
-.themeCard {
-  border: 1px solid rgba(17, 24, 39, 0.06);
-  border-radius: 18px;
-  padding: 18px;
-  background: rgba(255, 255, 255, 0.76);
+.themeJewel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 10px 14px;
+  border-radius: 20px;
+  border: 1px solid rgba(243, 235, 224, 0.1);
+  background: rgba(243, 235, 224, 0.03);
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: transform 0.22s ease, border-color 0.22s ease, background 0.22s ease;
+  font-family: var(--font-body);
+  color: var(--color-text-on-dark);
+}
+
+.themeJewel:hover {
+  transform: translateY(-2px);
+  border-color: rgba(198, 164, 106, 0.35);
+}
+
+.themeJewelActive {
+  border-color: rgba(198, 164, 106, 0.7);
+  background: rgba(198, 164, 106, 0.1);
+  box-shadow: 0 14px 28px rgba(0, 0, 0, 0.22);
+}
+
+.jewelFace {
+  width: 54px;
+  height: 54px;
+  border-radius: 50%;
+  border: 2px solid rgba(243, 235, 224, 0.35);
+  transition: transform 0.25s ease;
+}
+
+.themeJewelActive .jewelFace {
+  transform: scale(1.08);
+  border-color: var(--color-accent-soft);
+}
+
+.jewelMeta {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  text-align: center;
+}
+
+.jewelName {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.jewelDesc {
+  font-size: 11px;
+  color: var(--color-text-muted-dark);
+  line-height: 1.3;
+}
+
+.selectionSummary {
+  display: flex;
+  justify-content: center;
+  padding-top: 4px;
+}
+
+.summaryLabel {
+  display: block;
+  font-size: 10.5px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--color-accent);
+  text-align: center;
+  margin-bottom: 4px;
+}
+
+.summaryValue {
+  margin: 0;
+  text-align: center;
+  font-family: var(--font-display);
+  font-size: 1.35rem;
+  color: var(--color-text-on-dark);
+}
+
+/* Preview stage */
+.previewStage {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 24px;
+}
+
+.previewActions {
+  width: 100%;
+  max-width: 420px;
   display: flex;
   flex-direction: column;
   gap: 12px;
 }
 
-.themeCard:hover {
-  border-color: rgba(31, 75, 68, 0.12);
-  transform: translateY(-1px);
-}
-
-.themeCardActive {
-  border-color: rgba(31, 75, 68, 0.22);
-  box-shadow: 0 14px 26px rgba(17, 33, 30, 0.05);
-}
-
-.themePalette {
-  height: 52px;
-  border-radius: 8px;
-  display: flex;
-  overflow: hidden;
-  border: 1px solid rgba(0, 0, 0, 0.08);
-}
-
-.paletteSlice {
-  flex: 1;
-  height: 100%;
-}
-
-.themeMeta {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.themeName {
-  font-size: 15px;
-  font-weight: 700;
-  color: var(--color-text);
-  margin: 0;
-}
-
-.themeDescription {
-  font-size: 12px;
-  color: var(--color-text-muted);
-  margin: 0;
-}
-
-/* =========================================================
-   EXACT USER POSTER THEME DEFINITIONS & CSS RULES
-   ========================================================= */
-
-/* 1. Theme Blue (Original Cool Blue) */
 .themeBlue {
   --bg-gradient: linear-gradient(135deg, #eef7fc 0%, #d2e4f5 100%);
   --header-bg: #0056b3;
@@ -448,7 +581,6 @@
   --text-title: #0f2942;
 }
 
-/* 2. Theme Warm Red (Rich Crimson/Orange) */
 .themeWarmRed {
   --bg-gradient: linear-gradient(135deg, #fff3f3 0%, #fbe3e3 50%, #f3c2c2 100%);
   --header-bg: #c92a2a;
@@ -461,7 +593,6 @@
   --text-title: #4a0e17;
 }
 
-/* 3. Theme Green (Emerald / Teal) */
 .themeGreen {
   --bg-gradient: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 60%, #bbf7d0 100%);
   --header-bg: #0f5132;
@@ -474,7 +605,6 @@
   --text-title: #0f5132;
 }
 
-/* 4. Theme Purple (Royal Indigo) */
 .themePurple {
   --bg-gradient: linear-gradient(135deg, #f5f3ff 0%, #ede9fe 60%, #ddd6fe 100%);
   --header-bg: #4c1d95;
@@ -487,57 +617,52 @@
   --text-title: #311062;
 }
 
-/* Responsive Poster Outer Shell (4 / 5 Aspect Ratio) */
 .posterContainer {
   width: 100%;
-  max-width: 540px;
+  max-width: 420px;
   aspect-ratio: 4 / 5;
   background: var(--bg-gradient);
-  box-shadow: 0 16px 36px -8px rgba(0, 0, 0, 0.2), 0 0 0 1px rgba(0, 0, 0, 0.06);
+  box-shadow:
+    0 30px 60px -18px rgba(0, 0, 0, 0.45),
+    0 0 0 1px rgba(243, 235, 224, 0.12);
   position: relative;
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  border-radius: 14px;
-  transition: all 0.4s ease;
+  border-radius: 18px;
   user-select: none;
+  color: #1a2a25;
 }
 
-/* Pattern overlay for textured backgrounds */
 .posterOverlay {
   position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
+  inset: 0;
   opacity: 0.05;
-  background-image: radial-gradient(#000000 1px, transparent 1px);
+  background-image: radial-gradient(#000 1px, transparent 1px);
   background-size: 16px 16px;
   pointer-events: none;
 }
 
-/* Header Area */
 .posterHeader {
   position: relative;
   z-index: 1;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 24px 30px;
+  padding: 22px 24px;
   border-bottom: 5px solid var(--header-bg);
 }
 
 .doctorLogo {
-  width: 110px;
-  height: 72px;
-  background-color: #ffffff;
+  width: 96px;
+  height: 64px;
+  background: #fff;
   display: flex;
   align-items: center;
   justify-content: center;
   border-radius: 8px;
   overflow: hidden;
   border: 1px solid rgba(0, 0, 0, 0.08);
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
 }
 
 .doctorLogo img {
@@ -546,30 +671,22 @@
   object-fit: contain;
 }
 
-.logoFallback {
-  color: var(--header-bg);
-  font-family: Georgia, serif;
-  font-weight: 700;
-  font-size: 24px;
-}
-
 .posterDate {
-  font-size: 0.95rem;
+  font-size: 0.78rem;
   font-weight: 700;
   color: var(--header-bg);
   background-color: var(--card-glow);
-  padding: 6px 14px;
+  padding: 6px 12px;
   border-radius: 20px;
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
 
-/* Main Content Area */
 .posterBody {
   position: relative;
   z-index: 1;
   flex-grow: 1;
-  padding: 30px 24px;
+  padding: 28px 20px;
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -577,47 +694,46 @@
   text-align: center;
 }
 
-/* Therapy Type Badge */
 .therapyType {
   background-color: var(--badge-bg);
   color: var(--badge-text);
-  font-size: 1.15rem;
+  font-size: 0.85rem;
   font-weight: 700;
-  padding: 10px 24px;
+  padding: 8px 18px;
   border-radius: 30px;
   text-transform: uppercase;
   letter-spacing: 1px;
-  margin-bottom: 18px;
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+  margin-bottom: 16px;
 }
 
 .posterTitle {
-  font-size: 1.85rem;
+  font-family: var(--font-display);
+  font-size: 1.7rem;
   color: var(--text-title);
-  margin-bottom: 12px;
-  line-height: 1.25;
-  font-weight: 800;
+  margin: 0 0 10px;
+  line-height: 1.2;
+  font-weight: 700;
 }
 
 .posterSubtitle {
-  font-size: 1.05rem;
-  color: #444444;
+  font-size: 0.95rem;
+  color: #444;
   max-width: 86%;
   line-height: 1.5;
   margin: 0;
 }
 
-/* Footer Area */
 .posterFooter {
   position: relative;
   z-index: 1;
   background-color: var(--footer-bg);
-  color: #ffffff;
-  padding: 18px 26px;
+  color: #fff;
+  padding: 16px 22px;
   display: flex;
   justify-content: space-between;
   align-items: center;
   border-top: 4px solid var(--footer-accent);
+  gap: 12px;
 }
 
 .doctorInfo {
@@ -628,100 +744,50 @@
 }
 
 .doctorName {
-  font-size: 1.35rem;
+  font-size: 1.05rem;
   font-weight: 700;
-  color: #ffffff;
-  line-height: 1.2;
+  color: #fff;
 }
 
 .doctorTitle {
-  font-size: 0.88rem;
+  font-size: 0.78rem;
   opacity: 0.8;
-  color: rgba(255, 255, 255, 0.85);
 }
 
 .doctorWhatsapp {
-  font-size: 1.15rem;
+  font-size: 0.92rem;
   color: var(--footer-accent);
   font-weight: 600;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
 }
 
 .whatsappIcon {
-  font-size: 1.25rem;
+  font-size: 1rem;
 }
 
-/* Step 3 Layout: Mockup and Controls */
-.previewLayout {
-  display: grid;
-  grid-template-columns: 1.1fr 1fr;
-  gap: 36px;
-  align-items: start;
-}
-
-.mockupColumn {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 16px;
-}
-
-.controlColumn {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
-
-.actionCard {
-  background: rgba(255, 255, 255, 0.7);
-  border: 1px solid rgba(17, 24, 39, 0.06);
-  border-radius: 22px;
-  padding: 22px;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  box-shadow: 0 12px 24px rgba(17, 33, 30, 0.03);
-}
-
-.actionTitle {
-  font-size: 17px;
-  font-weight: 700;
-  color: var(--color-text);
-  margin: 0;
-}
-
-.actionSubtitle {
-  font-size: 13.5px;
-  color: var(--color-text-muted);
-  line-height: 1.5;
-  margin: 0;
-}
-
-/* Generate and Download Button */
 .generateBtn {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 10px;
   width: 100%;
-  padding: 16px 20px;
-  background: linear-gradient(135deg, var(--color-primary), #16362f);
-  color: #ffffff;
+  padding: 15px 20px;
+  background: linear-gradient(135deg, var(--color-accent), #b8924f);
+  color: #1a2a25;
   border: none;
   border-radius: 14px;
-  font-size: 15.5px;
+  font-size: 15px;
   font-weight: 700;
   cursor: pointer;
-  transition: all 0.2s ease;
-  box-shadow: 0 12px 20px rgba(17, 42, 37, 0.18);
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
+  box-shadow: 0 14px 28px rgba(0, 0, 0, 0.25);
+  font-family: var(--font-body);
 }
 
 .generateBtn:hover:not(:disabled) {
-  background: var(--color-primary-hover);
   transform: translateY(-1px);
-  box-shadow: 0 6px 18px rgba(31, 75, 68, 0.3);
+  box-shadow: 0 18px 32px rgba(0, 0, 0, 0.3);
 }
 
 .generateBtn:disabled {
@@ -732,62 +798,76 @@
 .successAlert {
   padding: 12px 16px;
   border-radius: var(--radius-sm);
-  background: #edf7ed;
-  border: 1px solid #c8e6c9;
-  color: #1e4620;
+  background: rgba(198, 164, 106, 0.16);
+  border: 1px solid rgba(198, 164, 106, 0.35);
+  color: var(--color-accent-soft);
   font-size: 13.5px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
+  text-align: center;
   font-weight: 500;
 }
 
-/* Navigation Row */
 .navRow {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-top: 16px;
-  padding-top: 16px;
-  border-top: 1px solid var(--color-border);
+  gap: 12px;
+  margin-top: 4px;
+  padding-top: 8px;
 }
 
 .secondaryBtn {
   background: transparent;
-  border: 1px solid var(--color-border);
-  padding: 10px 18px;
-  border-radius: var(--radius-sm);
+  border: 1px solid rgba(243, 235, 224, 0.22);
+  padding: 12px 18px;
+  border-radius: 12px;
   font-size: 14px;
   font-weight: 600;
-  color: var(--color-text);
+  color: var(--color-text-on-dark);
   cursor: pointer;
   transition: all 0.15s ease;
+  font-family: var(--font-body);
 }
 
 .secondaryBtn:hover {
-  background: #f4f6f5;
-  border-color: #adb8b4;
+  border-color: rgba(198, 164, 106, 0.45);
+  background: rgba(243, 235, 224, 0.05);
 }
 
 .primaryBtn {
-  background: linear-gradient(135deg, var(--color-primary), #16362f);
+  background: linear-gradient(135deg, var(--color-accent), #b8924f);
   border: none;
-  padding: 12px 22px;
+  padding: 13px 22px;
   border-radius: 12px;
   font-size: 14px;
   font-weight: 700;
-  color: #ffffff;
+  color: #1a2a25;
   cursor: pointer;
-  transition: all 0.15s ease;
-  box-shadow: 0 12px 24px rgba(17, 42, 37, 0.12);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.22);
+  font-family: var(--font-body);
 }
 
 .primaryBtn:hover {
-  background: linear-gradient(135deg, #16362f, var(--color-primary));
+  transform: translateY(-1px);
 }
 
-@media (max-width: 900px) {
-  .previewLayout {
+@media (max-width: 720px) {
+  .themeJewels {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .docFormCard,
+  .atelier {
+    padding: 22px 16px;
+  }
+}
+
+@media (max-width: 480px) {
+  .therapyOrbit {
     grid-template-columns: 1fr;
+  }
+
+  .stepLabel {
+    display: none;
   }
 }

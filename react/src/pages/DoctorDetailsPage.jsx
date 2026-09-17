@@ -12,7 +12,6 @@ export default function DoctorDetailsPage({ user, onLogout }) {
   const [logoFile, setLogoFile] = useState(null);
   const [logoPreview, setLogoPreview] = useState(null);
 
-  // Fetch initial doctor data if available from clinic registry
   useEffect(() => {
     let isMounted = true;
     const fetchDoctor = async () => {
@@ -42,7 +41,6 @@ export default function DoctorDetailsPage({ user, onLogout }) {
     };
   }, []);
 
-  // Automatically triggered in background when user downloads the poster in Step 4
   const handleAutoSave = async (currentFormData, currentLogoFile, posterBlob) => {
     const name = currentFormData?.name?.trim() || formData.name?.trim();
     const contactnumber = currentFormData?.contactnumber?.trim() || formData.contactnumber?.trim();
@@ -81,7 +79,6 @@ export default function DoctorDetailsPage({ user, onLogout }) {
 
   return (
     <div className={styles.page}>
-      {/* Top Navigation */}
       <header className={styles.header}>
         <div className={styles.brandGroup}>
           <div className={styles.logoIcon}>M</div>
@@ -103,13 +100,11 @@ export default function DoctorDetailsPage({ user, onLogout }) {
         </div>
       </header>
 
-      {/* Main Content */}
       <main className={styles.main}>
         <div className={styles.hero}>
-          <h1 className={styles.heroTitle}>Doctor Portal & Poster Studio</h1>
+          <h1 className={styles.heroTitle}>Poster Studio</h1>
         </div>
 
-        {/* Unified 4-Step Poster Studio */}
         <PosterGenerator
           formData={formData}
           setFormData={setFormData}
