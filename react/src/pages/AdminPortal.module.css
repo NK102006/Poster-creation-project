@@ -1,0 +1,257 @@
+.adminContainer {
+  font-family: var(--font-primary, 'Outfit', sans-serif);
+  background-color: var(--color-bg-base, #f9fafb);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.loginContainer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  background-color: var(--color-bg-base, #f9fafb);
+}
+
+.loginForm {
+  background: white;
+  padding: 40px;
+  border-radius: 12px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 100%;
+  max-width: 400px;
+}
+
+.loginForm h2 {
+  text-align: center;
+  margin-bottom: 20px;
+  color: var(--color-text-title, #14276b);
+}
+
+.loginForm input {
+  padding: 12px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  font-size: 16px;
+  color: #1e293b;
+}
+
+.error {
+  color: red;
+  font-size: 14px;
+  text-align: center;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 32px;
+  background: var(--color-text-title, #14276b);
+  color: white;
+}
+
+.header h1 {
+  font-size: 20px;
+  margin: 0;
+}
+
+.logoutBtn {
+  background: transparent;
+  border: 1px solid white;
+  color: white;
+  padding: 6px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.logoutBtn:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.layout {
+  display: flex;
+  flex: 1;
+}
+
+.sidebar {
+  width: 200px;
+  background: white;
+  border-right: 1px solid #eee;
+  padding: 20px 0;
+}
+
+.sidebar ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.sidebar li {
+  padding: 12px 24px;
+  cursor: pointer;
+  color: #555;
+  transition: all 0.2s;
+}
+
+.sidebar li:hover {
+  background: #f1f5f9;
+}
+
+.sidebar li.active {
+  background: #e0e7ff;
+  color: var(--color-text-title, #14276b);
+  font-weight: 600;
+  border-right: 4px solid var(--color-accent, #c6a46a);
+}
+
+.content {
+  flex: 1;
+  padding: 32px;
+  overflow-y: auto;
+}
+
+.toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+}
+
+.toolbar h2 {
+  color: var(--color-text-title, #14276b);
+  margin: 0;
+}
+
+.tableWrapper {
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+.table th, .table td {
+  padding: 16px;
+  border-bottom: 1px solid #eee;
+}
+
+.table td {
+  color: #334155;
+}
+
+.table th {
+  background: #f8fafc;
+  font-weight: 600;
+  color: #64748b;
+  text-transform: uppercase;
+  font-size: 12px;
+  letter-spacing: 0.5px;
+}
+
+.table tbody tr {
+  transition: background-color 0.2s ease;
+}
+
+.table tbody tr:nth-child(even) {
+  background-color: #f8fafc;
+}
+
+.table tbody tr:hover {
+  background-color: #f1f5f9;
+}
+
+.actions {
+  display: flex;
+  gap: 8px;
+}
+
+.primaryBtn, .secondaryBtn, .editBtn, .deleteBtn {
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-weight: 500;
+  cursor: pointer;
+  border: none;
+  font-size: 14px;
+}
+
+.primaryBtn {
+  background: var(--color-accent, #c6a46a);
+  color: white;
+}
+
+.secondaryBtn {
+  background: #e2e8f0;
+  color: #334155;
+}
+
+.editBtn {
+  background: #f1f5f9;
+  color: #3b82f6;
+}
+
+.deleteBtn {
+  background: #fee2e2;
+  color: #ef4444;
+}
+
+.modalOverlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modal {
+  background: white;
+  padding: 32px;
+  border-radius: 12px;
+  width: 100%;
+  max-width: 500px;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+}
+
+.modal h3 {
+  margin-top: 0;
+  margin-bottom: 24px;
+  color: var(--color-text-title, #14276b);
+}
+
+.formGroup {
+  margin-bottom: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.formGroup label {
+  font-size: 14px;
+  font-weight: 500;
+  color: #475569;
+}
+
+.formGroup input {
+  padding: 10px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  color: #1e293b;
+}
+
+.modalActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 24px;
+}

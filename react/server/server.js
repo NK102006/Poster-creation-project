@@ -83,12 +83,18 @@ app.post('/api/login', async (req, res) => {
 
   try {
     const numId = Number(id);
-    const user = await User.findOne({
-      $or: [
-        { id: numId },
-        { empid: numId },
-      ]
-    });
+    const queryOr = [
+      { id: id },
+      { empid: id },
+      { id: String(id) },
+      { empid: String(id) }
+    ];
+    
+    if (!isNaN(numId)) {
+      queryOr.push({ id: numId }, { empid: numId });
+    }
+
+    const user = await User.findOne({ $or: queryOr });
 
     if (!user) {
       return res.status(401).json({ success: false, message: 'User not found' });
@@ -181,6 +187,96 @@ app.post('/api/doctors', upload.any(), async (req, res) => {
   } catch (error) {
     console.error('Error saving doctor and poster:', error);
     return res.status(500).json({ message: 'Failed to save doctor and poster', error: error.message });
+  }
+});
+
+// --- Admin Routes ---
+const models = {
+  doctors: Doctor,
+  users: User
+};
+
+app.post('/api/admin/login', (req, res) => {
+  const { username, password } = req.body;
+  if (username === 'admin' && password === 'admin123') {
+    return res.status(200).json({ success: true, message: 'Admin login successful' });
+  }
+  return res.status(401).json({ success: false, message: 'Invalid admin credentials' });
+});
+
+app.get('/api/admin/collections/:collection', async (req, res) => {
+  try {
+    const Model = models[req.params.collection];
+    if (!Model) return res.status(404).json({ message: 'Collection not found' });
+    
+    const docs = await Model.find().sort({ createdAt: -1 });
+    if (req.params.collection === 'doctors') {
+      return res.status(200).json(docs.map(formatDoctor));
+    }
+    return res.status(200).json(docs);
+  } catch (err) {
+    res.status(500).json({ message: 'Error fetching collection', error: err.message });
+  }
+});
+
+app.post('/api/admin/collections/:collection', async (req, res) => {
+  try {
+    const Model = models[req.params.collection];
+    if (!Model) return res.status(404).json({ message: 'Collection not found' });
+    
+    const createData = { ...req.body };
+    if (req.params.collection === 'doctors') {
+      if (createData.logo && typeof createData.logo === 'string' && createData.logo.startsWith('data:')) {
+        createData.logo = Buffer.from(createData.logo.replace(/^data:image\/\w+;base64,/, ''), 'base64');
+      }
+      if (createData.poster && typeof createData.poster === 'string' && createData.poster.startsWith('data:')) {
+        createData.poster = Buffer.from(createData.poster.replace(/^data:image\/\w+;base64,/, ''), 'base64');
+      }
+    }
+
+    const doc = new Model(createData);
+    await doc.save();
+    res.status(201).json({ success: true, data: req.params.collection === 'doctors' ? formatDoctor(doc) : doc });
+  } catch (err) {
+    res.status(500).json({ message: 'Error creating document', error: err.message });
+  }
+});
+
+app.put('/api/admin/collections/:collection/:id', async (req, res) => {
+  try {
+    const Model = models[req.params.collection];
+    if (!Model) return res.status(404).json({ message: 'Collection not found' });
+    
+    const updateData = { ...req.body };
+    if (req.params.collection === 'doctors') {
+      if (updateData.logo && typeof updateData.logo === 'string' && updateData.logo.startsWith('data:')) {
+        updateData.logo = Buffer.from(updateData.logo.replace(/^data:image\/\w+;base64,/, ''), 'base64');
+      }
+      if (updateData.poster && typeof updateData.poster === 'string' && updateData.poster.startsWith('data:')) {
+        updateData.poster = Buffer.from(updateData.poster.replace(/^data:image\/\w+;base64,/, ''), 'base64');
+      }
+    }
+
+    const doc = await Model.findByIdAndUpdate(req.params.id, updateData, { new: true });
+    if (!doc) return res.status(404).json({ message: 'Document not found' });
+    
+    res.status(200).json({ success: true, data: req.params.collection === 'doctors' ? formatDoctor(doc) : doc });
+  } catch (err) {
+    res.status(500).json({ message: 'Error updating document', error: err.message });
+  }
+});
+
+app.delete('/api/admin/collections/:collection/:id', async (req, res) => {
+  try {
+    const Model = models[req.params.collection];
+    if (!Model) return res.status(404).json({ message: 'Collection not found' });
+    
+    const doc = await Model.findByIdAndDelete(req.params.id);
+    if (!doc) return res.status(404).json({ message: 'Document not found' });
+    
+    res.status(200).json({ success: true, message: 'Document deleted' });
+  } catch (err) {
+    res.status(500).json({ message: 'Error deleting document', error: err.message });
   }
 });
 

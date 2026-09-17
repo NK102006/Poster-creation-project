@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import LoginPage from './pages/LoginPage.jsx';
 import DoctorDetailsPage from './pages/DoctorDetailsPage.jsx';
+import AdminPortal from './pages/AdminPortal.jsx';
 
 export default function App() {
   const [currentUser, setCurrentUser] = useState(() => {
@@ -11,6 +12,10 @@ export default function App() {
       console.warn('Could not read session:', err);
     }
     return null;
+  });
+
+  const [isAdminRoute, setIsAdminRoute] = useState(() => {
+    return window.location.pathname === '/admin' || window.location.search.includes('view=admin');
   });
 
   const handleLoginSuccess = (user) => {
@@ -46,11 +51,17 @@ export default function App() {
           setCurrentUser(null);
         }
       } catch (err) {}
+      
+      setIsAdminRoute(window.location.pathname === '/admin' || window.location.search.includes('view=admin'));
     };
     
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
+
+  if (isAdminRoute) {
+    return <AdminPortal />;
+  }
 
   if (currentUser) {
     return <DoctorDetailsPage user={currentUser} onLogout={handleLogout} />;
