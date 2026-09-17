@@ -1,11 +1,22 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { apiRequest } from '../lib/apiClient';
 import styles from './AdminPortal.module.css';
 
+function getItemId(item) {
+  return item?.id || item?._id || '';
+}
+
+function formatLabel(key) {
+  if (key === 'empid') return 'Employee ID';
+  if (key === 'contactnumber') return 'Contact Number';
+  if (key === 'createdAt') return 'Created';
+  return key.charAt(0).toUpperCase() + key.slice(1);
+}
+
 export default function AdminPortal() {
-  const [isLoggedIn, setIsLoggedIn] = useState(() => {
-    return localStorage.getItem('admin_session') === 'true';
-  });
+  const [isLoggedIn, setIsLoggedIn] = useState(
+    () => localStorage.getItem('admin_session') === 'true'
+  );
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [loginError, setLoginError] = useState('');
@@ -13,10 +24,12 @@ export default function AdminPortal() {
   const [activeTab, setActiveTab] = useState('doctors');
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(false);
-  
+  const [search, setSearch] = useState('');
+
   const [showModal, setShowModal] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
   const [formData, setFormData] = useState({});
+  const [saving, setSaving] = useState(false);
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -24,7 +37,7 @@ export default function AdminPortal() {
     try {
       const res = await apiRequest('/admin/login', {
         method: 'POST',
-        body: { username, password }
+        body: { username, password },
       });
       if (res.success) {
         setIsLoggedIn(true);
@@ -44,9 +57,10 @@ export default function AdminPortal() {
     setLoading(true);
     try {
       const res = await apiRequest(`/admin/collections/${activeTab}`);
-      setItems(res);
+      setItems(Array.isArray(res) ? res : []);
     } catch (err) {
       alert('Error fetching items: ' + err.message);
+      setItems([]);
     } finally {
       setLoading(false);
     }
@@ -54,12 +68,13 @@ export default function AdminPortal() {
 
   useEffect(() => {
     if (isLoggedIn) {
+      setSearch('');
       fetchItems();
     }
   }, [isLoggedIn, activeTab]);
 
   const handleDelete = async (id) => {
-    if (!window.confirm('Are you sure you want to delete this?')) return;
+    if (!window.confirm('Delete this record? This cannot be undone.')) return;
     try {
       await apiRequest(`/admin/collections/${activeTab}/${id}`, { method: 'DELETE' });
       fetchItems();
@@ -70,199 +85,375 @@ export default function AdminPortal() {
 
   const openModal = (item = null) => {
     setEditingItem(item);
-    setFormData(item || {});
+    if (item) {
+      setFormData({ ...item });
+    } else if (activeTab === 'doctors') {
+      setFormData({ name: '', contactnumber: '', logo: '', poster: '' });
+    } else {
+      setFormData({ empid: '' });
+    }
     setShowModal(true);
   };
 
   const handleSave = async (e) => {
     e.preventDefault();
+    setSaving(true);
     try {
-      if (editingItem && (editingItem.id || editingItem._id)) {
-        await apiRequest(`/admin/collections/${activeTab}/${editingItem.id || editingItem._id}`, {
+      const id = getItemId(editingItem);
+      if (editingItem && id) {
+        await apiRequest(`/admin/collections/${activeTab}/${id}`, {
           method: 'PUT',
-          body: formData
+          body: formData,
         });
       } else {
         await apiRequest(`/admin/collections/${activeTab}`, {
           method: 'POST',
-          body: formData
+          body: formData,
         });
       }
       setShowModal(false);
       fetchItems();
     } catch (err) {
       alert('Save failed: ' + err.message);
+    } finally {
+      setSaving(false);
     }
   };
 
   const handleFieldChange = (key, val) => {
-    setFormData(prev => ({ ...prev, [key]: val }));
+    setFormData((prev) => ({ ...prev, [key]: val }));
   };
 
   const handleFileChange = (key, file) => {
     if (!file) return;
     const reader = new FileReader();
     reader.onload = (e) => {
-      setFormData(prev => ({ ...prev, [key]: e.target.result }));
+      setFormData((prev) => ({ ...prev, [key]: e.target.result }));
     };
     reader.readAsDataURL(file);
   };
 
-  const renderFormFields = () => {
-    let fields = [];
-    if (activeTab === 'doctors') fields = ['name', 'contactnumber', 'logo', 'poster'];
-    if (activeTab === 'users') fields = ['empid'];
+  const filteredItems = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return items;
+    return items.filter((item) => {
+      const haystack = [
+        getItemId(item),
+        item.name,
+        item.contactnumber,
+        item.empid,
+        item.id,
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase();
+      return haystack.includes(q);
+    });
+  }, [items, search]);
 
-    return fields.map(f => (
-      <div key={f} className={styles.formGroup}>
-        <label>{f}</label>
-        {f === 'logo' || f === 'poster' ? (
-          <div>
-            {formData[f] && <img src={formData[f]} alt={f} style={{ width: '50px', height: '50px', objectFit: 'cover', display: 'block', marginBottom: '8px', borderRadius: '4px' }} />}
-            <input 
-              type="file" 
-              accept="image/*"
-              onChange={e => handleFileChange(f, e.target.files[0])} 
-            />
-          </div>
-        ) : (
-          <input 
-            type="text" 
-            value={formData[f] || ''} 
-            onChange={e => handleFieldChange(f, e.target.value)} 
-            required={f !== 'logo' && f !== 'poster'}
-          />
-        )}
-      </div>
-    ));
-  };
-
-  const headers = items.length > 0 ? Object.keys(items[0]).filter(k => k !== '__v') : [];
-  
-  const chunkArray = (arr, size) => {
-    const chunked = [];
-    for (let i = 0; i < arr.length; i += size) {
-      chunked.push(arr.slice(i, i + size));
-    }
-    return chunked;
-  };
-  
-  const headerChunks = chunkArray(headers, 5);
+  const formFields =
+    activeTab === 'doctors'
+      ? ['name', 'contactnumber', 'logo', 'poster']
+      : ['empid'];
 
   if (!isLoggedIn) {
     return (
-      <div className={styles.loginContainer}>
-        <form onSubmit={handleLogin} className={styles.loginForm}>
-          <h2>Admin Login</h2>
+      <div className={styles.loginPage}>
+        <form onSubmit={handleLogin} className={styles.loginCard}>
+          <div className={styles.loginBrand}>
+            <div className={styles.brandMark}>M</div>
+            <div>
+              <div className={styles.brandName}>MedPortal</div>
+              <div className={styles.brandSub}>Admin access</div>
+            </div>
+          </div>
+          <h1 className={styles.loginTitle}>Sign in</h1>
+          <p className={styles.loginHint}>Manage doctors and employee users.</p>
           {loginError && <p className={styles.error}>{loginError}</p>}
-          <input 
-            type="text" 
-            placeholder="Username" 
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-            required
-          />
-          <input 
-            type="password" 
-            placeholder="Password" 
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-          />
-          <button type="submit" className={styles.primaryBtn}>Login</button>
+          <label className={styles.field}>
+            <span>Username</span>
+            <input
+              type="text"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              autoComplete="username"
+              required
+            />
+          </label>
+          <label className={styles.field}>
+            <span>Password</span>
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              autoComplete="current-password"
+              required
+            />
+          </label>
+          <button type="submit" className={styles.primaryBtn}>
+            Login
+          </button>
         </form>
       </div>
     );
   }
 
   return (
-    <div className={styles.adminContainer}>
-      <header className={styles.header}>
-        <h1>Admin Dashboard</h1>
-        <button onClick={handleLogout} className={styles.logoutBtn}>Logout</button>
-      </header>
+    <div className={styles.shell}>
+      <aside className={styles.sidebar}>
+        <div className={styles.sidebarTop}>
+          <div className={styles.brandMark}>M</div>
+          <div>
+            <div className={styles.brandName}>MedPortal</div>
+            <div className={styles.brandSub}>Admin</div>
+          </div>
+        </div>
 
-      <div className={styles.layout}>
-        <aside className={styles.sidebar}>
-          <ul>
-            <li 
-              className={activeTab === 'doctors' ? styles.active : ''} 
-              onClick={() => setActiveTab('doctors')}
-            >
-              Doctors
-            </li>
-            <li 
-              className={activeTab === 'users' ? styles.active : ''} 
-              onClick={() => setActiveTab('users')}
-            >
-              Users
-            </li>
-          </ul>
-        </aside>
+        <nav className={styles.nav}>
+          <p className={styles.navLabel}>Collections</p>
+          <button
+            type="button"
+            className={`${styles.navItem} ${activeTab === 'doctors' ? styles.navActive : ''}`}
+            onClick={() => setActiveTab('doctors')}
+          >
+            <span className={styles.navIcon}>D</span>
+            Doctors
+          </button>
+          <button
+            type="button"
+            className={`${styles.navItem} ${activeTab === 'users' ? styles.navActive : ''}`}
+            onClick={() => setActiveTab('users')}
+          >
+            <span className={styles.navIcon}>U</span>
+            Users
+          </button>
+        </nav>
 
-        <main className={styles.content}>
+        <button type="button" className={styles.sidebarLogout} onClick={handleLogout}>
+          Log out
+        </button>
+      </aside>
+
+      <div className={styles.main}>
+        <header className={styles.topbar}>
+          <div>
+            <p className={styles.breadcrumb}>Admin / {activeTab === 'doctors' ? 'Doctors' : 'Users'}</p>
+            <h1 className={styles.pageTitle}>
+              {activeTab === 'doctors' ? 'Doctors list' : 'Users list'}
+            </h1>
+          </div>
+          <div className={styles.topbarRight}>
+            <span className={styles.adminBadge}>Administrator</span>
+          </div>
+        </header>
+
+        <section className={styles.panel}>
           <div className={styles.toolbar}>
-            <h2>{activeTab.charAt(0).toUpperCase() + activeTab.slice(1)} Collection</h2>
-            <button onClick={() => openModal()} className={styles.primaryBtn}>Add New</button>
+            <div className={styles.searchWrap}>
+              <span className={styles.searchIcon} aria-hidden>
+                ⌕
+              </span>
+              <input
+                className={styles.searchInput}
+                type="search"
+                placeholder={
+                  activeTab === 'doctors'
+                    ? 'Search by name, contact, or ID…'
+                    : 'Search by employee ID…'
+                }
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+            </div>
+            <button type="button" className={styles.primaryBtn} onClick={() => openModal()}>
+              + Add {activeTab === 'doctors' ? 'doctor' : 'user'}
+            </button>
           </div>
 
-          {loading ? <p>Loading data...</p> : (
-            <div>
-              {items.length === 0 ? (
-                <div className={styles.tableWrapper} style={{ padding: '20px', textAlign: 'center' }}>
-                  No records found.
-                </div>
-              ) : (
-                headerChunks.map((chunk, chunkIdx) => (
-                  <div key={chunkIdx} className={styles.tableWrapper} style={{ marginBottom: '24px' }}>
-                    <table className={styles.table}>
-                      <thead>
-                        <tr>
-                          {chunk.map(h => <th key={h}>{h}</th>)}
-                          {chunkIdx === headerChunks.length - 1 && <th>Actions</th>}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {items.map(item => (
-                          <tr key={item.id || item._id}>
-                            {chunk.map(h => (
-                              <td key={h}>
-                                {(h === 'logo' || h === 'poster') && item[h] ? (
-                                  <img src={item[h]} alt={h} style={{ width: '40px', height: '40px', objectFit: 'cover', borderRadius: '4px' }} />
-                                ) : typeof item[h] === 'object' ? (
-                                  JSON.stringify(item[h])
-                                ) : (
-                                  String(item[h] || '').substring(0, 50)
-                                )}
-                              </td>
-                            ))}
-                            {chunkIdx === headerChunks.length - 1 && (
-                              <td className={styles.actions}>
-                                <button onClick={() => openModal(item)} className={styles.editBtn}>Edit</button>
-                                <button onClick={() => handleDelete(item.id || item._id)} className={styles.deleteBtn}>Delete</button>
-                              </td>
+          <div className={styles.tableCard}>
+            {loading ? (
+              <div className={styles.emptyState}>Loading…</div>
+            ) : filteredItems.length === 0 ? (
+              <div className={styles.emptyState}>
+                {items.length === 0 ? 'No records yet.' : 'No matches for your search.'}
+              </div>
+            ) : activeTab === 'doctors' ? (
+              <div className={styles.tableScroll}>
+                <table className={styles.table}>
+                  <thead>
+                    <tr>
+                      <th>ID</th>
+                      <th>Name</th>
+                      <th>Contact Number</th>
+                      <th>Logo</th>
+                      <th>Poster</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredItems.map((item) => {
+                      const id = getItemId(item);
+                      return (
+                        <tr key={id}>
+                          <td>
+                            <code className={styles.idCell} title={String(id)}>
+                              {String(id)}
+                            </code>
+                          </td>
+                          <td className={styles.nameCell}>{item.name || '—'}</td>
+                          <td>{item.contactnumber || '—'}</td>
+                          <td>
+                            {item.logo ? (
+                              <img src={item.logo} alt="" className={styles.logoThumb} />
+                            ) : (
+                              <span className={styles.muted}>—</span>
                             )}
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                ))
-              )}
+                          </td>
+                          <td>
+                            {item.poster ? (
+                              <img src={item.poster} alt="" className={styles.posterThumb} />
+                            ) : (
+                              <span className={styles.muted}>null</span>
+                            )}
+                          </td>
+                          <td>
+                            <div className={styles.actions}>
+                              <button
+                                type="button"
+                                className={styles.editBtn}
+                                onClick={() => openModal(item)}
+                              >
+                                Edit
+                              </button>
+                              <button
+                                type="button"
+                                className={styles.deleteBtn}
+                                onClick={() => handleDelete(id)}
+                              >
+                                Delete
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className={styles.tableScroll}>
+                <table className={styles.table}>
+                  <thead>
+                    <tr>
+                      <th>ID</th>
+                      <th>Employee ID</th>
+                      <th>Name</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredItems.map((item) => {
+                      const id = getItemId(item);
+                      return (
+                        <tr key={id}>
+                          <td>
+                            <code className={styles.idCell} title={String(id)}>
+                              {String(id)}
+                            </code>
+                          </td>
+                          <td className={styles.nameCell}>
+                            {item.empid ?? item.id ?? '—'}
+                          </td>
+                          <td>{item.name || '—'}</td>
+                          <td>
+                            <div className={styles.actions}>
+                              <button
+                                type="button"
+                                className={styles.editBtn}
+                                onClick={() => openModal(item)}
+                              >
+                                Edit
+                              </button>
+                              <button
+                                type="button"
+                                className={styles.deleteBtn}
+                                onClick={() => handleDelete(id)}
+                              >
+                                Delete
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            <div className={styles.tableFooter}>
+              Showing {filteredItems.length} of {items.length}{' '}
+              {activeTab === 'doctors' ? 'doctors' : 'users'}
             </div>
-          )}
-        </main>
+          </div>
+        </section>
       </div>
 
       {showModal && (
-        <div className={styles.modalOverlay}>
-          <div className={styles.modal}>
-            <h3>{editingItem ? 'Edit Record' : 'Add New Record'}</h3>
-            <form onSubmit={handleSave}>
-              {renderFormFields()}
+        <div className={styles.modalOverlay} onClick={() => setShowModal(false)}>
+          <div
+            className={styles.modal}
+            role="dialog"
+            aria-modal="true"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 className={styles.modalTitle}>
+              {editingItem
+                ? `Edit ${activeTab === 'doctors' ? 'doctor' : 'user'}`
+                : `Add ${activeTab === 'doctors' ? 'doctor' : 'user'}`}
+            </h2>
+            <form onSubmit={handleSave} className={styles.form}>
+              {formFields.map((f) => (
+                <label key={f} className={styles.field}>
+                  <span>{formatLabel(f)}</span>
+                  {f === 'logo' || f === 'poster' ? (
+                    <div className={styles.fileBlock}>
+                      {formData[f] ? (
+                        <img
+                          src={formData[f]}
+                          alt=""
+                          className={f === 'logo' ? styles.formLogo : styles.formPoster}
+                        />
+                      ) : (
+                        <span className={styles.muted}>No image</span>
+                      )}
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) => handleFileChange(f, e.target.files?.[0])}
+                      />
+                    </div>
+                  ) : (
+                    <input
+                      type="text"
+                      value={formData[f] ?? ''}
+                      onChange={(e) => handleFieldChange(f, e.target.value)}
+                      required={f !== 'logo' && f !== 'poster'}
+                    />
+                  )}
+                </label>
+              ))}
               <div className={styles.modalActions}>
-                <button type="button" onClick={() => setShowModal(false)} className={styles.secondaryBtn}>Cancel</button>
-                <button type="submit" className={styles.primaryBtn}>Save</button>
+                <button
+                  type="button"
+                  className={styles.secondaryBtn}
+                  onClick={() => setShowModal(false)}
+                >
+                  Cancel
+                </button>
+                <button type="submit" className={styles.primaryBtn} disabled={saving}>
+                  {saving ? 'Saving…' : 'Save'}
+                </button>
               </div>
             </form>
           </div>
