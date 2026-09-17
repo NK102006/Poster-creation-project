@@ -1,10 +1,6 @@
 import { useCallback, useState } from 'react';
 import { login } from './authService';
 import { validateEmployeeId } from './validators';
-import { ApiError } from '../../lib/apiClient';
-
-const GENERIC_AUTH_ERROR =
-  'The employee ID you entered is incorrect. Please try again.';
 
 export function useLoginForm({ onSuccess } = {}) {
   const [values, setValues] = useState({ id: '' });
@@ -38,14 +34,8 @@ export function useLoginForm({ onSuccess } = {}) {
       try {
         const result = await login({ id: values.id });
         onSuccess?.(result);
-      } catch (err) {
-        if (err instanceof ApiError && (err.status === 401 || err.status === 400)) {
-          setFormError(err.message || GENERIC_AUTH_ERROR);
-        } else if (err instanceof ApiError && err.status === 429) {
-          setFormError('Too many attempts. Please wait and try again.');
-        } else {
-          setFormError("We couldn't reach the server. Check your connection and try again.");
-        }
+      } catch {
+        setFormError('Something went wrong. Please try again.');
       } finally {
         setIsSubmitting(false);
       }

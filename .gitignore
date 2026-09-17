@@ -2,20 +2,23 @@
 node_modules/
 react/node_modules/
 
-# env / secrets
+# env
 .env
 react/.env
 *.local
 
-# build output
+# build
 dist/
 react/dist/
 
 # logs
 npm-debug.log*
-yarn-error.log*
 
 # OS / editor
 .DS_Store
 .vscode/
 .idea/
+
+# never commit backend leftovers
+react/server/
+**/server/

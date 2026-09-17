@@ -1,8 +1,10 @@
-import { apiRequest } from '../../lib/apiClient';
+/** Local-only login — no backend or database. */
+export async function login({ id }) {
+  const employeeId = String(id).trim();
 
-export function login({ id }) {
-  return apiRequest('/login', {
-    method: 'POST',
-    body: { id },
-  });
+  return {
+    id: employeeId,
+    empid: employeeId,
+    name: 'UI User',
+  };
 }

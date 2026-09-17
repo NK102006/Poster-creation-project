@@ -1,5 +1,4 @@
-import { useState, useEffect } from 'react';
-import { apiRequest } from '../lib/apiClient';
+import { useState } from 'react';
 import PosterGenerator from '../components/PosterGenerator';
 import styles from './DoctorDetailsPage.module.css';
 
@@ -12,69 +11,25 @@ export default function DoctorDetailsPage({ user, onLogout }) {
   const [logoFile, setLogoFile] = useState(null);
   const [logoPreview, setLogoPreview] = useState(null);
 
-  useEffect(() => {
-    let isMounted = true;
-    const fetchDoctor = async () => {
-      try {
-        const res = await apiRequest('/doctors/current');
-        if (isMounted && res?.doctor) {
-          setDoctor(res.doctor);
-          setFormData({
-            name: res.doctor.name || '',
-            contactnumber: res.doctor.contactnumber ? String(res.doctor.contactnumber) : '',
-          });
-          if (res.doctor.logo) {
-            setLogoPreview(res.doctor.logo);
-          }
-          setLogoFile(null);
-          setFormData({ name: '', contactnumber: '' });
-          setLogoPreview('');
-        }
-      } catch (err) {
-        console.warn('Doctor fetch notice:', err);
-      }
-    };
-
-    fetchDoctor();
-    return () => {
-      isMounted = false;
-    };
-  }, []);
-
-  const handleAutoSave = async (currentFormData, currentLogoFile, posterBlob) => {
+  // Local-only save — keeps UI flow working with no backend/database.
+  const handleAutoSave = async (currentFormData, currentLogoFile) => {
     const name = currentFormData?.name?.trim() || formData.name?.trim();
-    const contactnumber = currentFormData?.contactnumber?.trim() || formData.contactnumber?.trim();
+    const contactnumber =
+      currentFormData?.contactnumber?.trim() || formData.contactnumber?.trim();
     const file = currentLogoFile !== undefined ? currentLogoFile : logoFile;
 
-    if (!name && !contactnumber) {
+    if (!name && !contactnumber && !file && !logoPreview) {
       return { success: true };
     }
 
-    const data = new FormData();
-    if (name) data.append('name', name);
-    if (contactnumber) data.append('contactnumber', contactnumber);
-    if (file) {
-      data.append('logo', file);
-    } else if (logoPreview && typeof logoPreview === 'string' && logoPreview.startsWith('data:')) {
-      data.append('logo', logoPreview);
-    }
-    if (posterBlob) {
-      data.append('poster', posterBlob, 'poster.jpg');
-    }
+    setDoctor({
+      name: name || '',
+      contactnumber: contactnumber || '',
+      logo: logoPreview || null,
+      updatedBy: user?.empid || user?.id || null,
+    });
 
-    try {
-      const result = await apiRequest('/doctors', {
-        method: 'POST',
-        body: data,
-      });
-      if (result?.doctor) {
-        setDoctor(result.doctor);
-      }
-      return { success: true };
-    } catch (err) {
-      console.warn('Auto-save background sync notice:', err);
-      return { success: false, error: err };
-    }
+    return { success: true };
   };
 
   return (
@@ -87,7 +42,7 @@ export default function DoctorDetailsPage({ user, onLogout }) {
         <div className={styles.userNav}>
           <div className={styles.userBadge}>
             <span className={styles.statusDot} />
-            <span>Employee</span>
+            <span>Employee {user?.empid || user?.id || ''}</span>
           </div>
           <button
             type="button"
