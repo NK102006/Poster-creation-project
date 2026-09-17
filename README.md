@@ -1,13 +1,12 @@
-# Frontend-only UI branch (no backend required)
+# MedPortal UI branch
 
-This branch has only the React frontend. Login, poster studio, and admin work locally with no API, server, or database.
-
-## Run
+## Run frontend
 
 ```bash
 git checkout ui
 cd react
 npm install
+cp .env.example .env
 npm run dev
 ```
 
@@ -15,8 +14,16 @@ npm run dev
 
 - Login: http://localhost:5173/?view=login
 - Poster Studio: http://localhost:5173/?view=doctor
-- Admin (DataTables): http://localhost:5173/admin
+- Admin: http://localhost:5173/admin
 
-Enter any numeric employee ID (e.g. `12345`) on login to continue into Poster Studio.
+Admin login: `admin` / `admin123` (requires backend running)
 
-Admin uses one DataTable with **ID, Name, Contact Number, Logo, Poster**, and **Edit / Delete in the same row**.
+## Backend (for admin + live data)
+
+```bash
+cd react/server
+npm install
+npm run dev
+```
+
+Set `VITE_API_BASE_URL=http://localhost:3000/api` in `react/.env`.

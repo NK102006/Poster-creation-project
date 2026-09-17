@@ -1,10 +1,12 @@
 # dependencies
 node_modules/
 react/node_modules/
+react/server/node_modules/
 
-# env
+# env / secrets
 .env
 react/.env
+react/server/.env
 *.local
 
 # build
@@ -18,7 +20,3 @@ npm-debug.log*
 .DS_Store
 .vscode/
 .idea/
-
-# never commit backend leftovers
-react/server/
-**/server/

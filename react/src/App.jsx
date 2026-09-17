@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import LoginPage from './pages/LoginPage.jsx';
 import DoctorDetailsPage from './pages/DoctorDetailsPage.jsx';
-import AdminPage from './pages/AdminPage.jsx';
+import AdminPortal from './pages/AdminPortal.jsx';
 
 function getRoute() {
   const path = window.location.pathname.replace(/\/+$/, '') || '/';
@@ -76,7 +76,7 @@ export default function App() {
   }, []);
 
   if (route === 'admin') {
-    return <AdminPage onLogout={handleLogout} />;
+    return <AdminPortal />;
   }
 
   if (route === 'doctor') {
