@@ -1,3 +1,5 @@
+import { isUiOnly } from './uiOnly';
+
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api').replace(/\/$/, '');
 
 export class ApiError extends Error {
@@ -9,7 +11,37 @@ export class ApiError extends Error {
   }
 }
 
+function mockResponse(path, { method = 'GET', body } = {}) {
+  if (path === '/login' && method === 'POST') {
+    const id = body?.id ?? 'ui-dev';
+    return {
+      id,
+      empid: id,
+      name: 'UI Dev User',
+    };
+  }
+
+  if (path === '/doctors/current') {
+    return { doctor: null };
+  }
+
+  if (path === '/doctors' && method === 'POST') {
+    return {
+      doctor: {
+        name: body instanceof FormData ? body.get('name') || '' : '',
+        contactnumber: body instanceof FormData ? body.get('contactnumber') || '' : '',
+      },
+    };
+  }
+
+  return {};
+}
+
 export async function apiRequest(path, { method = 'GET', body, signal } = {}) {
+  if (isUiOnly) {
+    return mockResponse(path, { method, body });
+  }
+
   const isFormData = body instanceof FormData;
   const headers = isFormData ? {} : { 'Content-Type': 'application/json' };
   const formattedBody = isFormData ? body : body ? JSON.stringify(body) : undefined;
