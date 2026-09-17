@@ -1,6 +1,8 @@
 // src/components/PosterGenerator.jsx
 import { useState, useRef } from 'react';
-import { POSTER_THERAPIES, POSTER_THEMES, DEFAULT_DOCTOR_LOGO, renderPosterToCanvas } from './Poster';
+import { toJpeg } from 'html-to-image';
+import { POSTER_THERAPIES, POSTER_THEMES, DEFAULT_DOCTOR_LOGO } from './Poster';
+import DoctorPoster from './DoctorPoster';
 import LogoCanvas from './LogoCanvas';
 import styles from './PosterGenerator.module.css';
 
@@ -26,6 +28,10 @@ export default function PosterGenerator({
   const [isGenerating, setIsGenerating] = useState(false);
   const [downloadSuccess, setDownloadSuccess] = useState(false);
   const [stepError, setStepError] = useState(null);
+  
+  const [originalLogoUrl, setOriginalLogoUrl] = useState(null);
+  const [showCropModal, setShowCropModal] = useState(false);
+  const [croppedLogoData, setCroppedLogoData] = useState(null);
 
   const todayFormatted = new Date().toLocaleDateString('en-GB', {
     day: 'numeric',
@@ -50,7 +56,9 @@ export default function PosterGenerator({
     const file = e.target.files?.[0];
     if (file) {
       setLogoFile?.(file);
-      setLogoPreview?.(URL.createObjectURL(file));
+      const url = URL.createObjectURL(file);
+      setOriginalLogoUrl(url);
+      setShowCropModal(true);
       if (stepError) setStepError(null);
     }
   };
@@ -58,18 +66,32 @@ export default function PosterGenerator({
   const handleRemoveLogo = () => {
     setLogoFile?.(null);
     setLogoPreview?.(null);
+    setOriginalLogoUrl(null);
+  };
+
+  const handleAdjustClick = () => {
+    if (!originalLogoUrl && logoPreview) {
+      setOriginalLogoUrl(logoPreview);
+    } else if (!originalLogoUrl && doctor?.logo) {
+      setOriginalLogoUrl(doctor.logo);
+    }
+    setShowCropModal(true);
+  };
+
+  const handleApplyCrop = () => {
+    if (croppedLogoData) {
+      setLogoPreview?.(croppedLogoData);
+    }
+    setShowCropModal(false);
   };
 
   const handleContinueToDesign = () => {
-    const hasLogo = Boolean(logoFile || logoPreview || doctor?.logo);
+    const hasLogo = Boolean(logoFile || logoPreview);
+    const hasName = Boolean(formData.name?.trim());
+    const hasContact = Boolean(formData.contactnumber?.trim());
 
-    if (!formData.name?.trim() || !formData.contactnumber?.trim()) {
-      setStepError('Please enter all the details');
-      return;
-    }
-
-    if (!hasLogo) {
-      setStepError('Please upload a doctor photo or clinic logo before continuing.');
+    if (!hasName || !hasContact || !hasLogo) {
+      setStepError('Please fill in all three input fields (Name, Contact Number, and Logo) to proceed.');
       return;
     }
 
@@ -78,15 +100,12 @@ export default function PosterGenerator({
   };
 
   const checkCanNavigate = (targetStep) => {
-    const hasLogo = Boolean(logoFile || logoPreview || doctor?.logo);
+    const hasLogo = Boolean(logoFile || logoPreview);
+    const hasName = Boolean(formData.name?.trim());
+    const hasContact = Boolean(formData.contactnumber?.trim());
 
-    if (targetStep > 1 && (!formData.name?.trim() || !formData.contactnumber?.trim())) {
-      setStepError('Please enter both Doctor Name and WhatsApp Contact Number first.');
-      return false;
-    }
-
-    if (targetStep > 1 && !hasLogo) {
-      setStepError('Please upload a doctor photo or clinic logo before continuing.');
+    if (targetStep > 1 && (!hasName || !hasContact || !hasLogo)) {
+      setStepError('Please fill in all three input fields (Name, Contact Number, and Logo) to proceed.');
       return false;
     }
 
@@ -123,28 +142,16 @@ export default function PosterGenerator({
       setIsGenerating(true);
       setDownloadSuccess(false);
 
-      const canvas = canvasRef.current || document.createElement('canvas');
+      const node = document.getElementById('doctor-poster-capture');
+      if (!node) throw new Error('Poster node not found');
 
-      await renderPosterToCanvas(canvas, {
-        themeId: selectedThemeId,
-        therapyId: selectedTherapyId,
-        doctor: {
-          name: formattedDoctorName,
-          contactnumber: whatsappNumber,
-          logo: activeLogo,
-        },
-        customTitle: selectedTherapy.title,
-        dateText: todayFormatted,
-      });
+      const dataUrl = await toJpeg(node, { quality: 0.95 });
+      const posterBlob = await (await fetch(dataUrl)).blob();
 
       const cleanDocName = formattedDoctorName
         .replace(/[^a-zA-Z0-9_-]/g, '_')
         .replace(/_+/g, '_');
       const fileName = `Poster_${selectedTherapy.name}_${cleanDocName}.jpg`;
-
-      const posterBlob = await new Promise((resolve) => {
-        canvas.toBlob(resolve, 'image/jpeg', 0.95);
-      });
 
       if (onAutoSave) {
         onAutoSave(formData, logoFile, posterBlob).catch((err) => {
@@ -152,56 +159,14 @@ export default function PosterGenerator({
         });
       }
 
-      try {
-        const dataUrl = canvas.toDataURL('image/jpeg', 0.95);
-        const link = document.createElement('a');
-        link.style.display = 'none';
-        link.setAttribute('href', dataUrl);
-        link.setAttribute('download', fileName);
-        document.body.appendChild(link);
-        link.click();
+      const link = document.createElement('a');
+      link.download = fileName;
+      link.href = dataUrl;
+      link.click();
 
-        setTimeout(() => {
-          if (link.parentNode) {
-            link.parentNode.removeChild(link);
-          }
-        }, 1000);
-
-        setIsGenerating(false);
-        setDownloadSuccess(true);
-        setTimeout(() => setDownloadSuccess(false), 6000);
-      } catch (dataErr) {
-        canvas.toBlob(
-          (blob) => {
-            if (!blob) {
-              setIsGenerating(false);
-              alert('Could not render poster. Please try again.');
-              return;
-            }
-
-            const objectUrl = URL.createObjectURL(blob);
-            const link = document.createElement('a');
-            link.style.display = 'none';
-            link.href = objectUrl;
-            link.download = fileName;
-            document.body.appendChild(link);
-            link.click();
-
-            setTimeout(() => {
-              URL.revokeObjectURL(objectUrl);
-              if (link.parentNode) {
-                link.parentNode.removeChild(link);
-              }
-            }, 1000);
-
-            setIsGenerating(false);
-            setDownloadSuccess(true);
-            setTimeout(() => setDownloadSuccess(false), 6000);
-          },
-          'image/jpeg',
-          0.95
-        );
-      }
+      setIsGenerating(false);
+      setDownloadSuccess(true);
+      setTimeout(() => setDownloadSuccess(false), 6000);
     } catch (err) {
       console.error('Failed to render poster:', err);
       setIsGenerating(false);
@@ -225,6 +190,7 @@ export default function PosterGenerator({
           {STEPS.map((step) => {
             const active = currentStep === step.id;
             const complete = isStepComplete(step.id);
+            
             return (
               <button
                 key={step.id}
@@ -261,7 +227,7 @@ export default function PosterGenerator({
               <div className={styles.formGrid}>
                 <div className={styles.formGroup}>
                   <label className={styles.formLabel} htmlFor="step-doc-name">
-                    Doctor full name <span className={styles.requiredStar}>*</span>
+                    Doctor full name
                   </label>
                   <input
                     id="step-doc-name"
@@ -273,13 +239,12 @@ export default function PosterGenerator({
                       setFormData?.((prev) => ({ ...prev, name: e.target.value }));
                       if (stepError) setStepError(null);
                     }}
-                    required
                   />
                 </div>
 
                 <div className={styles.formGroup}>
                   <label className={styles.formLabel} htmlFor="step-doc-contact">
-                    WhatsApp contact number <span className={styles.requiredStar}>*</span>
+                    WhatsApp contact number
                   </label>
                   <input
                     id="step-doc-contact"
@@ -291,14 +256,13 @@ export default function PosterGenerator({
                       setFormData?.((prev) => ({ ...prev, contactnumber: e.target.value }));
                       if (stepError) setStepError(null);
                     }}
-                    required
                   />
                 </div>
               </div>
 
               <div className={styles.formGroup}>
                 <label className={styles.formLabel}>
-                  Doctor photo or clinic logo <span className={styles.requiredStar}>*</span>
+                  Doctor photo or clinic logo
                 </label>
 
                 <label className={styles.fileDrop} htmlFor="step-doc-logo">
@@ -309,7 +273,6 @@ export default function PosterGenerator({
                     accept="image/*"
                     className={styles.fileInput}
                     onChange={handleFileChange}
-                    required
                   />
                 </label>
 
@@ -319,13 +282,14 @@ export default function PosterGenerator({
                     <div className={styles.fileDetails}>
                       <span className={styles.fileName}>{logoFile?.name || 'Selected logo'}</span>
                     </div>
-                    <button type="button" onClick={handleRemoveLogo} className={styles.removeFileBtn}>
+                    <button type="button" onClick={handleAdjustClick} className={styles.primaryBtn} style={{marginRight: 8, padding: '4px 10px'}}>
+                      Adjust
+                    </button>
+                    <button type="button" onClick={handleRemoveLogo} className={styles.primaryBtn} style={{padding: '4px 10px'}}>
                       Remove
                     </button>
                   </div>
                 )}
-
-                <LogoCanvas logoSrc={logoPreview} />
               </div>
             </div>
 
@@ -448,91 +412,16 @@ export default function PosterGenerator({
             </header>
 
             <div className={styles.previewStage}>
-              <div
-                className={`${styles.posterContainer} ${getThemeClass(selectedThemeId)}`}
-                style={{
-                  '--poster-bg': selectedTheme.bgGradient,
-                  '--poster-title': selectedTheme.textTitle,
-                  '--poster-accent': selectedTheme.accentColor,
-                  '--poster-highlight': selectedTheme.highlight || selectedTheme.accentColor,
-                  '--poster-wash': selectedTheme.wash,
-                  '--poster-wash-2': selectedTheme.washSecondary || selectedTheme.wash,
-                  '--poster-leaf': selectedTheme.softLeaf,
-                  '--poster-footer': selectedTheme.highlight || selectedTheme.headerBg,
-                  '--poster-ribbon': selectedTheme.ribbon || selectedTheme.wash,
-                }}
-              >
-                <div className={styles.posterDecor} aria-hidden="true">
-                  <span className={`${styles.blob} ${styles.blobMain}`} />
-                  <span className={`${styles.blob} ${styles.blobSoft}`} />
-                  <span className={`${styles.leaf} ${styles.leafA}`} />
-                  <span className={`${styles.leaf} ${styles.leafB}`} />
-                  <span className={`${styles.leaf} ${styles.leafC}`} />
-                </div>
-
-                <div className={styles.posterTop}>
-                  <div className={styles.posterDateRow}>
-                    <span className={styles.dateIcon} aria-hidden="true" />
-                    <span className={styles.posterDate}>{todayFormatted}</span>
-                  </div>
-                  <p className={styles.posterScript}>Small Steps Big Miracles ♡</p>
-                </div>
-
-                <div className={styles.posterLayout}>
-                  <div className={styles.posterCopy}>
-                    <h1 className={styles.posterTitle}>{selectedTherapy.title}</h1>
-                    <p className={styles.posterTherapyLine}>
-                      Expert Care in{' '}
-                      <span>{selectedTherapy.therapyLabel || selectedTherapy.name}</span>
-                    </p>
-                    <p className={styles.posterPillars}>
-                      {selectedTherapy.pillars || 'Science | Compassion | Care'}
-                    </p>
-
-                    <div className={styles.featureRow}>
-                      {(selectedTherapy.features || []).map((feature) => (
-                        <div key={feature.label} className={styles.featureItem}>
-                          <span
-                            className={styles.featureDot}
-                            style={{ background: feature.color }}
-                          />
-                          <span className={styles.featureLabel}>{feature.label}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className={styles.posterPhotoCol}>
-                    <div className={styles.photoGlow} aria-hidden="true" />
-                    <div className={styles.posterPhotoFrame}>
-                      <img src={activeLogo} alt="" className={styles.posterPhoto} />
-                    </div>
-                    <div className={styles.doctorNameCard}>
-                      <div className={styles.doctorName}>{formattedDoctorName}</div>
-                      <div className={styles.doctorRole}>Consultant Specialist</div>
-                    </div>
-                  </div>
-                </div>
-
-                <p className={styles.quoteRibbon}>
-                  “{selectedTherapy.quote || 'Care that feels personal'} ♡”
-                </p>
-
-                <div className={styles.whatsappBlock}>
-                  <span className={styles.whatsappBadge} aria-hidden="true">✆</span>
-                  <div className={styles.whatsappText}>
-                    <span className={styles.whatsappLabel}>Chat with us on WhatsApp</span>
-                    <span className={styles.whatsappNumber}>{whatsappNumber}</span>
-                  </div>
-                </div>
-
-                <p className={styles.infoStrip}>
-                  Personalized Patient Education • Informative Health Posts • A Healthier Community Together
-                </p>
-
-                <div className={styles.posterFooterBar}>
-                  HEALTHY FAMILIES • HAPPIER TOMORROWS
-                </div>
+              <div style={{ display: 'flex', justifyContent: 'center', width: '100%', zoom: 0.8 }}>
+                <DoctorPoster
+                  doctorName={formattedDoctorName}
+                  credentials="Consultant Specialist"
+                  therapyName={selectedTherapy.therapyLabel || selectedTherapy.name}
+                  photo={activeLogo}
+                  date={todayFormatted}
+                  whatsapp={whatsappNumber}
+                  theme={selectedTheme}
+                />
               </div>
 
               <div className={styles.previewActions}>
@@ -563,6 +452,22 @@ export default function PosterGenerator({
           </div>
         )}
       </div>
+
+      {showCropModal && originalLogoUrl && (
+        <div style={{position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center'}}>
+          <div style={{background: '#fff', padding: '24px', borderRadius: '12px', display: 'flex', flexDirection: 'column', gap: '16px', alignItems: 'center', boxShadow: '0 4px 20px rgba(0,0,0,0.15)'}}>
+            <h3 style={{margin: 0, fontSize: '18px', color: '#14276b', fontFamily: '"Poppins", sans-serif'}}>Adjust Photo</h3>
+            <LogoCanvas 
+              logoSrc={originalLogoUrl} 
+              onChange={(dataUrl) => setCroppedLogoData(dataUrl)} 
+            />
+            <div style={{display: 'flex', gap: '12px', width: '100%', justifyContent: 'flex-end', marginTop: '8px'}}>
+              <button type="button" onClick={() => setShowCropModal(false)} className={styles.primaryBtn} style={{padding: '6px 16px', fontSize: '13px'}}>Cancel</button>
+              <button type="button" onClick={handleApplyCrop} className={styles.primaryBtn} style={{padding: '6px 16px', fontSize: '13px'}}>Apply</button>
+            </div>
+          </div>
+        </div>
+      )}
     </section>
   );
 }
