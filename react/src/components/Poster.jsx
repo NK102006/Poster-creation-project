@@ -1,70 +1,98 @@
 // src/components/Poster.jsx
-// Dynamic Pharma Poster Template definitions and Canvas Renderer
+// Dynamic clinical poster template + high-res canvas renderer
 
 export const POSTER_THEMES = [
   {
     id: 'theme-blue',
     name: 'Cool Blue',
-    description: 'Professional medical blue with forest green accents',
-    headerBg: '#0056b3',
-    accentColor: '#007bff',
-    badgeBg: '#0056b3',
+    description: 'Professional medical blue',
+    headerBg: '#1a4f8b',
+    accentColor: '#2b6cb0',
+    highlight: '#1d6fb8',
+    badgeBg: '#1a4f8b',
     badgeText: '#ffffff',
-    cardGlow: 'rgba(0, 86, 179, 0.1)',
-    footerBg: '#0f2942',
-    footerAccent: '#28a745',
-    textTitle: '#0f2942',
-    bgGradient: 'linear-gradient(135deg, #eef7fc 0%, #d2e4f5 100%)',
-    bgStart: '#eef7fc',
-    bgEnd: '#d2e4f5',
+    cardGlow: 'rgba(26, 79, 139, 0.12)',
+    footerBg: '#143a66',
+    footerAccent: '#3b82c4',
+    textTitle: '#1a3a66',
+    bgGradient: 'linear-gradient(160deg, #f4f9fd 0%, #e4f0fa 40%, #f7ebf2 100%)',
+    bgStart: '#f5fafd',
+    bgMid: '#e5f1fa',
+    bgEnd: '#f8ecf3',
+    wash: 'rgba(214, 120, 168, 0.35)',
+    washSecondary: 'rgba(120, 170, 220, 0.28)',
+    softLeaf: 'rgba(72, 145, 110, 0.32)',
+    scriptColor: '#1a4f8b',
+    ribbon: 'rgba(214, 120, 168, 0.28)',
   },
   {
     id: 'theme-warm-red',
     name: 'Warm Red',
-    description: 'Rich crimson and warm orange cardiovascular tones',
-    headerBg: '#c92a2a',
-    accentColor: '#ff6b6b',
-    badgeBg: '#9c0c0c',
+    description: 'Warm crimson and rose',
+    headerBg: '#9c1c4a',
+    accentColor: '#c0267a',
+    highlight: '#d63384',
+    badgeBg: '#9c1c4a',
     badgeText: '#ffffff',
-    cardGlow: 'rgba(201, 42, 42, 0.1)',
-    footerBg: '#4a0e17',
-    footerAccent: '#ffa94d',
-    textTitle: '#4a0e17',
-    bgGradient: 'linear-gradient(135deg, #fff3f3 0%, #fbe3e3 50%, #f3c2c2 100%)',
-    bgStart: '#fff3f3',
-    bgEnd: '#f3c2c2',
+    cardGlow: 'rgba(198, 38, 122, 0.12)',
+    footerBg: '#7a1540',
+    footerAccent: '#e85a9b',
+    textTitle: '#1f2a5a',
+    bgGradient: 'linear-gradient(160deg, #f3f8fc 0%, #eef4fb 35%, #fbe9f1 100%)',
+    bgStart: '#f4f8fc',
+    bgMid: '#eef3fa',
+    bgEnd: '#fce8f1',
+    wash: 'rgba(232, 120, 170, 0.42)',
+    washSecondary: 'rgba(150, 185, 230, 0.25)',
+    softLeaf: 'rgba(72, 145, 110, 0.3)',
+    scriptColor: '#1f2a5a',
+    ribbon: 'rgba(232, 140, 180, 0.35)',
   },
   {
     id: 'theme-green',
     name: 'Emerald Green',
-    description: 'Refreshing vitality and natural wellness teal',
-    headerBg: '#0f5132',
-    accentColor: '#198754',
-    badgeBg: '#0f5132',
+    description: 'Natural emerald wellness',
+    headerBg: '#1b5c45',
+    accentColor: '#218a62',
+    highlight: '#1f7a58',
+    badgeBg: '#1b5c45',
     badgeText: '#ffffff',
-    cardGlow: 'rgba(15, 81, 50, 0.15)',
-    footerBg: '#0b2211',
-    footerAccent: '#34d399',
-    textTitle: '#0f5132',
-    bgGradient: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 60%, #bbf7d0 100%)',
-    bgStart: '#f0fdf4',
-    bgEnd: '#bbf7d0',
+    cardGlow: 'rgba(27, 92, 69, 0.14)',
+    footerBg: '#134435',
+    footerAccent: '#34b386',
+    textTitle: '#134435',
+    bgGradient: 'linear-gradient(160deg, #f3faf6 0%, #e5f3ec 45%, #eef6f1 100%)',
+    bgStart: '#f4fbf7',
+    bgMid: '#e6f4ed',
+    bgEnd: '#eef7f2',
+    wash: 'rgba(80, 170, 130, 0.32)',
+    washSecondary: 'rgba(140, 200, 180, 0.22)',
+    softLeaf: 'rgba(45, 120, 90, 0.34)',
+    scriptColor: '#134435',
+    ribbon: 'rgba(80, 170, 130, 0.28)',
   },
   {
     id: 'theme-purple',
     name: 'Royal Purple',
-    description: 'Deep royal indigo and lavender care accents',
+    description: 'Soft royal lilac',
     headerBg: '#4c1d95',
     accentColor: '#7c3aed',
+    highlight: '#9333ea',
     badgeBg: '#4c1d95',
     badgeText: '#ffffff',
-    cardGlow: 'rgba(76, 29, 149, 0.15)',
-    footerBg: '#1e1b4b',
+    cardGlow: 'rgba(124, 58, 237, 0.14)',
+    footerBg: '#2e1065',
     footerAccent: '#a78bfa',
-    textTitle: '#311062',
-    bgGradient: 'linear-gradient(135deg, #f5f3ff 0%, #ede9fe 60%, #ddd6fe 100%)',
-    bgStart: '#f5f3ff',
-    bgEnd: '#ddd6fe',
+    textTitle: '#2e1065',
+    bgGradient: 'linear-gradient(160deg, #f7f4ff 0%, #efe9ff 45%, #f8ebf5 100%)',
+    bgStart: '#f8f5ff',
+    bgMid: '#efe9ff',
+    bgEnd: '#f9ecf6',
+    wash: 'rgba(180, 130, 230, 0.35)',
+    washSecondary: 'rgba(210, 160, 220, 0.25)',
+    softLeaf: 'rgba(72, 145, 110, 0.28)',
+    scriptColor: '#2e1065',
+    ribbon: 'rgba(180, 130, 230, 0.3)',
   },
 ];
 
@@ -73,56 +101,86 @@ export const POSTER_THERAPIES = [
     id: 'infertility',
     name: 'Infertility',
     badge: 'INFERTILITY',
+    therapyLabel: 'Infertility Treatment',
     icon: '🌸',
-    title: 'Guiding Hope, Nurturing Life',
-    subtitle: 'Comprehensive fertility care and reproductive health guidance.',
-    recommendedTheme: 'theme-purple',
+    title: 'Hope Grows Here',
+    subtitle: 'Expert Care in Infertility Treatment',
+    pillars: 'Science | Compassion | New Beginnings',
+    features: [
+      { label: 'Personalized Treatment Plans', color: '#e85a9b' },
+      { label: 'Advanced Fertility Solutions', color: '#8b5cf6' },
+      { label: 'Support at Every Step', color: '#34a06c' },
+    ],
+    quote: 'Because every family has a story worth waiting for',
+    recommendedTheme: 'theme-warm-red',
   },
   {
     id: 'diabetes',
     name: 'Diabetes',
     badge: 'DIABETES',
+    therapyLabel: 'Diabetes Care',
     icon: '🩸',
-    title: 'Mastering Diabetes, Empowering Life',
-    subtitle: 'Simple steps today, healthier balance tomorrow.',
+    title: 'Balance for Life',
+    subtitle: 'Expert Care in Diabetes Care',
+    pillars: 'Monitoring | Guidance | Wellness',
+    features: [
+      { label: 'Personalized Care Plans', color: '#3b82c4' },
+      { label: 'Advanced Monitoring', color: '#6366f1' },
+      { label: 'Support at Every Step', color: '#34a06c' },
+    ],
+    quote: 'Small daily choices create lasting health',
     recommendedTheme: 'theme-blue',
   },
   {
     id: 'cardio',
     name: 'Cardio',
     badge: 'CARDIO',
+    therapyLabel: 'Cardiac Care',
     icon: '❤️',
-    title: 'Take Care of Your Heart',
-    subtitle: 'Simple steps today, healthier beats tomorrow.',
+    title: 'Stronger Heart Days',
+    subtitle: 'Expert Care in Cardiac Care',
+    pillars: 'Prevention | Care | Recovery',
+    features: [
+      { label: 'Heart Health Guidance', color: '#e85a9b' },
+      { label: 'Advanced Cardiac Care', color: '#ef4444' },
+      { label: 'Support at Every Step', color: '#34a06c' },
+    ],
+    quote: 'Every healthy beat builds a brighter tomorrow',
     recommendedTheme: 'theme-warm-red',
   },
   {
     id: 'hypertension',
     name: 'Hypertension',
     badge: 'HYPERTENSION',
+    therapyLabel: 'Blood Pressure Care',
     icon: '🩺',
-    title: 'Control Your Blood Pressure',
-    subtitle: 'Proactive care today, a stronger and safer tomorrow.',
+    title: 'Steady Pressure Care',
+    subtitle: 'Expert Care in Blood Pressure Care',
+    pillars: 'Awareness | Control | Longevity',
+    features: [
+      { label: 'Pressure Control Plans', color: '#218a62' },
+      { label: 'Lifestyle Guidance', color: '#0ea5e9' },
+      { label: 'Support at Every Step', color: '#34a06c' },
+    ],
+    quote: 'Calm days begin with steady care',
     recommendedTheme: 'theme-green',
   },
 ];
 
 export const DEFAULT_DOCTOR_LOGO = `data:image/svg+xml;utf8,${encodeURIComponent(`
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 120" width="240" height="120">
-  <rect width="240" height="120" rx="10" fill="#ffffff"/>
-  <g transform="translate(18, 20)">
-    <circle cx="40" cy="40" r="36" fill="#0056b3" fill-opacity="0.1" stroke="#0056b3" stroke-width="3"/>
-    <path d="M40 22 V58 M22 40 H58" stroke="#0056b3" stroke-width="7" stroke-linecap="round"/>
-    <circle cx="40" cy="40" r="7" fill="#28a745"/>
-  </g>
-  <text x="104" y="52" font-family="'Segoe UI', Roboto, sans-serif" font-weight="800" font-size="24" fill="#0f2942">MEDICAL</text>
-  <text x="104" y="76" font-family="'Segoe UI', Roboto, sans-serif" font-weight="700" font-size="13" fill="#007bff" letter-spacing="3">CLINIC +</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 520" width="400" height="520">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#d9e7f5"/>
+      <stop offset="100%" stop-color="#f3d6e4"/>
+    </linearGradient>
+  </defs>
+  <rect width="400" height="520" fill="url(#g)"/>
+  <circle cx="200" cy="190" r="78" fill="#c5d4e4"/>
+  <ellipse cx="200" cy="390" rx="120" ry="140" fill="#b7c8db"/>
 </svg>
 `)}`;
 
-/**
- * Loads an image from URL or data URI and returns an HTMLImageElement
- */
 function loadImage(src) {
   return new Promise((resolve) => {
     if (!src) return resolve(null);
@@ -134,249 +192,398 @@ function loadImage(src) {
   });
 }
 
-/**
- * Draws rounded rectangle on canvas
- */
 function drawRoundedRect(ctx, x, y, width, height, radius) {
+  const r = Math.min(radius, width / 2, height / 2);
   ctx.beginPath();
-  ctx.moveTo(x + radius, y);
-  ctx.lineTo(x + width - radius, y);
-  ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
-  ctx.lineTo(x + width, y + height - radius);
-  ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
-  ctx.lineTo(x + radius, y + height);
-  ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
-  ctx.lineTo(x, y + radius);
-  ctx.quadraticCurveTo(x, y, x + radius, y);
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + width - r, y);
+  ctx.quadraticCurveTo(x + width, y, x + width, y + r);
+  ctx.lineTo(x + width, y + height - r);
+  ctx.quadraticCurveTo(x + width, y + height, x + width - r, y + height);
+  ctx.lineTo(x + r, y + height);
+  ctx.quadraticCurveTo(x, y + height, x, y + height - r);
+  ctx.lineTo(x, y + r);
+  ctx.quadraticCurveTo(x, y, x + r, y);
   ctx.closePath();
 }
 
-/**
- * Helper to wrap text cleanly
- */
 function wrapText(ctx, text, x, y, maxWidth, lineHeight) {
-  const words = text.split(' ');
+  const words = String(text).split(' ');
   let line = '';
   let currentY = y;
+  const lines = [];
 
   for (let n = 0; n < words.length; n++) {
-    const testLine = line + words[n] + ' ';
-    const metrics = ctx.measureText(testLine);
-    const testWidth = metrics.width;
-    if (testWidth > maxWidth && n > 0) {
-      ctx.fillText(line, x, currentY);
-      line = words[n] + ' ';
-      currentY += lineHeight;
+    const testLine = `${line}${words[n]} `;
+    if (ctx.measureText(testLine).width > maxWidth && n > 0) {
+      lines.push(line.trim());
+      line = `${words[n]} `;
     } else {
       line = testLine;
     }
   }
-  ctx.fillText(line, x, currentY);
+  lines.push(line.trim());
+
+  lines.forEach((l, i) => {
+    ctx.fillText(l, x, currentY + i * lineHeight);
+  });
+
+  return lines.length * lineHeight;
+}
+
+function drawSoftLeaf(ctx, x, y, scale, color, rotation = -0.4) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(rotation);
+  ctx.scale(scale, scale);
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.moveTo(0, 0);
+  ctx.bezierCurveTo(26, -20, 58, -10, 68, 20);
+  ctx.bezierCurveTo(42, 24, 16, 18, 0, 0);
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(255,255,255,0.25)';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(8, 4);
+  ctx.quadraticCurveTo(34, 2, 58, 16);
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawWatercolorBlob(ctx, x, y, rx, ry, color) {
+  ctx.save();
+  const g = ctx.createRadialGradient(x, y, 10, x, y, Math.max(rx, ry));
+  g.addColorStop(0, color);
+  g.addColorStop(0.55, color.replace(/[\d.]+\)$/, (a) => `${Math.max(0, parseFloat(a) * 0.45)})`));
+  g.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.ellipse(x, y, rx, ry, -0.2, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
+function drawCoverImage(ctx, img, x, y, w, h) {
+  const scale = Math.max(w / img.width, h / img.height) * 1.02;
+  const drawW = img.width * scale;
+  const drawH = img.height * scale;
+  const dx = x + (w - drawW) / 2;
+  const dy = y + (h - drawH) * 0.08;
+  ctx.drawImage(img, dx, dy, drawW, drawH);
 }
 
 /**
- * High-resolution canvas renderer for the user's poster template (1200 x 1500 px, 4:5 ratio)
+ * Soft feathered portrait: no hard box — fades into the poster wash.
+ */
+function drawBlendedPortrait(ctx, img, x, y, w, h) {
+  const off = document.createElement('canvas');
+  off.width = w;
+  off.height = h;
+  const o = off.getContext('2d');
+
+  drawCoverImage(o, img, 0, 0, w, h);
+
+  // Build soft alpha mask on a second canvas
+  const mask = document.createElement('canvas');
+  mask.width = w;
+  mask.height = h;
+  const m = mask.getContext('2d');
+
+  // Soft vertical body silhouette
+  const body = m.createRadialGradient(w * 0.52, h * 0.38, w * 0.12, w * 0.5, h * 0.42, h * 0.62);
+  body.addColorStop(0, 'rgba(0,0,0,1)');
+  body.addColorStop(0.55, 'rgba(0,0,0,0.98)');
+  body.addColorStop(0.82, 'rgba(0,0,0,0.55)');
+  body.addColorStop(1, 'rgba(0,0,0,0)');
+  m.fillStyle = body;
+  m.fillRect(0, 0, w, h);
+
+  // Extra soft left blend into copy area
+  const left = m.createLinearGradient(0, 0, w * 0.28, 0);
+  left.addColorStop(0, 'rgba(0,0,0,0)');
+  left.addColorStop(0.45, 'rgba(0,0,0,0.55)');
+  left.addColorStop(1, 'rgba(0,0,0,1)');
+  m.globalCompositeOperation = 'destination-in';
+  m.fillStyle = left;
+  m.fillRect(0, 0, w, h);
+
+  // Soft bottom fade under name card
+  m.globalCompositeOperation = 'destination-in';
+  const bottom = m.createLinearGradient(0, h * 0.62, 0, h);
+  bottom.addColorStop(0, 'rgba(0,0,0,1)');
+  bottom.addColorStop(0.55, 'rgba(0,0,0,0.85)');
+  bottom.addColorStop(1, 'rgba(0,0,0,0)');
+  m.fillStyle = bottom;
+  m.fillRect(0, 0, w, h);
+
+  // Soft top fade
+  m.globalCompositeOperation = 'destination-in';
+  const top = m.createLinearGradient(0, 0, 0, h * 0.18);
+  top.addColorStop(0, 'rgba(0,0,0,0)');
+  top.addColorStop(1, 'rgba(0,0,0,1)');
+  m.fillStyle = top;
+  m.fillRect(0, 0, w, h);
+
+  // Apply mask to portrait
+  o.globalCompositeOperation = 'destination-in';
+  o.drawImage(mask, 0, 0);
+
+  ctx.drawImage(off, x, y);
+}
+
+function drawFeatureIcon(ctx, x, y, color, index) {
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(x, y, 34, 0, Math.PI * 2);
+  ctx.fillStyle = color;
+  ctx.fill();
+  ctx.fillStyle = '#ffffff';
+  ctx.font = '700 22px "Segoe UI", Tahoma, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  const glyphs = ['♡', '🔬', '👥'];
+  ctx.fillText(glyphs[index] || '✦', x, y + 1);
+  ctx.restore();
+}
+
+/**
+ * High-resolution canvas renderer — reference-style clinical poster (1200 x 1500)
  */
 export async function renderPosterToCanvas(
   canvas,
-  { themeId, therapyId, doctor, customTitle, customSubtitle, dateText }
+  { themeId, therapyId, doctor, customTitle, dateText }
 ) {
-  const theme =
-    POSTER_THEMES.find((t) => t.id === themeId) || POSTER_THEMES[0];
-  const therapy =
-    POSTER_THERAPIES.find((t) => t.id === therapyId) || POSTER_THERAPIES[0];
+  const theme = POSTER_THEMES.find((t) => t.id === themeId) || POSTER_THEMES[0];
+  const therapy = POSTER_THERAPIES.find((t) => t.id === therapyId) || POSTER_THERAPIES[0];
 
-  const title = customTitle || therapy.title;
-  const subtitle = customSubtitle || therapy.subtitle;
-  const dateStr = dateText || new Date().toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  }).toUpperCase();
+  const headline = customTitle || therapy.title;
+  const therapyLabel = therapy.therapyLabel || therapy.name;
+  const dateStr =
+    dateText ||
+    new Date().toLocaleDateString('en-GB', {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+    });
 
   const width = 1200;
   const height = 1500;
-
   canvas.width = width;
   canvas.height = height;
   const ctx = canvas.getContext('2d');
 
-  // 1. Solid opaque base & Background Gradient (4:5 Aspect Ratio, required for JPEG)
-  ctx.fillStyle = '#FFFFFF';
+  // ---- Background atmosphere ----
+  ctx.fillStyle = '#ffffff';
   ctx.fillRect(0, 0, width, height);
 
-  const grad = ctx.createLinearGradient(0, 0, width, height);
+  const grad = ctx.createLinearGradient(0, 0, width * 0.15, height);
   grad.addColorStop(0, theme.bgStart);
+  grad.addColorStop(0.4, theme.bgMid || theme.bgStart);
   grad.addColorStop(1, theme.bgEnd);
   ctx.fillStyle = grad;
   ctx.fillRect(0, 0, width, height);
 
-  // Subtle texture
+  // Watercolor washes (restored poster atmosphere)
+  drawWatercolorBlob(ctx, width * 0.78, height * 0.38, 340, 420, theme.wash);
+  drawWatercolorBlob(ctx, width * 0.7, height * 0.55, 260, 300, theme.washSecondary || theme.wash);
+  drawWatercolorBlob(ctx, width * 0.2, height * 0.82, 220, 160, theme.washSecondary || theme.wash);
+  drawWatercolorBlob(ctx, width * 0.88, height * 0.16, 160, 120, theme.washSecondary || theme.wash);
+
+  // Botanical leaves
+  drawSoftLeaf(ctx, 48, height - 290, 2.4, theme.softLeaf, -0.5);
+  drawSoftLeaf(ctx, 120, height - 240, 1.7, theme.softLeaf, 0.35);
+  drawSoftLeaf(ctx, width - 70, 150, 1.8, theme.softLeaf, 0.7);
+  drawSoftLeaf(ctx, width - 140, height - 220, 2.0, theme.softLeaf, -0.25);
+  drawSoftLeaf(ctx, 40, 180, 1.3, theme.softLeaf, 0.9);
+
+  // ---- Header ----
   ctx.save();
-  ctx.fillStyle = 'rgba(0, 0, 0, 0.025)';
-  for (let x = 0; x < width; x += 40) {
-    for (let y = 0; y < height; y += 40) {
-      ctx.fillRect(x, y, 20, 20);
-    }
-  }
-  ctx.restore();
-
-  // 2. HEADER: Doctor Logo & Date
-  const headerPaddingX = 80;
-  const headerPaddingY = 60;
-  const headerHeight = 220;
-
-  // Header bottom border line (5px solid var(--header-bg))
-  ctx.fillStyle = theme.headerBg;
-  ctx.fillRect(0, headerHeight, width, 10);
-
-  // Doctor Logo Card in Header
-  const logoCardWidth = 240;
-  const logoCardHeight = 150;
-  const logoCardX = headerPaddingX;
-  const logoCardY = headerPaddingY - 15;
-
-  ctx.save();
-  ctx.fillStyle = '#FFFFFF';
-  ctx.shadowColor = 'rgba(0, 0, 0, 0.1)';
-  ctx.shadowBlur = 12;
-  ctx.shadowOffsetY = 4;
-  drawRoundedRect(ctx, logoCardX, logoCardY, logoCardWidth, logoCardHeight, 16);
+  drawRoundedRect(ctx, 72, 64, 36, 36, 9);
+  ctx.fillStyle = theme.accentColor;
   ctx.fill();
-  ctx.strokeStyle = 'rgba(0, 0, 0, 0.08)';
-  ctx.lineWidth = 2;
+  ctx.strokeStyle = '#ffffff';
+  ctx.lineWidth = 2.2;
+  drawRoundedRect(ctx, 81, 73, 18, 16, 3);
   ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(81, 78.5);
+  ctx.lineTo(99, 78.5);
+  ctx.moveTo(86, 70);
+  ctx.lineTo(86, 75);
+  ctx.moveTo(94, 70);
+  ctx.lineTo(94, 75);
+  ctx.stroke();
+
+  ctx.fillStyle = theme.textTitle;
+  ctx.font = '700 30px "Segoe UI", Tahoma, sans-serif';
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(dateStr, 124, 83);
+
+  // Decorative script (top)
+  ctx.fillStyle = theme.scriptColor || theme.textTitle;
+  ctx.font = 'italic 600 28px Georgia, "Times New Roman", serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('Small Steps Big Miracles ♡', width * 0.52, 88);
   ctx.restore();
 
-  // Draw Logo in Header (Doctor's logo or default medical clinic logo)
-  const headerLogoSrc = doctor?.logo || DEFAULT_DOCTOR_LOGO;
-  let headerLogoImg = null;
-  if (headerLogoSrc) {
-    headerLogoImg = await loadImage(headerLogoSrc);
+  // ---- Doctor photo (blended) ----
+  const photoSrc = doctor?.logo || DEFAULT_DOCTOR_LOGO;
+  const photoImg = await loadImage(photoSrc);
+  const photoX = 560;
+  const photoY = 150;
+  const photoW = 580;
+  const photoH = 980;
+
+  if (photoImg) {
+    // Soft glow plate behind portrait
+    drawWatercolorBlob(ctx, photoX + photoW * 0.48, photoY + photoH * 0.42, 280, 360, theme.wash);
+    drawBlendedPortrait(ctx, photoImg, photoX, photoY, photoW, photoH);
   }
 
-  if (headerLogoImg) {
-    ctx.save();
-    drawRoundedRect(ctx, logoCardX + 8, logoCardY + 8, logoCardWidth - 16, logoCardHeight - 16, 10);
-    ctx.clip();
-    ctx.drawImage(headerLogoImg, logoCardX + 16, logoCardY + 16, logoCardWidth - 32, logoCardHeight - 32);
-    ctx.restore();
-  }
+  // ---- Left copy ----
+  const leftX = 72;
+  const copyTop = 200;
 
-  // Date Pill on Top Right
-  ctx.save();
-  const datePillText = `DATE: ${dateStr}`;
-  ctx.font = 'bold 26px "Segoe UI", Tahoma, sans-serif';
-  const dateMetrics = ctx.measureText(datePillText);
-  const datePillWidth = dateMetrics.width + 48;
-  const datePillHeight = 60;
-  const datePillX = width - headerPaddingX - datePillWidth;
-  const datePillY = headerPaddingY + 20;
-
-  ctx.fillStyle = theme.cardGlow;
-  drawRoundedRect(ctx, datePillX, datePillY, datePillWidth, datePillHeight, 30);
-  ctx.fill();
-
-  ctx.fillStyle = theme.headerBg;
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText(datePillText, datePillX + datePillWidth / 2, datePillY + datePillHeight / 2 + 1);
-  ctx.restore();
-
-  // 3. BODY: Therapy Type Badge, Poster Title, Subtitle
-  const bodyTop = headerHeight + 60;
-  const bodyBottom = height - 260;
-  const bodyCenterY = bodyTop + (bodyBottom - bodyTop) / 2;
-
-  // Therapy Badge
-  ctx.save();
-  const badgeText = `THERAPY TYPE: ${therapy.badge}`;
-  ctx.font = 'bold 36px "Segoe UI", Tahoma, sans-serif';
-  const badgeMetrics = ctx.measureText(badgeText);
-  const badgeWidth = badgeMetrics.width + 80;
-  const badgeHeight = 84;
-  const badgeX = (width - badgeWidth) / 2;
-  const badgeY = bodyCenterY - 240;
-
-  ctx.fillStyle = theme.badgeBg;
-  ctx.shadowColor = 'rgba(0, 0, 0, 0.15)';
-  ctx.shadowBlur = 20;
-  ctx.shadowOffsetY = 6;
-  drawRoundedRect(ctx, badgeX, badgeY, badgeWidth, badgeHeight, 42);
-  ctx.fill();
-
-  ctx.fillStyle = theme.badgeText;
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText(badgeText, width / 2, badgeY + badgeHeight / 2 + 1);
-  ctx.restore();
-
-  // Poster Title
   ctx.save();
   ctx.fillStyle = theme.textTitle;
-  ctx.font = '800 68px "Segoe UI", Tahoma, sans-serif';
-  ctx.textAlign = 'center';
+  ctx.font = '800 76px "Segoe UI", Tahoma, sans-serif';
+  ctx.textAlign = 'left';
   ctx.textBaseline = 'top';
-  const titleY = badgeY + badgeHeight + 50;
-  wrapText(ctx, title, width / 2, titleY, width - 200, 84);
+  const headlineHeight = wrapText(ctx, headline, leftX, copyTop, 500, 84);
+
+  // Leaf accent near headline
+  drawSoftLeaf(ctx, leftX + 310, copyTop + 18, 1.1, theme.softLeaf, -0.2);
+
+  const careY = copyTop + headlineHeight + 24;
+  ctx.font = '600 32px "Segoe UI", Tahoma, sans-serif';
+  ctx.fillStyle = theme.textTitle;
+  const prefix = 'Expert Care in ';
+  ctx.fillText(prefix, leftX, careY);
+  const prefixW = ctx.measureText(prefix).width;
+  ctx.fillStyle = theme.highlight || theme.accentColor;
+  ctx.font = '800 32px "Segoe UI", Tahoma, sans-serif';
+  wrapText(ctx, therapyLabel, leftX + prefixW, careY, 460 - prefixW, 40);
+
+  // Pillars line
+  ctx.fillStyle = theme.textTitle;
+  ctx.font = '600 22px "Segoe UI", Tahoma, sans-serif';
+  ctx.globalAlpha = 0.85;
+  ctx.fillText(therapy.pillars || 'Science | Compassion | Care', leftX, careY + 58);
+  ctx.globalAlpha = 1;
+
+  // Feature icons
+  const features = therapy.features || [];
+  const featureY = careY + 150;
+  features.forEach((feature, i) => {
+    const fx = leftX + 48 + i * 155;
+    drawFeatureIcon(ctx, fx, featureY, feature.color, i);
+    ctx.fillStyle = theme.textTitle;
+    ctx.font = '600 16px "Segoe UI", Tahoma, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    wrapText(ctx, feature.label, fx, featureY + 48, 130, 20);
+  });
   ctx.restore();
 
-  // Poster Subtitle
-  ctx.save();
-  ctx.fillStyle = '#444444';
-  ctx.font = '500 34px "Segoe UI", Tahoma, sans-serif';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'top';
-  const subtitleY = titleY + 180;
-  wrapText(ctx, subtitle, width / 2, subtitleY, width - 280, 52);
-  ctx.restore();
-
-  // 4. FOOTER: Doctor Name & Title on left, WhatsApp on right (Exact Template)
-  const footerHeight = 220;
-  const footerY = height - footerHeight;
-
-  // Accent Line on top of footer (4px solid var(--footer-accent))
-  ctx.fillStyle = theme.footerAccent;
-  ctx.fillRect(0, footerY, width, 8);
-
-  // Footer Background (var(--footer-bg))
-  ctx.fillStyle = theme.footerBg;
-  ctx.fillRect(0, footerY + 8, width, footerHeight - 8);
-
-  // Footer Left Content: Doctor Name & Title
-  const footerLeftX = 80;
-  const footerCenterY = footerY + footerHeight / 2 + 4;
-  const rawDocName = doctor?.name || 'Doctor';
+  // ---- Doctor name card ----
+  const rawDocName = doctor?.name?.trim() || 'Doctor Name';
   const formattedDocName = rawDocName.startsWith('Dr.') ? rawDocName : `Dr. ${rawDocName}`;
 
-  ctx.save();
-  // Doctor Name
-  ctx.fillStyle = '#FFFFFF';
-  ctx.font = 'bold 44px "Segoe UI", Tahoma, sans-serif';
-  ctx.textAlign = 'left';
-  ctx.textBaseline = 'bottom';
-  ctx.fillText(formattedDocName, footerLeftX, footerCenterY - 6);
+  const cardW = 430;
+  const cardH = 128;
+  const cardX = photoX + (photoW - cardW) / 2 - 20;
+  const cardY = photoY + photoH - 210;
 
-  // Doctor Title
-  ctx.fillStyle = 'rgba(255, 255, 255, 0.82)';
-  ctx.font = '28px "Segoe UI", Tahoma, sans-serif';
-  ctx.textBaseline = 'top';
-  ctx.fillText('Consultant Specialist', footerLeftX, footerCenterY + 6);
+  ctx.save();
+  ctx.shadowColor = 'rgba(20, 40, 70, 0.2)';
+  ctx.shadowBlur = 28;
+  ctx.shadowOffsetY = 12;
+  ctx.fillStyle = '#ffffff';
+  drawRoundedRect(ctx, cardX, cardY, cardW, cardH, 24);
+  ctx.fill();
   ctx.restore();
 
-  // Footer Right Content: Doctor WhatsApp
   ctx.save();
-  const footerRightX = width - 80;
-  const waNumber = doctor?.contactnumber ? String(doctor.contactnumber) : '';
-  const waDisplay = waNumber ? `📞 ${waNumber}` : '📞 Contact for Appointments';
-
-  ctx.fillStyle = theme.footerAccent;
-  ctx.font = '600 38px "Segoe UI", Tahoma, sans-serif';
-  ctx.textAlign = 'right';
+  ctx.fillStyle = theme.textTitle;
+  ctx.font = '800 36px "Segoe UI", Tahoma, sans-serif';
+  ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText(waDisplay, footerRightX, footerCenterY);
+  ctx.fillText(formattedDocName, cardX + cardW / 2, cardY + 48);
+  ctx.font = '500 20px "Segoe UI", Tahoma, sans-serif';
+  ctx.globalAlpha = 0.78;
+  ctx.fillText('Consultant Specialist', cardX + cardW / 2, cardY + 88);
   ctx.restore();
+
+  // Quote ribbon
+  ctx.save();
+  ctx.translate(width * 0.34, height - 320);
+  ctx.rotate(-0.06);
+  ctx.fillStyle = theme.ribbon || theme.wash;
+  drawRoundedRect(ctx, -220, -28, 440, 56, 18);
+  ctx.fill();
+  ctx.fillStyle = theme.highlight || theme.accentColor;
+  ctx.font = 'italic 600 22px Georgia, "Times New Roman", serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(`“${therapy.quote || 'Care that feels personal'} ♡”`, 0, 2);
+  ctx.restore();
+
+  // Side script
+  ctx.save();
+  ctx.fillStyle = theme.scriptColor || theme.textTitle;
+  ctx.font = 'italic 600 26px Georgia, "Times New Roman", serif';
+  ctx.textAlign = 'right';
+  ctx.fillText('New Hope · Brighter Tomorrows ♡', width - 70, height - 250);
+  ctx.restore();
+
+  // ---- WhatsApp ----
+  const waNumber = doctor?.contactnumber ? String(doctor.contactnumber).trim() : '';
+  const waDisplay = waNumber || 'Contact for consultation';
+  const waY = height - 175;
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(108, waY, 38, 0, Math.PI * 2);
+  ctx.fillStyle = '#25D366';
+  ctx.fill();
+  ctx.fillStyle = '#ffffff';
+  ctx.font = '700 26px "Segoe UI", Tahoma, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('✆', 108, waY + 1);
+
+  ctx.textAlign = 'left';
+  ctx.fillStyle = theme.textTitle;
+  ctx.font = '600 20px "Segoe UI", Tahoma, sans-serif';
+  ctx.fillText('Chat with us on WhatsApp', 168, waY - 16);
+  ctx.font = '800 38px "Segoe UI", Tahoma, sans-serif';
+  ctx.fillText(waDisplay, 168, waY + 22);
+  ctx.restore();
+
+  // Info strip
+  ctx.save();
+  ctx.fillStyle = theme.textTitle;
+  ctx.globalAlpha = 0.7;
+  ctx.font = '600 16px "Segoe UI", Tahoma, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText(
+    'Personalized Patient Education  •  Informative Health Posts  •  A Healthier Community Together',
+    width / 2,
+    height - 105
+  );
+  ctx.restore();
+
+  // Footer bar
+  const footerH = 72;
+  ctx.fillStyle = theme.highlight || theme.headerBg;
+  ctx.fillRect(0, height - footerH, width, footerH);
+  ctx.fillStyle = '#ffffff';
+  ctx.font = '700 24px "Segoe UI", Tahoma, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('HEALTHY FAMILIES  •  HAPPIER TOMORROWS', width / 2, height - footerH / 2);
 
   return canvas;
 }
-

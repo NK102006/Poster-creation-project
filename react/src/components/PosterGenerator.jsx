@@ -27,13 +27,11 @@ export default function PosterGenerator({
   const [downloadSuccess, setDownloadSuccess] = useState(false);
   const [stepError, setStepError] = useState(null);
 
-  const todayFormatted = new Date()
-    .toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-    })
-    .toUpperCase();
+  const todayFormatted = new Date().toLocaleDateString('en-GB', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  });
 
   const canvasRef = useRef(null);
 
@@ -136,7 +134,6 @@ export default function PosterGenerator({
           logo: activeLogo,
         },
         customTitle: selectedTherapy.title,
-        customSubtitle: selectedTherapy.subtitle,
         dateText: todayFormatted,
       });
 
@@ -451,29 +448,90 @@ export default function PosterGenerator({
             </header>
 
             <div className={styles.previewStage}>
-              <div className={`${styles.posterContainer} ${getThemeClass(selectedThemeId)}`}>
-                <div className={styles.posterOverlay} />
-                <div className={styles.posterHeader}>
-                  <div className={styles.doctorLogo}>
-                    <img src={activeLogo} alt="Doctor Logo" />
-                  </div>
-                  <div className={styles.posterDate}>DATE: {todayFormatted}</div>
+              <div
+                className={`${styles.posterContainer} ${getThemeClass(selectedThemeId)}`}
+                style={{
+                  '--poster-bg': selectedTheme.bgGradient,
+                  '--poster-title': selectedTheme.textTitle,
+                  '--poster-accent': selectedTheme.accentColor,
+                  '--poster-highlight': selectedTheme.highlight || selectedTheme.accentColor,
+                  '--poster-wash': selectedTheme.wash,
+                  '--poster-wash-2': selectedTheme.washSecondary || selectedTheme.wash,
+                  '--poster-leaf': selectedTheme.softLeaf,
+                  '--poster-footer': selectedTheme.highlight || selectedTheme.headerBg,
+                  '--poster-ribbon': selectedTheme.ribbon || selectedTheme.wash,
+                }}
+              >
+                <div className={styles.posterDecor} aria-hidden="true">
+                  <span className={`${styles.blob} ${styles.blobMain}`} />
+                  <span className={`${styles.blob} ${styles.blobSoft}`} />
+                  <span className={`${styles.leaf} ${styles.leafA}`} />
+                  <span className={`${styles.leaf} ${styles.leafB}`} />
+                  <span className={`${styles.leaf} ${styles.leafC}`} />
                 </div>
 
-                <div className={styles.posterBody}>
-                  <div className={styles.therapyType}>THERAPY TYPE: {selectedTherapy.badge}</div>
-                  <h1 className={styles.posterTitle}>{selectedTherapy.title}</h1>
-                  <p className={styles.posterSubtitle}>{selectedTherapy.subtitle}</p>
+                <div className={styles.posterTop}>
+                  <div className={styles.posterDateRow}>
+                    <span className={styles.dateIcon} aria-hidden="true" />
+                    <span className={styles.posterDate}>{todayFormatted}</span>
+                  </div>
+                  <p className={styles.posterScript}>Small Steps Big Miracles ♡</p>
                 </div>
 
-                <div className={styles.posterFooter}>
-                  <div className={styles.doctorInfo}>
-                    <div className={styles.doctorName}>{formattedDoctorName}</div>
-                    <div className={styles.doctorTitle}>Consultant Specialist</div>
+                <div className={styles.posterLayout}>
+                  <div className={styles.posterCopy}>
+                    <h1 className={styles.posterTitle}>{selectedTherapy.title}</h1>
+                    <p className={styles.posterTherapyLine}>
+                      Expert Care in{' '}
+                      <span>{selectedTherapy.therapyLabel || selectedTherapy.name}</span>
+                    </p>
+                    <p className={styles.posterPillars}>
+                      {selectedTherapy.pillars || 'Science | Compassion | Care'}
+                    </p>
+
+                    <div className={styles.featureRow}>
+                      {(selectedTherapy.features || []).map((feature) => (
+                        <div key={feature.label} className={styles.featureItem}>
+                          <span
+                            className={styles.featureDot}
+                            style={{ background: feature.color }}
+                          />
+                          <span className={styles.featureLabel}>{feature.label}</span>
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                  <div className={styles.doctorWhatsapp}>
-                    <span className={styles.whatsappIcon}>📞</span> {whatsappNumber}
+
+                  <div className={styles.posterPhotoCol}>
+                    <div className={styles.photoGlow} aria-hidden="true" />
+                    <div className={styles.posterPhotoFrame}>
+                      <img src={activeLogo} alt="" className={styles.posterPhoto} />
+                    </div>
+                    <div className={styles.doctorNameCard}>
+                      <div className={styles.doctorName}>{formattedDoctorName}</div>
+                      <div className={styles.doctorRole}>Consultant Specialist</div>
+                    </div>
                   </div>
+                </div>
+
+                <p className={styles.quoteRibbon}>
+                  “{selectedTherapy.quote || 'Care that feels personal'} ♡”
+                </p>
+
+                <div className={styles.whatsappBlock}>
+                  <span className={styles.whatsappBadge} aria-hidden="true">✆</span>
+                  <div className={styles.whatsappText}>
+                    <span className={styles.whatsappLabel}>Chat with us on WhatsApp</span>
+                    <span className={styles.whatsappNumber}>{whatsappNumber}</span>
+                  </div>
+                </div>
+
+                <p className={styles.infoStrip}>
+                  Personalized Patient Education • Informative Health Posts • A Healthier Community Together
+                </p>
+
+                <div className={styles.posterFooterBar}>
+                  HEALTHY FAMILIES • HAPPIER TOMORROWS
                 </div>
               </div>
 
