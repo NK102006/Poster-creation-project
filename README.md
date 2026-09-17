@@ -1,6 +1,6 @@
 # Frontend-only UI branch (no backend required)
 
-This branch has only the React frontend. Login and poster flow work locally with no API, server, or database.
+This branch has only the React frontend. Login, poster studio, and admin work locally with no API, server, or database.
 
 ## Run
 
@@ -11,6 +11,12 @@ npm install
 npm run dev
 ```
 
-Open http://localhost:5173
+## Pages
 
-Enter any numeric employee ID (e.g. `12345`) to continue into Poster Studio.
+- Login: http://localhost:5173/?view=login
+- Poster Studio: http://localhost:5173/?view=doctor
+- Admin (DataTables): http://localhost:5173/admin
+
+Enter any numeric employee ID (e.g. `12345`) on login to continue into Poster Studio.
+
+Admin uses one DataTable with **ID, Name, Contact Number, Logo, Poster**, and **Edit / Delete in the same row**.

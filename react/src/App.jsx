@@ -1,15 +1,46 @@
 import { useState, useEffect } from 'react';
 import LoginPage from './pages/LoginPage.jsx';
 import DoctorDetailsPage from './pages/DoctorDetailsPage.jsx';
+import AdminPage from './pages/AdminPage.jsx';
+
+function getRoute() {
+  const path = window.location.pathname.replace(/\/+$/, '') || '/';
+  if (path === '/admin') return 'admin';
+
+  const view = new URLSearchParams(window.location.search).get('view');
+  if (view === 'admin' || view === 'doctor' || view === 'login') return view;
+  return 'login';
+}
+
+function goTo(route) {
+  if (route === 'admin') {
+    window.history.pushState({}, '', '/admin');
+    return;
+  }
+
+  const nextUrl = new URL(window.location.origin + '/');
+  nextUrl.searchParams.set('view', route);
+  window.history.pushState({}, '', nextUrl);
+}
+
+const DEMO_USER = { id: '12345', empid: '12345', name: 'UI User' };
+
+function readStoredUser() {
+  try {
+    const stored = localStorage.getItem('auth_session');
+    if (stored) return JSON.parse(stored);
+  } catch (err) {
+    console.warn('Could not read session:', err);
+  }
+  return null;
+}
 
 export default function App() {
+  const [route, setRoute] = useState(getRoute);
   const [currentUser, setCurrentUser] = useState(() => {
-    try {
-      const stored = localStorage.getItem('auth_session');
-      if (stored) return JSON.parse(stored);
-    } catch (err) {
-      console.warn('Could not read session:', err);
-    }
+    const stored = readStoredUser();
+    if (stored) return stored;
+    if (getRoute() === 'doctor') return DEMO_USER;
     return null;
   });
 
@@ -18,10 +49,8 @@ export default function App() {
     try {
       localStorage.setItem('auth_session', JSON.stringify(user));
     } catch (e) {}
-    
-    const nextUrl = new URL(window.location.href);
-    nextUrl.searchParams.set('view', 'doctor');
-    window.history.pushState({}, '', nextUrl);
+    setRoute('doctor');
+    goTo('doctor');
   };
 
   const handleLogout = () => {
@@ -29,31 +58,34 @@ export default function App() {
     try {
       localStorage.removeItem('auth_session');
     } catch (e) {}
-    
-    const nextUrl = new URL(window.location.href);
-    nextUrl.searchParams.set('view', 'login');
-    window.history.pushState({}, '', nextUrl);
+    setRoute('login');
+    goTo('login');
   };
 
   useEffect(() => {
-    const handlePopState = () => {
-      // On browser back/forward, sync with localStorage to keep session active if they didn't logout
-      try {
-        const stored = localStorage.getItem('auth_session');
-        if (stored) {
-          setCurrentUser(JSON.parse(stored));
-        } else {
-          setCurrentUser(null);
-        }
-      } catch (err) {}
+    const syncFromUrl = () => {
+      const next = getRoute();
+      setRoute(next);
+      if (next === 'doctor') {
+        setCurrentUser((prev) => prev || readStoredUser() || DEMO_USER);
+      }
     };
-    
-    window.addEventListener('popstate', handlePopState);
-    return () => window.removeEventListener('popstate', handlePopState);
+
+    window.addEventListener('popstate', syncFromUrl);
+    return () => window.removeEventListener('popstate', syncFromUrl);
   }, []);
 
-  if (currentUser) {
-    return <DoctorDetailsPage user={currentUser} onLogout={handleLogout} />;
+  if (route === 'admin') {
+    return <AdminPage onLogout={handleLogout} />;
+  }
+
+  if (route === 'doctor') {
+    return (
+      <DoctorDetailsPage
+        user={currentUser || DEMO_USER}
+        onLogout={handleLogout}
+      />
+    );
   }
 
   return <LoginPage onLoginSuccess={handleLoginSuccess} />;
