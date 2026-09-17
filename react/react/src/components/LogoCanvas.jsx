@@ -6,7 +6,7 @@ import styles from './LogoCanvas.module.css';
 const CANVAS_SIZE = 300;
 const RADIUS = CANVAS_SIZE / 2;
 
-export default function LogoCanvas({ logoSrc, onChange, initialState }) {
+export default function LogoCanvas({ logoSrc, onChange }) {
   const canvasRef = useRef(null);
   const [logoImg, setLogoImg] = useState(null);
   const [logoPos, setLogoPos] = useState({ x: 0, y: 0 });
@@ -26,16 +26,11 @@ export default function LogoCanvas({ logoSrc, onChange, initialState }) {
       setLogoImg(img);
       const scale = Math.max(CANVAS_SIZE / img.width, CANVAS_SIZE / img.height);
       setBaseScale(scale);
-      if (initialState) {
-        setLogoScale(initialState.scale);
-        setLogoPos(initialState.pos);
-      } else {
-        setLogoScale(scale);
-        setLogoPos({
-          x: (CANVAS_SIZE - img.width * scale) / 2,
-          y: (CANVAS_SIZE - img.height * scale) / 2,
-        });
-      }
+      setLogoScale(scale);
+      setLogoPos({
+        x: (CANVAS_SIZE - img.width * scale) / 2,
+        y: (CANVAS_SIZE - img.height * scale) / 2,
+      });
     };
     img.src = logoSrc;
   }, [logoSrc]);
@@ -105,7 +100,7 @@ export default function LogoCanvas({ logoSrc, onChange, initialState }) {
       const drawW = logoImg.width * logoScale;
       const drawH = logoImg.height * logoScale;
       ectx.drawImage(logoImg, logoPos.x, logoPos.y, drawW, drawH);
-      onChange(exportCanvas.toDataURL('image/png'), { pos: logoPos, scale: logoScale });
+      onChange(exportCanvas.toDataURL('image/png'));
     }, 200);
     return () => clearTimeout(timeout);
   }, [logoImg, logoPos, logoScale, onChange]);

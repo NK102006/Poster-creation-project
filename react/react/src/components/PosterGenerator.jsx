@@ -32,8 +32,6 @@ export default function PosterGenerator({
   const [originalLogoUrl, setOriginalLogoUrl] = useState(null);
   const [showCropModal, setShowCropModal] = useState(false);
   const [croppedLogoData, setCroppedLogoData] = useState(null);
-  const [logoCropState, setLogoCropState] = useState(null);
-  const [tempLogoCropState, setTempLogoCropState] = useState(null);
 
   const todayFormatted = new Date().toLocaleDateString('en-GB', {
     day: 'numeric',
@@ -60,8 +58,6 @@ export default function PosterGenerator({
       setLogoFile?.(file);
       const url = URL.createObjectURL(file);
       setOriginalLogoUrl(url);
-      setLogoCropState(null);
-      setTempLogoCropState(null);
       setShowCropModal(true);
       if (stepError) setStepError(null);
     }
@@ -71,8 +67,6 @@ export default function PosterGenerator({
     setLogoFile?.(null);
     setLogoPreview?.(null);
     setOriginalLogoUrl(null);
-    setLogoCropState(null);
-    setTempLogoCropState(null);
   };
 
   const handleAdjustClick = () => {
@@ -87,7 +81,6 @@ export default function PosterGenerator({
   const handleApplyCrop = () => {
     if (croppedLogoData) {
       setLogoPreview?.(croppedLogoData);
-      if (tempLogoCropState) setLogoCropState(tempLogoCropState);
     }
     setShowCropModal(false);
   };
@@ -466,11 +459,7 @@ export default function PosterGenerator({
             <h3 style={{margin: 0, fontSize: '18px', color: '#14276b', fontFamily: '"Poppins", sans-serif'}}>Adjust Photo</h3>
             <LogoCanvas 
               logoSrc={originalLogoUrl} 
-              initialState={logoCropState}
-              onChange={(dataUrl, state) => {
-                setCroppedLogoData(dataUrl);
-                if (state) setTempLogoCropState(state);
-              }} 
+              onChange={(dataUrl) => setCroppedLogoData(dataUrl)} 
             />
             <div style={{display: 'flex', gap: '12px', width: '100%', justifyContent: 'flex-end', marginTop: '8px'}}>
               <button type="button" onClick={() => setShowCropModal(false)} className={styles.primaryBtn} style={{padding: '6px 16px', fontSize: '13px'}}>Cancel</button>
