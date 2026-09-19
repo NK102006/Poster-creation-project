@@ -1,6 +1,13 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import DataTable from 'datatables.net-dt';
+import 'datatables.net-dt/css/dataTables.dataTables.css';
 import { apiRequest } from '../lib/apiClient';
 import styles from './AdminPortal.module.css';
+
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api').replace(
+  /\/$/,
+  ''
+);
 
 function getItemId(item) {
   return item?.id || item?._id || '';
@@ -22,14 +29,14 @@ export default function AdminPortal() {
   const [loginError, setLoginError] = useState('');
 
   const [activeTab, setActiveTab] = useState('doctors');
-  const [items, setItems] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [search, setSearch] = useState('');
-
   const [showModal, setShowModal] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
   const [formData, setFormData] = useState({});
   const [saving, setSaving] = useState(false);
+  const [previewItem, setPreviewItem] = useState(null);
+
+  const hostRef = useRef(null);
+  const tableRef = useRef(null);
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -53,44 +60,209 @@ export default function AdminPortal() {
     localStorage.removeItem('admin_session');
   };
 
-  const fetchItems = async () => {
-    setLoading(true);
-    try {
-      const res = await apiRequest(`/admin/collections/${activeTab}`);
-      setItems(Array.isArray(res) ? res : []);
-    } catch (err) {
-      alert('Error fetching items: ' + err.message);
-      setItems([]);
-    } finally {
-      setLoading(false);
-    }
+  const reloadTable = () => {
+    tableRef.current?.ajax?.reload(null, false);
   };
 
   useEffect(() => {
-    if (isLoggedIn) {
-      setSearch('');
-      fetchItems();
-    }
+    if (!isLoggedIn) return undefined;
+
+    const openEdit = (item) => {
+      setEditingItem(item);
+      setFormData({ ...item });
+      setShowModal(true);
+    };
+
+    const removeRow = async (id) => {
+      if (!window.confirm('Delete this record? This cannot be undone.')) return;
+      try {
+        await apiRequest(`/admin/collections/${activeTab}/${id}`, { method: 'DELETE' });
+        reloadTable();
+      } catch (err) {
+        alert('Delete failed: ' + err.message);
+      }
+    };
+
+    window.__adminPortal = { openEdit, removeRow, setPreviewItem };
+    return () => {
+      delete window.__adminPortal;
+    };
   }, [isLoggedIn, activeTab]);
 
-  const handleDelete = async (id) => {
-    if (!window.confirm('Delete this record? This cannot be undone.')) return;
-    try {
-      await apiRequest(`/admin/collections/${activeTab}/${id}`, { method: 'DELETE' });
-      fetchItems();
-    } catch (err) {
-      alert('Delete failed: ' + err.message);
-    }
-  };
+  useEffect(() => {
+    if (!isLoggedIn || !hostRef.current) return undefined;
 
-  const openModal = (item = null) => {
-    setEditingItem(item);
-    if (item) {
-      setFormData({ ...item });
-    } else if (activeTab === 'doctors') {
+    const host = hostRef.current;
+    host.innerHTML = '';
+    const tableEl = document.createElement('table');
+    tableEl.className = `display ${styles.table}`;
+    tableEl.style.width = '100%';
+    host.appendChild(tableEl);
+
+    const isDoctors = activeTab === 'doctors';
+
+    const columns = isDoctors
+      ? [
+          {
+            title: 'ID',
+            data: 'id',
+            className: styles.colId,
+            render: (data) =>
+              `<code class="${styles.idCell}" title="${data}">${data}</code>`,
+          },
+          { title: 'Name', data: 'name', className: styles.nameCell },
+          {
+            title: 'Contact Number',
+            data: 'contactnumber',
+            render: (data) => data || '—',
+          },
+          {
+            title: 'Logo',
+            data: 'logo',
+            orderable: false,
+            searchable: false,
+            render: (data) =>
+              data
+                ? `<img src="${data}" alt="" class="${styles.logoThumb}" />`
+                : `<span class="${styles.muted}">—</span>`,
+          },
+          {
+            title: 'Poster',
+            data: 'poster',
+            orderable: false,
+            searchable: false,
+            render: (data) =>
+              data
+                ? `<img src="${data}" alt="" class="${styles.posterThumb}" />`
+                : `<span class="${styles.muted}">null</span>`,
+          },
+          {
+            title: 'Actions',
+            data: null,
+            orderable: false,
+            searchable: false,
+            className: styles.colActions,
+            render: (_data, _type, row) => {
+              const id = getItemId(row);
+              return `<div class="${styles.actions}">
+                <button type="button" class="${styles.editBtn}" data-action="edit">Edit</button>
+                <button type="button" class="${styles.deleteBtn}" data-action="delete" data-id="${id}">Delete</button>
+              </div>`;
+            },
+          },
+        ]
+      : [
+          {
+            title: 'ID',
+            data: 'id',
+            className: styles.colId,
+            render: (data) =>
+              `<code class="${styles.idCell}" title="${data}">${data}</code>`,
+          },
+          {
+            title: 'Employee ID',
+            data: 'empid',
+            className: styles.nameCell,
+            render: (data, _type, row) => data ?? row.id ?? '—',
+          },
+          {
+            title: 'Name',
+            data: 'name',
+            render: (data) => data || '—',
+          },
+          {
+            title: 'Actions',
+            data: null,
+            orderable: false,
+            searchable: false,
+            className: styles.colActions,
+            render: (_data, _type, row) => {
+              const id = getItemId(row);
+              return `<div class="${styles.actions}">
+                <button type="button" class="${styles.editBtn}" data-action="edit">Edit</button>
+                <button type="button" class="${styles.deleteBtn}" data-action="delete" data-id="${id}">Delete</button>
+              </div>`;
+            },
+          },
+        ];
+
+    const table = new DataTable(tableEl, {
+      serverSide: true,
+      processing: true,
+      pageLength: 10,
+      lengthMenu: [5, 10, 25, 50],
+      paging: true,
+      pagingType: 'simple_numbers',
+      autoWidth: false,
+      scrollX: true,
+      order: [[1, 'asc']],
+      layout: {
+        topStart: 'pageLength',
+        topEnd: 'search',
+        bottomStart: 'info',
+        bottomEnd: 'paging',
+      },
+      ajax: {
+        url: `${API_BASE_URL}/admin/datatables/${activeTab}`,
+        dataSrc: 'data',
+      },
+      columns,
+      language: {
+        search: 'Search:',
+        lengthMenu: 'Show _MENU_',
+        info: '_START_–_END_ of _TOTAL_',
+        infoEmpty: 'No records',
+        zeroRecords: 'No matching records found',
+        processing: 'Loading…',
+        paginate: {
+          previous: 'Prev',
+          next: 'Next',
+        },
+      },
+      rowCallback(row) {
+        row.style.cursor = isDoctors ? 'pointer' : 'default';
+        row.dataset.hasMedia = isDoctors ? 'true' : 'false';
+      },
+    });
+
+    function onClick(e) {
+      const btn = e.target.closest('button[data-action]');
+      const tr = e.target.closest('tr');
+      if (btn) {
+        e.preventDefault();
+        e.stopPropagation();
+        const rowData = table.row(tr).data();
+        const action = btn.getAttribute('data-action');
+        if (action === 'edit') window.__adminPortal?.openEdit(rowData);
+        if (action === 'delete') {
+          window.__adminPortal?.removeRow(btn.getAttribute('data-id') || getItemId(rowData));
+        }
+        return;
+      }
+
+      if (!tr || !host.contains(tr) || tr.parentElement?.tagName !== 'TBODY') return;
+      if (activeTab !== 'doctors') return;
+      const rowData = table.row(tr).data();
+      if (rowData) window.__adminPortal?.setPreviewItem(rowData);
+    }
+
+    host.addEventListener('click', onClick);
+    tableRef.current = table;
+
+    return () => {
+      host.removeEventListener('click', onClick);
+      table.destroy();
+      tableRef.current = null;
+      host.innerHTML = '';
+    };
+  }, [isLoggedIn, activeTab]);
+
+  const openCreate = () => {
+    setEditingItem(null);
+    if (activeTab === 'doctors') {
       setFormData({ name: '', contactnumber: '', logo: '', poster: '' });
     } else {
-      setFormData({ empid: '' });
+      setFormData({ empid: '', name: '' });
     }
     setShowModal(true);
   };
@@ -112,7 +284,7 @@ export default function AdminPortal() {
         });
       }
       setShowModal(false);
-      fetchItems();
+      reloadTable();
     } catch (err) {
       alert('Save failed: ' + err.message);
     } finally {
@@ -127,34 +299,16 @@ export default function AdminPortal() {
   const handleFileChange = (key, file) => {
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = (e) => {
-      setFormData((prev) => ({ ...prev, [key]: e.target.result }));
+    reader.onload = (ev) => {
+      setFormData((prev) => ({ ...prev, [key]: ev.target.result }));
     };
     reader.readAsDataURL(file);
   };
 
-  const filteredItems = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    if (!q) return items;
-    return items.filter((item) => {
-      const haystack = [
-        getItemId(item),
-        item.name,
-        item.contactnumber,
-        item.empid,
-        item.id,
-      ]
-        .filter(Boolean)
-        .join(' ')
-        .toLowerCase();
-      return haystack.includes(q);
-    });
-  }, [items, search]);
-
   const formFields =
     activeTab === 'doctors'
       ? ['name', 'contactnumber', 'logo', 'poster']
-      : ['empid'];
+      : ['empid', 'name'];
 
   if (!isLoggedIn) {
     return (
@@ -237,10 +391,15 @@ export default function AdminPortal() {
       <div className={styles.main}>
         <header className={styles.topbar}>
           <div>
-            <p className={styles.breadcrumb}>Admin / {activeTab === 'doctors' ? 'Doctors' : 'Users'}</p>
+            <p className={styles.breadcrumb}>
+              Admin / {activeTab === 'doctors' ? 'Doctors' : 'Users'}
+            </p>
             <h1 className={styles.pageTitle}>
               {activeTab === 'doctors' ? 'Doctors list' : 'Users list'}
             </h1>
+            <p className={styles.pageHint}>
+              DataTables with server-side pagination. Click a doctor row to preview logo & poster.
+            </p>
           </div>
           <div className={styles.topbarRight}>
             <span className={styles.adminBadge}>Administrator</span>
@@ -249,155 +408,66 @@ export default function AdminPortal() {
 
         <section className={styles.panel}>
           <div className={styles.toolbar}>
-            <div className={styles.searchWrap}>
-              <span className={styles.searchIcon} aria-hidden>
-                ⌕
-              </span>
-              <input
-                className={styles.searchInput}
-                type="search"
-                placeholder={
-                  activeTab === 'doctors'
-                    ? 'Search by name, contact, or ID…'
-                    : 'Search by employee ID…'
-                }
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-              />
-            </div>
-            <button type="button" className={styles.primaryBtn} onClick={() => openModal()}>
+            <p className={styles.toolbarHint}>
+              Page size + search are handled by DataTables against MongoDB.
+            </p>
+            <button type="button" className={styles.primaryBtn} onClick={openCreate}>
               + Add {activeTab === 'doctors' ? 'doctor' : 'user'}
             </button>
           </div>
 
           <div className={styles.tableCard}>
-            {loading ? (
-              <div className={styles.emptyState}>Loading…</div>
-            ) : filteredItems.length === 0 ? (
-              <div className={styles.emptyState}>
-                {items.length === 0 ? 'No records yet.' : 'No matches for your search.'}
-              </div>
-            ) : activeTab === 'doctors' ? (
-              <div className={styles.tableScroll}>
-                <table className={styles.table}>
-                  <thead>
-                    <tr>
-                      <th>ID</th>
-                      <th>Name</th>
-                      <th>Contact Number</th>
-                      <th>Logo</th>
-                      <th>Poster</th>
-                      <th>Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredItems.map((item) => {
-                      const id = getItemId(item);
-                      return (
-                        <tr key={id}>
-                          <td>
-                            <code className={styles.idCell} title={String(id)}>
-                              {String(id)}
-                            </code>
-                          </td>
-                          <td className={styles.nameCell}>{item.name || '—'}</td>
-                          <td>{item.contactnumber || '—'}</td>
-                          <td>
-                            {item.logo ? (
-                              <img src={item.logo} alt="" className={styles.logoThumb} />
-                            ) : (
-                              <span className={styles.muted}>—</span>
-                            )}
-                          </td>
-                          <td>
-                            {item.poster ? (
-                              <img src={item.poster} alt="" className={styles.posterThumb} />
-                            ) : (
-                              <span className={styles.muted}>null</span>
-                            )}
-                          </td>
-                          <td>
-                            <div className={styles.actions}>
-                              <button
-                                type="button"
-                                className={styles.editBtn}
-                                onClick={() => openModal(item)}
-                              >
-                                Edit
-                              </button>
-                              <button
-                                type="button"
-                                className={styles.deleteBtn}
-                                onClick={() => handleDelete(id)}
-                              >
-                                Delete
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            ) : (
-              <div className={styles.tableScroll}>
-                <table className={styles.table}>
-                  <thead>
-                    <tr>
-                      <th>ID</th>
-                      <th>Employee ID</th>
-                      <th>Name</th>
-                      <th>Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredItems.map((item) => {
-                      const id = getItemId(item);
-                      return (
-                        <tr key={id}>
-                          <td>
-                            <code className={styles.idCell} title={String(id)}>
-                              {String(id)}
-                            </code>
-                          </td>
-                          <td className={styles.nameCell}>
-                            {item.empid ?? item.id ?? '—'}
-                          </td>
-                          <td>{item.name || '—'}</td>
-                          <td>
-                            <div className={styles.actions}>
-                              <button
-                                type="button"
-                                className={styles.editBtn}
-                                onClick={() => openModal(item)}
-                              >
-                                Edit
-                              </button>
-                              <button
-                                type="button"
-                                className={styles.deleteBtn}
-                                onClick={() => handleDelete(id)}
-                              >
-                                Delete
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
-
-            <div className={styles.tableFooter}>
-              Showing {filteredItems.length} of {items.length}{' '}
-              {activeTab === 'doctors' ? 'doctors' : 'users'}
-            </div>
+            <div ref={hostRef} className={styles.dtHost} />
           </div>
         </section>
       </div>
+
+      {previewItem && (
+        <div className={styles.modalOverlay} onClick={() => setPreviewItem(null)}>
+          <div
+            className={styles.previewModal}
+            role="dialog"
+            aria-modal="true"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className={styles.previewHeader}>
+              <div>
+                <p className={styles.previewEyebrow}>Doctor preview</p>
+                <h2 className={styles.modalTitle}>{previewItem.name || 'Doctor'}</h2>
+                <p className={styles.previewMeta}>
+                  Contact: {previewItem.contactnumber || '—'} · ID:{' '}
+                  <code>{getItemId(previewItem)}</code>
+                </p>
+              </div>
+              <button
+                type="button"
+                className={styles.secondaryBtn}
+                onClick={() => setPreviewItem(null)}
+              >
+                Close
+              </button>
+            </div>
+            <div className={styles.previewGrid}>
+              <div className={styles.previewPane}>
+                <h3>Logo</h3>
+                {previewItem.logo ? (
+                  <img src={previewItem.logo} alt="Logo" className={styles.previewLogo} />
+                ) : (
+                  <p className={styles.muted}>No logo</p>
+                )}
+              </div>
+              <div className={styles.previewPane}>
+                <h3>Poster</h3>
+                {previewItem.poster ? (
+                  <img src={previewItem.poster} alt="Poster" className={styles.previewPoster} />
+                ) : (
+                  <p className={styles.muted}>No poster</p>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {showModal && (
         <div className={styles.modalOverlay} onClick={() => setShowModal(false)}>
@@ -438,7 +508,7 @@ export default function AdminPortal() {
                       type="text"
                       value={formData[f] ?? ''}
                       onChange={(e) => handleFieldChange(f, e.target.value)}
-                      required={f !== 'logo' && f !== 'poster'}
+                      required={f !== 'logo' && f !== 'poster' && f !== 'name'}
                     />
                   )}
                 </label>
