@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { getActiveFestival, getGeneralPosters, getMonthlyPosters } from '../lib/posterCatalog';
-import { themePageStyle } from '../lib/posterExport';
+import { mapThemeToRiskFactor, themePageStyle } from '../lib/posterExport';
 import { getPosterTiming, getSendDateForIndex } from '../lib/posterSchedule';
+import RiskFactorPoster from './RiskFactorPoster';
 import styles from './PosterCarousel.module.css';
 
 function posterLabel(poster, generalPosters) {
@@ -15,6 +16,86 @@ function posterSendLabel(poster, index, total) {
     return getPosterTiming({ mode: 'festival' }).sendLabel;
   }
   return getSendDateForIndex(index, total);
+}
+
+function ScaledRiskFactorPoster({
+  isCaptureTarget,
+  theme,
+  doctorFields,
+}) {
+  const hostRef = useRef(null);
+  const [scale, setScale] = useState(0.35);
+
+  useEffect(() => {
+    const host = hostRef.current;
+    if (!host) return undefined;
+    const measure = () => {
+      const { width, height } = host.getBoundingClientRect();
+      if (width < 1 || height < 1) return;
+      setScale(Math.min(width, height) / 736);
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(host);
+    return () => observer.disconnect();
+  }, []);
+
+  const riskTheme = mapThemeToRiskFactor(theme?.id);
+
+  return (
+    <div ref={hostRef} className={styles.componentFit}>
+      <div
+        className={styles.componentScaler}
+        style={{ transform: `translate(-50%, -50%) scale(${scale})` }}
+      >
+        <RiskFactorPoster
+          logo={doctorFields.logo}
+          doctorName={doctorFields.doctorName}
+          doctorDegree={doctorFields.doctorDegree}
+          clinicName={doctorFields.clinicName}
+          phone={doctorFields.phone}
+          theme={riskTheme}
+          id={isCaptureTarget ? 'risk-factor-poster' : undefined}
+        />
+      </div>
+    </div>
+  );
+}
+
+function PosterPage({
+  poster,
+  label,
+  pageStyle,
+  isCaptureTarget,
+  theme,
+  doctorFields,
+}) {
+  if (poster.template === 'risk-factor') {
+    return (
+      <div
+        className={`${styles.blankPage} ${styles.componentPage}`}
+        style={pageStyle}
+        id={isCaptureTarget ? 'doctor-poster-capture' : undefined}
+      >
+        <ScaledRiskFactorPoster
+          isCaptureTarget={isCaptureTarget}
+          theme={theme}
+          doctorFields={doctorFields}
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className={styles.blankPage}
+      style={pageStyle}
+      id={isCaptureTarget ? 'doctor-poster-capture' : undefined}
+    >
+      <span className={styles.blankSheen} aria-hidden="true" />
+      <span className={styles.blankLabel}>{label}</span>
+    </div>
+  );
 }
 
 function Dropdowns({
@@ -76,6 +157,7 @@ function ScrollView({
   pageStyle,
   generalPosters,
   theme,
+  doctorFields,
 }) {
   const viewportRef = useRef(null);
   const [stageWidth, setStageWidth] = useState(0);
@@ -194,14 +276,14 @@ function ScrollView({
                   aria-label={label}
                   aria-current={distance === 0 ? 'true' : undefined}
                 >
-                  <div
-                    className={styles.blankPage}
-                    style={pageStyle}
-                    id={distance === 0 ? 'doctor-poster-capture' : undefined}
-                  >
-                    <span className={styles.blankSheen} aria-hidden="true" />
-                    <span className={styles.blankLabel}>{label}</span>
-                  </div>
+                  <PosterPage
+                    poster={poster}
+                    label={label}
+                    pageStyle={pageStyle}
+                    isCaptureTarget={distance === 0}
+                    theme={theme}
+                    doctorFields={doctorFields}
+                  />
                 </button>
               );
             })}
@@ -256,6 +338,13 @@ export default function PosterCarousel({
   onModeChange,
   theme,
   variant = 'grid',
+  doctorFields = {
+    clinicName: '',
+    doctorName: '',
+    doctorDegree: '',
+    phone: '',
+    logo: null,
+  },
 }) {
   const festival = useMemo(() => getActiveFestival(new Date()), []);
   const generalPosters = useMemo(() => getGeneralPosters(), []);
@@ -320,6 +409,7 @@ export default function PosterCarousel({
           pageStyle={pageStyle}
           generalPosters={generalPosters}
           theme={theme}
+          doctorFields={doctorFields}
         />
       ) : (
         <div className={styles.posterGridBox}>
@@ -337,14 +427,14 @@ export default function PosterCarousel({
                 aria-label={label}
                 aria-current={isActive ? 'true' : undefined}
               >
-                <div
-                  className={styles.blankPage}
-                  style={pageStyle}
-                  id={isActive && variant === 'grid' ? 'doctor-poster-capture' : undefined}
-                >
-                  <span className={styles.blankSheen} aria-hidden="true" />
-                  <span className={styles.blankLabel}>{label}</span>
-                </div>
+                <PosterPage
+                  poster={poster}
+                  label={label}
+                  pageStyle={pageStyle}
+                  isCaptureTarget={isActive}
+                  theme={theme}
+                  doctorFields={doctorFields}
+                />
                 <p className={styles.sendDate}>
                   Send <strong>{sendLabel}</strong>
                 </p>

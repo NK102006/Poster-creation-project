@@ -9,6 +9,7 @@ const EMPTY_FORM = {
   name: '',
   clinicName: '',
   contactnumber: '',
+  doctorDegree: '',
 };
 
 export default function DoctorManagePage({
@@ -45,6 +46,7 @@ export default function DoctorManagePage({
         name: res.doctor.name || '',
         clinicName: res.doctor.clinicName || '',
         contactnumber: res.doctor.contactnumber ? String(res.doctor.contactnumber) : '',
+        doctorDegree: res.doctor.doctorDegree || '',
       });
       setLogoPreview(res.doctor.logo || '');
       setLogoFile(null);
@@ -73,6 +75,7 @@ export default function DoctorManagePage({
       data.append('name', form.name.trim());
       data.append('clinicName', form.clinicName.trim());
       data.append('contactnumber', form.contactnumber.trim());
+      data.append('doctorDegree', form.doctorDegree.trim());
       if (logoFile) data.append('logo', logoFile);
       else if (logoPreview?.startsWith('data:')) data.append('logo', logoPreview);
 
@@ -171,6 +174,10 @@ export default function DoctorManagePage({
       setError('Reactivate this doctor before continuing.');
       return;
     }
+    if (!form.doctorDegree?.trim()) {
+      setError("Doctor's degree is required before continuing.");
+      return;
+    }
     onContinue?.(doctor);
   };
 
@@ -238,6 +245,15 @@ export default function DoctorManagePage({
                 />
               </label>
               <label className={styles.field}>
+                <span>Doctor&apos;s degree</span>
+                <input
+                  value={form.doctorDegree}
+                  onChange={(e) => setForm((p) => ({ ...p, doctorDegree: e.target.value }))}
+                  placeholder="e.g. MBBS, MD (Medicine)"
+                  required
+                />
+              </label>
+              <label className={styles.field}>
                 <span>Clinic / Hospital name</span>
                 <input
                   value={form.clinicName}
@@ -295,11 +311,13 @@ export default function DoctorManagePage({
                 type="button"
                 className={styles.continueBtn}
                 onClick={handleContinue}
-                disabled={isInactive}
+                disabled={isInactive || !form.doctorDegree?.trim()}
                 title={
                   isInactive
                     ? 'Activate this doctor to continue'
-                    : 'Continue to design'
+                    : !form.doctorDegree?.trim()
+                      ? "Add doctor's degree to continue"
+                      : 'Continue to design'
                 }
               >
                 Continue

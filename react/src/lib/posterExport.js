@@ -1,4 +1,85 @@
 /** Render themed blank poster pages to JPEG blobs for download / zip. */
+import { createRoot } from 'react-dom/client';
+import { toJpeg } from 'html-to-image';
+import { createElement } from 'react';
+import RiskFactorPoster from '../components/RiskFactorPoster';
+
+export function mapThemeToRiskFactor(themeId) {
+  switch (themeId) {
+    case 'theme-warm-red':
+      return 'red';
+    case 'theme-green':
+      return 'green';
+    case 'theme-purple':
+      return 'purple';
+    case 'theme-blue':
+    default:
+      return 'blue';
+  }
+}
+
+function waitForImages(node) {
+  const images = Array.from(node?.querySelectorAll('img') || []);
+  return Promise.all(
+    images.map(
+      (img) =>
+        new Promise((resolve) => {
+          if (img.complete) {
+            resolve();
+            return;
+          }
+          img.onload = () => resolve();
+          img.onerror = () => resolve();
+        })
+    )
+  );
+}
+
+export async function renderRiskFactorPosterBlob(fields) {
+  const host = document.createElement('div');
+  host.style.cssText =
+    'position:fixed;left:-10000px;top:0;width:736px;height:736px;pointer-events:none;opacity:0;';
+  document.body.appendChild(host);
+
+  const root = createRoot(host);
+  root.render(
+    createElement(RiskFactorPoster, {
+      logo: fields.logo,
+      doctorName: fields.doctorName,
+      doctorDegree: fields.doctorDegree,
+      clinicName: fields.clinicName,
+      phone: fields.phone,
+      theme: fields.theme || 'blue',
+      id: 'risk-factor-poster-export',
+    })
+  );
+
+  await new Promise((resolve) => {
+    requestAnimationFrame(() => requestAnimationFrame(resolve));
+  });
+
+  const node = host.querySelector('.rfp');
+  if (!node) {
+    root.unmount();
+    host.remove();
+    throw new Error('Risk factor poster node not found');
+  }
+
+  await waitForImages(node);
+
+  try {
+    const dataUrl = await toJpeg(node, {
+      quality: 0.95,
+      pixelRatio: 2,
+      cacheBust: true,
+    });
+    const res = await fetch(dataUrl);
+    return res.blob();
+  } finally {
+    root.unmount();
+    host.remove();
+  }
+}
 
 function hexToRgb(hex) {
   const h = String(hex || '').replace('#', '');

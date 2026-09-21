@@ -13,6 +13,7 @@ const doctorSchema = new mongoose.Schema(
   {
     name: { type: String, required: true },
     clinicName: { type: String, required: true },
+    doctorDegree: { type: String, default: '' },
     contactnumber: { type: Number, required: true },
     logo: { type: Buffer },
     poster: { type: Buffer },
@@ -84,6 +85,7 @@ async function seed() {
     doctors.push({
       name,
       clinicName: `Clinic ${i + 1}`,
+      doctorDegree: 'MBBS, MD',
       contactnumber: 9000000000 + i,
       logo: logoSvg(initials, hue),
       poster: posterSvg(name.replace('Dr. Dummy ', ''), hue),

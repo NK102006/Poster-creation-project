@@ -1,4 +1,4 @@
-/* LogoCanvas.module.css — Circular logo positioner */
+/* LogoCanvas.module.css — Square logo positioner */
 
 .wrapper {
   margin-top: 16px;
@@ -20,11 +20,11 @@
   }
 }
 
-.circleContainer {
+.squareContainer {
   position: relative;
   width: 220px;
   height: 220px;
-  border-radius: 50%;
+  border-radius: 8px;
   overflow: hidden;
   box-shadow:
     0 4px 20px rgba(0, 0, 0, 0.10),
@@ -32,7 +32,7 @@
   transition: box-shadow 0.25s ease;
 }
 
-.circleContainer:hover {
+.squareContainer:hover {
   box-shadow:
     0 6px 28px rgba(0, 0, 0, 0.14),
     0 0 0 3px rgba(198, 164, 106, 0.45);
@@ -43,7 +43,7 @@
   width: 100%;
   height: 100%;
   touch-action: none;
-  border-radius: 50%;
+  border-radius: 0;
 }
 
 .zoomBar {

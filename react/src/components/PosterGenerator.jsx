@@ -5,7 +5,11 @@ import { POSTER_THEMES } from './Poster';
 import PosterCarousel from './PosterCarousel';
 import LogoCanvas from './LogoCanvas';
 import { getGeneralPosters, getMonthlyPosters } from '../lib/posterCatalog';
-import { renderBlankPosterBlob } from '../lib/posterExport';
+import {
+  mapThemeToRiskFactor,
+  renderBlankPosterBlob,
+  renderRiskFactorPosterBlob,
+} from '../lib/posterExport';
 import styles from './PosterGenerator.module.css';
 
 const STEPS = [
@@ -15,7 +19,7 @@ const STEPS = [
 ];
 
 export default function PosterGenerator({
-  formData = { name: '', contactnumber: '', clinicName: '' },
+  formData = { name: '', contactnumber: '', clinicName: '', doctorDegree: '' },
   setFormData,
   logoFile = null,
   setLogoFile,
@@ -91,10 +95,11 @@ export default function PosterGenerator({
     const hasName = Boolean(formData.name?.trim());
     const hasContact = Boolean(formData.contactnumber?.trim());
     const hasClinic = Boolean(formData.clinicName?.trim());
+    const hasDegree = Boolean(formData.doctorDegree?.trim());
 
-    if (!hasName || !hasContact || !hasClinic || !hasLogo) {
+    if (!hasName || !hasDegree || !hasContact || !hasClinic || !hasLogo) {
       setStepError(
-        'Please fill in all required fields (Name, Clinic/Hospital, Contact, and Logo) to proceed.'
+        'Please fill in all required fields (Name, Degree, Clinic/Hospital, Contact, and Logo) to proceed.'
       );
       return;
     }
@@ -108,10 +113,11 @@ export default function PosterGenerator({
     const hasName = Boolean(formData.name?.trim());
     const hasContact = Boolean(formData.contactnumber?.trim());
     const hasClinic = Boolean(formData.clinicName?.trim());
+    const hasDegree = Boolean(formData.doctorDegree?.trim());
 
-    if (targetStep > 1 && (!hasName || !hasContact || !hasClinic || !hasLogo)) {
+    if (targetStep > 1 && (!hasName || !hasDegree || !hasContact || !hasClinic || !hasLogo)) {
       setStepError(
-        'Please fill in all required fields (Name, Clinic/Hospital, Contact, and Logo) to proceed.'
+        'Please fill in all required fields (Name, Degree, Clinic/Hospital, Contact, and Logo) to proceed.'
       );
       return false;
     }
@@ -127,6 +133,13 @@ export default function PosterGenerator({
 
   const rawDocName = formData.name?.trim() || doctor?.name || 'Doctor Name';
   const formattedDoctorName = rawDocName.startsWith('Dr.') ? rawDocName : `Dr. ${rawDocName}`;
+  const doctorFields = {
+    logo: logoPreview || doctor?.logo || null,
+    doctorName: formattedDoctorName,
+    doctorDegree: formData.doctorDegree?.trim() || doctor?.doctorDegree || '',
+    clinicName: formData.clinicName?.trim() || 'Your Clinic Name',
+    phone: formData.contactnumber?.trim() || doctor?.contactnumber || '',
+  };
 
   const carouselProps = {
     activeIndex: activePosterIndex,
@@ -134,6 +147,17 @@ export default function PosterGenerator({
     mode: posterMode,
     onModeChange: setPosterMode,
     theme: selectedTheme,
+    doctorFields,
+  };
+
+  const renderPosterBlob = async (poster, label) => {
+    if (poster?.template === 'risk-factor') {
+      return renderRiskFactorPosterBlob({
+        ...doctorFields,
+        theme: mapThemeToRiskFactor(selectedTheme?.id),
+      });
+    }
+    return renderBlankPosterBlob(selectedTheme, label);
   };
 
   const handleGenerateAndDownload = async () => {
@@ -153,7 +177,7 @@ export default function PosterGenerator({
                   )
             }`;
 
-      const posterBlob = await renderBlankPosterBlob(selectedTheme, label);
+      const posterBlob = await renderPosterBlob(activePosterContent, label);
       const dataUrl = URL.createObjectURL(posterBlob);
 
       const cleanDocName = formattedDoctorName
@@ -203,7 +227,7 @@ export default function PosterGenerator({
           poster.kind === 'festival'
             ? poster.festivalName || 'Festival'
             : `Poster-${++generalCounter}`;
-        const blob = await renderBlankPosterBlob(selectedTheme, label);
+        const blob = await renderPosterBlob(poster, label);
         const safeLabel = label.replace(/[^a-zA-Z0-9_-]/g, '_');
         zip.file(`${String(i + 1).padStart(2, '0')}_${safeLabel}.jpg`, blob);
       }
@@ -217,8 +241,8 @@ export default function PosterGenerator({
       URL.revokeObjectURL(url);
 
       if (onAutoSave && pack[0]) {
-        const firstBlob = await renderBlankPosterBlob(
-          selectedTheme,
+        const firstBlob = await renderPosterBlob(
+          pack[0],
           pack[0].kind === 'festival' ? pack[0].festivalName : 'Poster-1'
         );
         onAutoSave(formData, logoFile, firstBlob).catch(() => {});
@@ -291,11 +315,29 @@ export default function PosterGenerator({
                   <input
                     id="step-doc-name"
                     type="text"
-                    placeholder="e.g. Dr. Emily Watson, MD"
+                    placeholder="e.g. Dr. Emily Watson"
                     className={styles.inputField}
                     value={formData.name}
                     onChange={(e) => {
                       setFormData?.((prev) => ({ ...prev, name: e.target.value }));
+                      if (stepError) setStepError(null);
+                    }}
+                    required
+                  />
+                </div>
+
+                <div className={styles.formGroup}>
+                  <label className={styles.formLabel} htmlFor="step-doc-degree">
+                    Doctor&apos;s degree <span className={styles.requiredStar}>*</span>
+                  </label>
+                  <input
+                    id="step-doc-degree"
+                    type="text"
+                    placeholder="e.g. MBBS, MD (Medicine)"
+                    className={styles.inputField}
+                    value={formData.doctorDegree || ''}
+                    onChange={(e) => {
+                      setFormData?.((prev) => ({ ...prev, doctorDegree: e.target.value }));
                       if (stepError) setStepError(null);
                     }}
                     required

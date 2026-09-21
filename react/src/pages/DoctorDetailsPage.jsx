@@ -22,6 +22,7 @@ export default function DoctorDetailsPage({
       ? String(existingDoctor.contactnumber)
       : '',
     clinicName: existingDoctor?.clinicName || '',
+    doctorDegree: existingDoctor?.doctorDegree || '',
   });
   const [logoFile, setLogoFile] = useState(null);
   const [logoPreview, setLogoPreview] = useState(existingDoctor?.logo || null);
@@ -42,6 +43,7 @@ export default function DoctorDetailsPage({
             ? String(res.doctor.contactnumber)
             : '',
           clinicName: res.doctor.clinicName || '',
+          doctorDegree: res.doctor.doctorDegree || '',
         });
         setLogoPreview(res.doctor.logo || null);
       } catch (err) {
@@ -59,9 +61,11 @@ export default function DoctorDetailsPage({
       currentFormData?.contactnumber?.trim() || formData.contactnumber?.trim();
     const clinicName =
       currentFormData?.clinicName?.trim() || formData.clinicName?.trim();
+    const doctorDegree =
+      currentFormData?.doctorDegree?.trim() || formData.doctorDegree?.trim();
     const file = currentLogoFile !== undefined ? currentLogoFile : logoFile;
 
-    if (!name && !contactnumber && !clinicName) {
+    if (!name && !contactnumber && !clinicName && !doctorDegree) {
       return { success: true };
     }
 
@@ -69,6 +73,7 @@ export default function DoctorDetailsPage({
     if (name) data.append('name', name);
     if (contactnumber) data.append('contactnumber', contactnumber);
     if (clinicName) data.append('clinicName', clinicName);
+    if (doctorDegree) data.append('doctorDegree', doctorDegree);
     if (doctor?.id) data.append('doctorId', doctor.id);
     data.append('countDownload', 'true');
 

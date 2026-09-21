@@ -1,10 +1,10 @@
 // src/components/LogoCanvas.jsx
-// Circular interactive canvas — drag to move, slider to zoom (center fixed)
+// Square interactive canvas — drag to move, slider to zoom (center fixed)
 import { useRef, useState, useEffect, useCallback } from 'react';
 import styles from './LogoCanvas.module.css';
 
 const CANVAS_SIZE = 300;
-const RADIUS = CANVAS_SIZE / 2;
+const CENTER = CANVAS_SIZE / 2;
 
 export default function LogoCanvas({ logoSrc, onChange, initialState }) {
   const canvasRef = useRef(null);
@@ -49,7 +49,7 @@ export default function LogoCanvas({ logoSrc, onChange, initialState }) {
 
     ctx.save();
     ctx.beginPath();
-    ctx.arc(RADIUS, RADIUS, RADIUS, 0, Math.PI * 2);
+    ctx.rect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
     ctx.clip();
 
     const tileSize = 10;
@@ -69,21 +69,17 @@ export default function LogoCanvas({ logoSrc, onChange, initialState }) {
     ctx.restore();
 
     ctx.save();
-    ctx.beginPath();
-    ctx.arc(RADIUS, RADIUS, RADIUS - 1.5, 0, Math.PI * 2);
     ctx.strokeStyle = logoImg ? 'rgba(198, 164, 106, 0.75)' : 'rgba(0, 0, 0, 0.12)';
     ctx.lineWidth = 3;
-    ctx.stroke();
+    ctx.strokeRect(1.5, 1.5, CANVAS_SIZE - 3, CANVAS_SIZE - 3);
     ctx.restore();
 
     if (dragging && logoImg) {
       ctx.save();
-      ctx.beginPath();
-      ctx.arc(RADIUS, RADIUS, RADIUS - 4, 0, Math.PI * 2);
       ctx.strokeStyle = 'rgba(198, 164, 106, 0.35)';
       ctx.lineWidth = 2;
       ctx.setLineDash([6, 4]);
-      ctx.stroke();
+      ctx.strokeRect(4, 4, CANVAS_SIZE - 8, CANVAS_SIZE - 8);
       ctx.restore();
     }
   }, [logoImg, logoPos, logoScale, dragging]);
@@ -100,7 +96,7 @@ export default function LogoCanvas({ logoSrc, onChange, initialState }) {
       exportCanvas.height = CANVAS_SIZE;
       const ectx = exportCanvas.getContext('2d');
       ectx.beginPath();
-      ectx.arc(RADIUS, RADIUS, RADIUS, 0, Math.PI * 2);
+      ectx.rect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
       ectx.clip();
       const drawW = logoImg.width * logoScale;
       const drawH = logoImg.height * logoScale;
@@ -120,19 +116,16 @@ export default function LogoCanvas({ logoSrc, onChange, initialState }) {
     };
   };
 
-  const isInsideCircle = (mx, my) => {
-    const dx = mx - RADIUS;
-    const dy = my - RADIUS;
-    return dx * dx + dy * dy <= RADIUS * RADIUS;
-  };
+  const isInsideSquare = (mx, my) =>
+    mx >= 0 && mx <= CANVAS_SIZE && my >= 0 && my <= CANVAS_SIZE;
 
   const applyScaleKeepingCenter = (nextScale) => {
     const prev = logoScale || 1;
     const ratio = nextScale / prev;
     setLogoScale(nextScale);
     setLogoPos((p) => ({
-      x: RADIUS - (RADIUS - p.x) * ratio,
-      y: RADIUS - (RADIUS - p.y) * ratio,
+      x: CENTER - (CENTER - p.x) * ratio,
+      y: CENTER - (CENTER - p.y) * ratio,
     }));
   };
 
@@ -142,7 +135,7 @@ export default function LogoCanvas({ logoSrc, onChange, initialState }) {
   const handlePointerDown = (e) => {
     if (!logoImg) return;
     const { mx, my } = getMousePos(e);
-    if (!isInsideCircle(mx, my)) return;
+    if (!isInsideSquare(mx, my)) return;
 
     setDragging(true);
     setDragStart({ x: mx - logoPos.x, y: my - logoPos.y });
@@ -154,7 +147,7 @@ export default function LogoCanvas({ logoSrc, onChange, initialState }) {
     const { mx, my } = getMousePos(e);
 
     canvasRef.current.style.cursor =
-      isInsideCircle(mx, my) ? (dragging ? 'grabbing' : 'grab') : 'default';
+      isInsideSquare(mx, my) ? (dragging ? 'grabbing' : 'grab') : 'default';
 
     if (dragging) {
       setLogoPos({
@@ -191,7 +184,7 @@ export default function LogoCanvas({ logoSrc, onChange, initialState }) {
 
   return (
     <div className={styles.wrapper}>
-      <div className={styles.circleContainer}>
+      <div className={styles.squareContainer}>
         <canvas
           ref={canvasRef}
           width={CANVAS_SIZE}

@@ -76,6 +76,7 @@ const GK_POSTERS = [
   {
     id: 'gk-bp',
     kind: 'gk',
+    template: 'risk-factor',
     badge: 'Health tip',
     headline: ['Know', 'Your', 'Numbers'],
     scriptTop: 'Awareness First\nCare Always',

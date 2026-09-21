@@ -46,6 +46,7 @@ const posterEntrySchema = new mongoose.Schema(
 const doctorSchema = new mongoose.Schema({
   name: { type: String, required: true },
   clinicName: { type: String, required: true, trim: true },
+  doctorDegree: { type: String, trim: true, default: '' },
   contactnumber: { type: Number, required: true },
   logo: { type: Buffer },
   poster: { type: Buffer }, // latest poster (legacy + convenience)
@@ -104,6 +105,7 @@ function formatDoctor(doc, { includePosters = false, light = false } = {}) {
     id: obj._id,
     name: obj.name,
     clinicName: obj.clinicName || '',
+    doctorDegree: obj.doctorDegree || '',
     contactnumber: obj.contactnumber,
     active: obj.active !== false,
     postersMade,
@@ -267,7 +269,7 @@ app.put('/api/doctors/:id', upload.any(), async (req, res) => {
     const doctor = await Doctor.findById(req.params.id);
     if (!doctor) return res.status(404).json({ message: 'Doctor not found' });
 
-    const { name, contactnumber, clinicName, active } = req.body;
+    const { name, contactnumber, clinicName, doctorDegree, active } = req.body;
     let logo = req.files?.find((f) => f.fieldname === 'logo')?.buffer || null;
     if (!logo && req.body.logo && typeof req.body.logo === 'string' && req.body.logo.startsWith('data:')) {
       logo = Buffer.from(req.body.logo.replace(/^data:image\/\w+;base64,/, ''), 'base64');
@@ -280,6 +282,13 @@ app.put('/api/doctors/:id', upload.any(), async (req, res) => {
         return res.status(400).json({ message: 'Clinic/Hospital name is required.' });
       }
       doctor.clinicName = cleaned;
+    }
+    if (doctorDegree != null) {
+      const cleaned = String(doctorDegree).trim();
+      if (!cleaned) {
+        return res.status(400).json({ message: "Doctor's degree is required." });
+      }
+      doctor.doctorDegree = cleaned;
     }
     if (contactnumber != null) {
       doctor.contactnumber =
@@ -363,7 +372,7 @@ app.post('/api/doctors/:id/download', async (req, res) => {
 
 // Create/update doctor profile and poster with multer file upload
 app.post('/api/doctors', upload.any(), async (req, res) => {
-  const { name, contactnumber, clinicName, doctorId } = req.body;
+  const { name, contactnumber, clinicName, doctorDegree, doctorId } = req.body;
   const countDownload = String(req.body.countDownload || '') === 'true';
   let logo = req.files?.find((f) => f.fieldname === 'logo')?.buffer || null;
   let poster = req.files?.find((f) => f.fieldname === 'poster')?.buffer || null;
@@ -383,8 +392,13 @@ app.post('/api/doctors', upload.any(), async (req, res) => {
     return res.status(400).json({ success: false, message: 'Clinic/Hospital name is required.' });
   }
 
+  if (!String(doctorDegree || '').trim()) {
+    return res.status(400).json({ success: false, message: "Doctor's degree is required." });
+  }
+
   try {
     const cleanedContact = Number(String(contactnumber || '').replace(/\D/g, '')) || 9999999999;
+    const cleanedDegree = String(doctorDegree).trim();
 
     // Update existing doctor when doctorId is provided
     if (doctorId) {
@@ -395,6 +409,7 @@ app.post('/api/doctors', upload.any(), async (req, res) => {
 
       doctor.name = name?.trim() || doctor.name;
       doctor.clinicName = String(clinicName).trim();
+      doctor.doctorDegree = cleanedDegree;
       doctor.contactnumber = cleanedContact;
       if (logo) doctor.logo = logo;
 
@@ -426,6 +441,7 @@ app.post('/api/doctors', upload.any(), async (req, res) => {
     const docData = {
       name: name?.trim() || 'Doctor',
       clinicName: String(clinicName).trim(),
+      doctorDegree: cleanedDegree,
       contactnumber: cleanedContact,
       logo,
       active: true,
@@ -769,6 +785,14 @@ const startServer = async () => {
     );
     if (clinicBackfill.modifiedCount) {
       console.log(`Backfilled clinicName for ${clinicBackfill.modifiedCount} doctor(s)`);
+    }
+
+    const degreeBackfill = await Doctor.updateMany(
+      { $or: [{ doctorDegree: { $exists: false } }, { doctorDegree: null }] },
+      { $set: { doctorDegree: '' } }
+    );
+    if (degreeBackfill.modifiedCount) {
+      console.log(`Backfilled doctorDegree for ${degreeBackfill.modifiedCount} doctor(s)`);
     }
 
     const activeBackfill = await Doctor.updateMany(
