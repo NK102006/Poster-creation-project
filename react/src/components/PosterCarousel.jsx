@@ -392,15 +392,6 @@ export default function PosterCarousel({
 
   return (
     <div className={styles.carousel}>
-      <Dropdowns
-        festival={festival}
-        slides={slides}
-        safeIndex={safeIndex}
-        generalPosters={generalPosters}
-        generalSelectValue={generalSelectValue}
-        onFestivalChange={handleFestivalChange}
-        onGeneralChange={handleGeneralChange}
-      />
 
       {variant === 'scroll' ? (
         <ScrollView

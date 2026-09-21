@@ -519,29 +519,33 @@ export default function PosterGenerator({
         )}
       </div>
 
-      {showCropModal && originalLogoUrl && (
+      {showCropModal && originalLogoUrl && createPortal(
         <div
           style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(0,0,0,0.5)',
-            zIndex: 9999,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
+            position: 'fixed', inset: 0, 
+            background: 'rgba(255,255,255,0.05)',
+            backdropFilter: 'blur(15px)',
+            WebkitBackdropFilter: 'blur(15px)',
+            zIndex: 999999,
+            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+            padding: '40px 20px',
           }}
+          onClick={() => setShowCropModal(false)}
         >
           <div
             style={{
+              position: 'relative',
               background: '#fff',
               padding: '24px',
-              borderRadius: '12px',
+              borderRadius: '16px',
               display: 'flex',
               flexDirection: 'column',
               gap: '16px',
               alignItems: 'center',
-              boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
+              boxShadow: '0 20px 50px rgba(0,0,0,0.2)',
+              maxHeight: '85vh',
             }}
+            onClick={(e) => e.stopPropagation()}
           >
             <h3
               style={{
@@ -588,7 +592,8 @@ export default function PosterGenerator({
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Poster Preview Modal */}
