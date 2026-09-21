@@ -36,19 +36,19 @@
   width: 100%;
   appearance: none;
   border-radius: 12px;
-  border: 1px solid rgba(36, 71, 62, 0.14);
-  background: linear-gradient(180deg, #f7f1e8 0%, var(--color-surface) 100%);
+  border: 1px solid rgba(31, 111, 159, 0.14);
+  background: linear-gradient(180deg, #f4f9fc 0%, var(--color-surface) 100%);
   color: var(--color-text);
   font-family: var(--font-body);
   font-size: 14px;
   font-weight: 550;
   padding: 11px 36px 11px 14px;
   outline: none;
-  box-shadow: 0 10px 24px rgba(8, 20, 16, 0.12);
+  box-shadow: 0 10px 24px rgba(31, 111, 159, 0.12);
   background-image:
     linear-gradient(45deg, transparent 50%, #5f6e68 50%),
     linear-gradient(135deg, #5f6e68 50%, transparent 50%),
-    linear-gradient(180deg, #f7f1e8 0%, var(--color-surface) 100%);
+    linear-gradient(180deg, #f4f9fc 0%, var(--color-surface) 100%);
   background-position:
     calc(100% - 16px) calc(50% - 3px),
     calc(100% - 11px) calc(50% - 3px),
@@ -73,9 +73,9 @@
   gap: 14px;
   padding: 22px 18px 18px;
   border-radius: 20px;
-  border: 1px solid rgba(36, 71, 62, 0.12);
-  background: linear-gradient(180deg, #f7f1e8 0%, var(--color-surface) 100%);
-  box-shadow: 0 16px 36px rgba(8, 20, 16, 0.16);
+  border: 1px solid rgba(31, 111, 159, 0.12);
+  background: linear-gradient(180deg, #f4f9fc 0%, var(--color-surface) 100%);
+  box-shadow: 0 16px 36px rgba(31, 111, 159, 0.16);
   overflow: visible;
 }
 
@@ -98,8 +98,8 @@
 
 .gridCardActive .blankPage {
   box-shadow:
-    0 14px 28px rgba(8, 20, 16, 0.22),
-    0 0 0 2px rgba(198, 164, 106, 0.55);
+    0 14px 28px rgba(31, 111, 159, 0.22),
+    0 0 0 2px rgba(74, 159, 212, 0.55);
 }
 
 .blankPage {
@@ -108,8 +108,8 @@
   aspect-ratio: 3 / 4;
   border-radius: 12px;
   background: linear-gradient(180deg, #ffffff 0%, var(--color-surface) 100%);
-  border: 1px solid rgba(36, 71, 62, 0.1);
-  box-shadow: 0 10px 22px rgba(8, 20, 16, 0.14);
+  border: 1px solid rgba(31, 111, 159, 0.1);
+  box-shadow: 0 10px 22px rgba(31, 111, 159, 0.14);
   display: grid;
   place-items: center;
   overflow: hidden;
@@ -146,11 +146,11 @@
 .gridCard:hover .blankPage {
   transform: scale(1.55);
   filter: brightness(1.04) saturate(1.05);
-  border-color: rgba(198, 164, 106, 0.55);
+  border-color: rgba(74, 159, 212, 0.55);
   box-shadow:
-    0 28px 50px rgba(8, 20, 16, 0.32),
-    0 0 0 1px rgba(198, 164, 106, 0.35),
-    0 0 28px rgba(198, 164, 106, 0.22);
+    0 28px 50px rgba(31, 111, 159, 0.32),
+    0 0 0 1px rgba(74, 159, 212, 0.35),
+    0 0 28px rgba(74, 159, 212, 0.22);
 }
 
 .gridCard:hover .blankLabel {
@@ -163,7 +163,7 @@
   inset: 0;
   background:
     linear-gradient(145deg, rgba(255, 255, 255, 0.55), transparent 42%),
-    radial-gradient(circle at 80% 18%, var(--page-wash, rgba(198, 164, 106, 0.18)), transparent 42%);
+    radial-gradient(circle at 80% 18%, var(--page-wash, rgba(74, 159, 212, 0.18)), transparent 42%);
   pointer-events: none;
 }
 
@@ -189,7 +189,7 @@
 }
 
 .sendDate strong {
-  color: #8a6a35;
+  color: var(--color-accent);
   font-weight: 700;
 }
 
@@ -231,8 +231,8 @@
   left: 0;
   background: linear-gradient(
     90deg,
-    rgba(12, 26, 22, 0.75) 0%,
-    rgba(12, 26, 22, 0.2) 55%,
+    rgba(255, 255, 255, 0.75) 0%,
+    rgba(255, 255, 255, 0.2) 55%,
     transparent 100%
   );
 }
@@ -241,8 +241,8 @@
   right: 0;
   background: linear-gradient(
     270deg,
-    rgba(12, 26, 22, 0.75) 0%,
-    rgba(12, 26, 22, 0.2) 55%,
+    rgba(255, 255, 255, 0.75) 0%,
+    rgba(255, 255, 255, 0.2) 55%,
     transparent 100%
   );
 }
@@ -279,8 +279,8 @@
 
 .slideActive .blankPage {
   box-shadow:
-    0 22px 44px rgba(8, 20, 16, 0.3),
-    0 0 0 1px color-mix(in srgb, var(--carousel-accent, #c6a46a) 45%, transparent);
+    0 22px 44px rgba(31, 111, 159, 0.3),
+    0 0 0 1px color-mix(in srgb, var(--carousel-accent, #4a9fd4) 45%, transparent);
 }
 
 .slideNear {
@@ -299,20 +299,20 @@
   width: 44px;
   height: 44px;
   border-radius: 50%;
-  border: 1px solid rgba(36, 71, 62, 0.12);
-  background: linear-gradient(180deg, #f7f1e8 0%, var(--color-surface) 100%);
+  border: 1px solid rgba(31, 111, 159, 0.12);
+  background: linear-gradient(180deg, #f4f9fc 0%, var(--color-surface) 100%);
   color: var(--color-text);
   display: grid;
   place-items: center;
   cursor: pointer;
-  box-shadow: 0 10px 22px rgba(8, 20, 16, 0.16);
+  box-shadow: 0 10px 22px rgba(31, 111, 159, 0.16);
   z-index: 4;
   transition: transform 0.2s ease, border-color 0.2s ease;
 }
 
 .arrow:hover:not(:disabled) {
   transform: scale(1.05);
-  border-color: rgba(198, 164, 106, 0.55);
+  border-color: rgba(74, 159, 212, 0.55);
 }
 
 .arrow:disabled {
@@ -329,16 +329,16 @@
   max-width: 280px;
   margin: 0 auto;
   border-radius: 14px;
-  background: linear-gradient(180deg, #f7f1e8 0%, var(--color-surface) 100%);
-  border: 1px solid rgba(36, 71, 62, 0.12);
-  box-shadow: 0 10px 22px rgba(8, 20, 16, 0.12);
+  background: linear-gradient(180deg, #f4f9fc 0%, var(--color-surface) 100%);
+  border: 1px solid rgba(31, 111, 159, 0.12);
+  box-shadow: 0 10px 22px rgba(31, 111, 159, 0.12);
 }
 
 .scrollSendLabel {
   font-size: 10px;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: #8a6a35;
+  color: var(--color-accent);
   font-weight: 700;
 }
 
@@ -362,7 +362,7 @@
   border-radius: 999px;
   border: none;
   padding: 0;
-  background: rgba(243, 235, 224, 0.28);
+  background: rgba(255, 255, 255, 0.28);
   cursor: pointer;
   transition: width 0.28s ease, background 0.28s ease, box-shadow 0.28s ease;
 }
@@ -370,7 +370,7 @@
 .dotActive {
   width: 22px;
   background: var(--color-accent);
-  box-shadow: 0 0 0 3px rgba(198, 164, 106, 0.22);
+  box-shadow: 0 0 0 3px rgba(74, 159, 212, 0.22);
 }
 
 @media (max-width: 900px) {

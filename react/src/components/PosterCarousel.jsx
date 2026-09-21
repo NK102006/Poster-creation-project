@@ -229,7 +229,7 @@ function ScrollView({
         style={{
           '--slide-w': `${slideWidth}px`,
           '--slide-gap': `${gap}px`,
-          '--carousel-accent': theme?.accentColor || '#c6a46a',
+          '--carousel-accent': theme?.accentColor || '#4a9fd4',
         }}
       >
         <button

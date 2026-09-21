@@ -15,8 +15,8 @@
   transform: translateX(-50%);
   background: radial-gradient(
     circle,
-    rgba(198, 164, 106, 0.16) 0%,
-    rgba(198, 164, 106, 0.04) 42%,
+    rgba(126, 192, 232, 0.35) 0%,
+    rgba(74, 159, 212, 0.08) 42%,
     transparent 70%
   );
   animation: glowBreatheCenter 10s ease-in-out infinite;
@@ -30,7 +30,7 @@
   bottom: -12%;
   background: radial-gradient(
     circle,
-    rgba(90, 140, 120, 0.22) 0%,
+    rgba(74, 159, 212, 0.2) 0%,
     transparent 68%
   );
   animation: glowBreatheCorner 12s ease-in-out infinite;
@@ -40,12 +40,12 @@
   position: absolute;
   inset: 0;
   background:
-    radial-gradient(ellipse 90% 70% at 50% 40%, transparent 48%, rgba(8, 18, 14, 0.32) 100%);
+    radial-gradient(ellipse 90% 70% at 50% 40%, transparent 48%, rgba(185, 214, 232, 0.35) 100%);
 }
 
 .motif {
   position: absolute;
-  color: rgba(236, 214, 164, 0.85);
+  color: rgba(31, 111, 159, 0.55);
 }
 
 .stethoscope {
@@ -53,10 +53,10 @@
   height: auto;
   right: 0;
   bottom: 0;
-  opacity: 0.28;
+  opacity: 0.14;
   transform: rotate(-8deg);
   animation: floatSoft 14s ease-in-out infinite;
-  filter: drop-shadow(0 0 24px rgba(198, 164, 106, 0.12));
+  filter: drop-shadow(0 0 24px rgba(74, 159, 212, 0.1));
 }
 
 .pulse {
@@ -64,7 +64,7 @@
   height: auto;
   top: 10%;
   left: -2%;
-  opacity: 0.2;
+  opacity: 0.12;
   transform: rotate(-6deg);
 }
 
@@ -79,7 +79,7 @@
   height: auto;
   left: 4%;
   bottom: 14%;
-  opacity: 0.16;
+  opacity: 0.1;
   animation: floatSoft 16s ease-in-out infinite reverse;
 }
 
@@ -88,7 +88,7 @@
   height: auto;
   top: 14%;
   right: 6%;
-  opacity: 0.17;
+  opacity: 0.1;
   transform: rotate(28deg);
   animation: floatSoft 18s ease-in-out infinite;
 }
@@ -149,20 +149,20 @@
 @media (max-width: 720px) {
   .stethoscope {
     width: 64vw;
-    opacity: 0.18;
+    opacity: 0.1;
     right: -8%;
     bottom: -2%;
   }
 
   .pulse {
     width: 80vw;
-    opacity: 0.12;
+    opacity: 0.08;
     top: 10%;
   }
 
   .cross,
   .capsule {
-    opacity: 0.1;
+    opacity: 0.07;
   }
 }
 

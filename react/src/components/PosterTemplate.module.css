@@ -107,7 +107,7 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  font-family: 'Outfit', sans-serif;
+  font-family: var(--font-body), sans-serif;
   font-weight: 700;
   font-size: 34px;
   color: #1a1a2e;
@@ -149,7 +149,7 @@
 }
 
 .brandTitle {
-  font-family: 'Outfit', sans-serif;
+  font-family: var(--font-body), sans-serif;
   font-weight: 800;
   font-size: 20px;
   color: #1565C0;
@@ -157,7 +157,7 @@
 }
 
 .brandSubtitle {
-  font-family: 'Outfit', sans-serif;
+  font-family: var(--font-body), sans-serif;
   font-weight: 700;
   font-size: 16px;
   color: #2E7D32;
@@ -194,7 +194,7 @@
 }
 
 .titleWord {
-  font-family: 'Outfit', sans-serif;
+  font-family: var(--font-body), sans-serif;
   font-weight: 800;
   font-size: 128px;
   line-height: 1;
@@ -242,7 +242,7 @@
 }
 
 .treatmentLine {
-  font-family: 'Outfit', sans-serif;
+  font-family: var(--font-body), sans-serif;
   font-size: 56px;
   font-weight: 800;
   color: #1565C0;
@@ -345,7 +345,7 @@
 }
 
 .nameplateTitle {
-  font-family: 'Outfit', sans-serif;
+  font-family: var(--font-body), sans-serif;
   font-weight: 800;
   font-size: 34px;
   color: #1a1a2e;
@@ -420,7 +420,7 @@
 }
 
 .whatsappNumber {
-  font-family: 'Outfit', sans-serif;
+  font-family: var(--font-body), sans-serif;
   font-size: 40px;
   font-weight: 800;
   color: #1a1a2e;
@@ -503,7 +503,7 @@
 }
 
 .footerText {
-  font-family: 'Outfit', sans-serif;
+  font-family: var(--font-body), sans-serif;
   font-weight: 700;
   font-size: 24px;
   color: #ffffff;
