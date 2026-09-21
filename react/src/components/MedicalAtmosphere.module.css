@@ -1,0 +1,182 @@
+.root {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.glowPrimary {
+  position: absolute;
+  width: min(70vw, 720px);
+  height: min(70vw, 720px);
+  top: -18%;
+  left: 50%;
+  transform: translateX(-50%);
+  background: radial-gradient(
+    circle,
+    rgba(126, 192, 232, 0.35) 0%,
+    rgba(74, 159, 212, 0.08) 42%,
+    transparent 70%
+  );
+  animation: glowBreatheCenter 10s ease-in-out infinite;
+}
+
+.glowSecondary {
+  position: absolute;
+  width: min(50vw, 480px);
+  height: min(50vw, 480px);
+  right: -8%;
+  bottom: -12%;
+  background: radial-gradient(
+    circle,
+    rgba(74, 159, 212, 0.2) 0%,
+    transparent 68%
+  );
+  animation: glowBreatheCorner 12s ease-in-out infinite;
+}
+
+.vignette {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(ellipse 90% 70% at 50% 40%, transparent 48%, rgba(185, 214, 232, 0.35) 100%);
+}
+
+.motif {
+  position: absolute;
+  color: rgba(31, 111, 159, 0.55);
+}
+
+.stethoscope {
+  width: min(52vw, 460px);
+  height: auto;
+  right: 0;
+  bottom: 0;
+  opacity: 0.14;
+  transform: rotate(-8deg);
+  animation: floatSoft 14s ease-in-out infinite;
+  filter: drop-shadow(0 0 24px rgba(74, 159, 212, 0.1));
+}
+
+.pulse {
+  width: min(60vw, 580px);
+  height: auto;
+  top: 10%;
+  left: -2%;
+  opacity: 0.12;
+  transform: rotate(-6deg);
+}
+
+.pulsePath {
+  stroke-dasharray: 680;
+  stroke-dashoffset: 680;
+  animation: pulseDraw 8s ease-in-out infinite;
+}
+
+.cross {
+  width: min(20vw, 150px);
+  height: auto;
+  left: 4%;
+  bottom: 14%;
+  opacity: 0.1;
+  animation: floatSoft 16s ease-in-out infinite reverse;
+}
+
+.capsule {
+  width: min(17vw, 140px);
+  height: auto;
+  top: 14%;
+  right: 6%;
+  opacity: 0.1;
+  transform: rotate(28deg);
+  animation: floatSoft 18s ease-in-out infinite;
+}
+
+@keyframes glowBreatheCenter {
+  0%,
+  100% {
+    opacity: 0.85;
+    transform: translateX(-50%) scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: translateX(-50%) scale(1.06);
+  }
+}
+
+@keyframes glowBreatheCorner {
+  0%,
+  100% {
+    opacity: 0.8;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.08);
+  }
+}
+
+@keyframes floatSoft {
+  0%,
+  100% {
+    translate: 0 0;
+  }
+  50% {
+    translate: 0 -12px;
+  }
+}
+
+@keyframes pulseDraw {
+  0% {
+    stroke-dashoffset: 680;
+    opacity: 0.35;
+  }
+  35% {
+    stroke-dashoffset: 0;
+    opacity: 1;
+  }
+  70% {
+    stroke-dashoffset: 0;
+    opacity: 0.85;
+  }
+  100% {
+    stroke-dashoffset: -40;
+    opacity: 0.2;
+  }
+}
+
+@media (max-width: 720px) {
+  .stethoscope {
+    width: 64vw;
+    opacity: 0.1;
+    right: -8%;
+    bottom: -2%;
+  }
+
+  .pulse {
+    width: 80vw;
+    opacity: 0.08;
+    top: 10%;
+  }
+
+  .cross,
+  .capsule {
+    opacity: 0.07;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .glowPrimary,
+  .glowSecondary,
+  .stethoscope,
+  .cross,
+  .capsule,
+  .pulsePath {
+    animation: none;
+  }
+
+  .pulsePath {
+    stroke-dashoffset: 0;
+  }
+}

@@ -10,7 +10,10 @@
   },
   "dependencies": {
     "@vitejs/plugin-react": "^5.0.2",
+    "datatables.net": "^3.0.4",
+    "datatables.net-dt": "^3.0.4",
     "html-to-image": "^1.11.13",
+    "jszip": "^3.10.2",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
     "vite": "^7.1.3"

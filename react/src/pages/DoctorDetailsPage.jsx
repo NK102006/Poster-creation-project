@@ -1,58 +1,82 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { apiRequest } from '../lib/apiClient';
 import PosterGenerator from '../components/PosterGenerator';
+import StudioShell from '../components/StudioShell';
 import styles from './DoctorDetailsPage.module.css';
 
-export default function DoctorDetailsPage({ user, onLogout }) {
-  const [doctor, setDoctor] = useState(null);
+export default function DoctorDetailsPage({
+  user,
+  onLogout,
+  onBack,
+  onBrandClick,
+  onOpenExisting,
+  onStartNew,
+  existingDoctor = null,
+  doctorId = null,
+  initialStep = 1,
+}) {
+  const [doctor, setDoctor] = useState(existingDoctor);
   const [formData, setFormData] = useState({
-    name: '',
-    contactnumber: '',
+    name: existingDoctor?.name || '',
+    contactnumber: existingDoctor?.contactnumber
+      ? String(existingDoctor.contactnumber)
+      : '',
+    clinicName: existingDoctor?.clinicName || '',
+    doctorDegree: existingDoctor?.doctorDegree || '',
   });
   const [logoFile, setLogoFile] = useState(null);
-  const [logoPreview, setLogoPreview] = useState(null);
+  const [logoPreview, setLogoPreview] = useState(existingDoctor?.logo || null);
+
+  const editingExisting = Boolean(doctor || existingDoctor || doctorId);
 
   useEffect(() => {
-    let isMounted = true;
-    const fetchDoctor = async () => {
+    if (!doctorId || existingDoctor?.id === doctorId) return;
+    let cancelled = false;
+    (async () => {
       try {
-        const res = await apiRequest('/doctors/current');
-        if (isMounted && res?.doctor) {
-          setDoctor(res.doctor);
-          setFormData({
-            name: res.doctor.name || '',
-            contactnumber: res.doctor.contactnumber ? String(res.doctor.contactnumber) : '',
-          });
-          if (res.doctor.logo) {
-            setLogoPreview(res.doctor.logo);
-          }
-          setLogoFile(null);
-          setFormData({ name: '', contactnumber: '' });
-          setLogoPreview('');
-        }
+        const res = await apiRequest(`/doctors/${doctorId}`);
+        if (cancelled || !res?.doctor) return;
+        setDoctor(res.doctor);
+        setFormData({
+          name: res.doctor.name || '',
+          contactnumber: res.doctor.contactnumber
+            ? String(res.doctor.contactnumber)
+            : '',
+          clinicName: res.doctor.clinicName || '',
+          doctorDegree: res.doctor.doctorDegree || '',
+        });
+        setLogoPreview(res.doctor.logo || null);
       } catch (err) {
-        console.warn('Doctor fetch notice:', err);
+        console.warn('Could not load doctor for poster:', err);
       }
-    };
-
-    fetchDoctor();
+    })();
     return () => {
-      isMounted = false;
+      cancelled = true;
     };
-  }, []);
+  }, [doctorId, existingDoctor?.id]);
 
   const handleAutoSave = async (currentFormData, currentLogoFile, posterBlob) => {
     const name = currentFormData?.name?.trim() || formData.name?.trim();
-    const contactnumber = currentFormData?.contactnumber?.trim() || formData.contactnumber?.trim();
+    const contactnumber =
+      currentFormData?.contactnumber?.trim() || formData.contactnumber?.trim();
+    const clinicName =
+      currentFormData?.clinicName?.trim() || formData.clinicName?.trim();
+    const doctorDegree =
+      currentFormData?.doctorDegree?.trim() || formData.doctorDegree?.trim();
     const file = currentLogoFile !== undefined ? currentLogoFile : logoFile;
 
-    if (!name && !contactnumber) {
+    if (!name && !contactnumber && !clinicName && !doctorDegree) {
       return { success: true };
     }
 
     const data = new FormData();
     if (name) data.append('name', name);
     if (contactnumber) data.append('contactnumber', contactnumber);
+    if (clinicName) data.append('clinicName', clinicName);
+    if (doctorDegree) data.append('doctorDegree', doctorDegree);
+    if (doctor?.id) data.append('doctorId', doctor.id);
+    data.append('countDownload', 'true');
+
     if (file) {
       data.append('logo', file);
     } else if (logoPreview && typeof logoPreview === 'string' && logoPreview.startsWith('data:')) {
@@ -78,44 +102,49 @@ export default function DoctorDetailsPage({ user, onLogout }) {
   };
 
   return (
-    <div className={styles.page}>
-      <header className={styles.header}>
-        <div className={styles.brandGroup}>
-          <div className={styles.logoIcon}>M</div>
-          <span className={styles.brandName}>MedPortal</span>
-        </div>
-        <div className={styles.userNav}>
-          <div className={styles.userBadge}>
-            <span className={styles.statusDot} />
-            <span>Employee</span>
-          </div>
-          <button
-            type="button"
-            className={styles.logoutBtn}
-            onClick={onLogout}
-            id="logout-button"
-          >
-            Sign out
+    <StudioShell
+      onLogout={onLogout}
+      onBrandClick={onBrandClick || onStartNew}
+      headerActions={
+        onOpenExisting ? (
+          <button type="button" className={styles.headerAction} onClick={onOpenExisting}>
+            Existing doctors
           </button>
-        </div>
-      </header>
+        ) : null
+      }
+    >
+      <div className={styles.hero}>
+        {onBack && (
+          <button type="button" className={styles.backLink} onClick={onBack}>
+            ← Back to doctor
+          </button>
+        )}
+        <h1 className={styles.heroTitle}>
+          {editingExisting ? 'Create poster' : 'Doctor details'}
+        </h1>
+        <p className={styles.heroSub}>
+          {editingExisting
+            ? `Working on ${doctor?.name || existingDoctor?.name || 'this doctor'}`
+            : 'Fill in the profile and generate a poster'}
+        </p>
+        {editingExisting && onStartNew && (
+          <button type="button" className={styles.switchLink} onClick={onStartNew}>
+            Start a new doctor instead
+          </button>
+        )}
+      </div>
 
-      <main className={styles.main}>
-        <div className={styles.hero}>
-          <h1 className={styles.heroTitle}>Poster Studio</h1>
-        </div>
-
-        <PosterGenerator
-          formData={formData}
-          setFormData={setFormData}
-          logoFile={logoFile}
-          setLogoFile={setLogoFile}
-          logoPreview={logoPreview}
-          setLogoPreview={setLogoPreview}
-          onAutoSave={handleAutoSave}
-          doctor={doctor}
-        />
-      </main>
-    </div>
+      <PosterGenerator
+        formData={formData}
+        setFormData={setFormData}
+        logoFile={logoFile}
+        setLogoFile={setLogoFile}
+        logoPreview={logoPreview}
+        setLogoPreview={setLogoPreview}
+        onAutoSave={handleAutoSave}
+        doctor={doctor}
+        initialStep={initialStep}
+      />
+    </StudioShell>
   );
 }

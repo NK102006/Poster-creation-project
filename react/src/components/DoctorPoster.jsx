@@ -35,20 +35,50 @@ const FontImports = () => (
 export default function DoctorPoster({
   doctorName = "Dr. Ananya Mehta",
   credentials = "Consultant Specialist",
-  therapyName = "Infertility Treatment",
+  therapyName,
   photo,
   date = "25 April 2025",
   whatsapp = "+91 98765 43210",
   clinicName = "YOUR HEALTH",
   clinicTagline = "OUR PRIORITY",
   theme,
+  content = null,
+  capture = false,
+  className = "",
 }) {
   const styles = getStyles(theme);
+  const headline = content?.headline || ["Hope", "Grows", "Here"];
+  const scriptTop = (content?.scriptTop || "Small Steps\nBig Miracles").split("\n");
+  const expertLabel = content?.expertLabel || "Expert Care in";
+  const focusTitle = content?.focusTitle || therapyName || "Infertility Treatment";
+  const pillars = content?.pillars || "Science  |  Compassion  |  New Beginnings";
+  const features = content?.features || [
+    ["Personalized", "Treatment Plans"],
+    ["Advanced", "Fertility Solutions"],
+    ["Support", "at Every Step"],
+  ];
+  const quote =
+    content?.quote || "Because every family has a story worth waiting for";
+  const scriptBottom = (content?.scriptBottom || "New Hope\nBrighter Tomorrows").split(
+    "\n"
+  );
+  const banner =
+    content?.banner || "HEALTHY FAMILIES  •  HAPPIER TOMORROWS";
+  const featureColors = [
+    theme?.highlight || "#e8608f",
+    theme?.accentColor || "#8a5fd6",
+    theme?.headerBg || "#69b83e",
+  ];
+
   return (
-    <div style={styles.page}>
+    <div style={styles.page} className={className}>
       <FontImports />
 
-      <div style={styles.poster} id="doctor-poster-capture">
+      <div
+        style={styles.poster}
+        id={capture ? "doctor-poster-capture" : undefined}
+        data-poster-capture={capture ? "true" : undefined}
+      >
         {/* ---------- decorative background blobs ---------- */}
         <div style={styles.bgWash} />
         <div style={styles.pinkBlob} />
@@ -56,7 +86,7 @@ export default function DoctorPoster({
         {/* ---------- top bar ---------- */}
         <div style={styles.topBar}>
           <div style={styles.dateChip}>
-            <CalendarIcon />
+            <CalendarIcon color={theme?.textTitle} />
             <span style={styles.dateText}>{date}</span>
           </div>
 
@@ -70,48 +100,46 @@ export default function DoctorPoster({
         </div>
 
         <div style={styles.scriptTopRight}>
-          Small Steps
+          {scriptTop[0]}
           <br />
-          Big Miracles <HeartGlyph color="#e0507e" size={16} />
+          {scriptTop[1]}{" "}
+          <HeartGlyph color={theme?.highlight || "#e0507e"} size={16} />
         </div>
 
         {/* ---------- headline ---------- */}
         <div style={styles.headlineBlock}>
-          <h1 style={styles.headlineNavy}>Hope</h1>
+          <h1 style={styles.headlineNavy}>{headline[0]}</h1>
           <h1 style={{ ...styles.headlineTeal, position: "relative", width: "fit-content" }}>
-            Grows
+            {headline[1]}
             <LeafGlyph style={styles.leafOnGrows} />
           </h1>
-          <h1 style={styles.headlineNavy}>Here</h1>
+          <h1 style={styles.headlineNavy}>{headline[2]}</h1>
         </div>
 
         {/* ---------- subheading ---------- */}
         <div style={styles.subheadBlock}>
-          <p style={styles.subheadLine}>Expert Care in</p>
-          <p style={styles.subheadTherapy}>{therapyName}</p>
-          <p style={styles.subheadTags}>
-            Science&nbsp;&nbsp;|&nbsp;&nbsp;Compassion&nbsp;&nbsp;|&nbsp;&nbsp;New
-            Beginnings
-          </p>
+          <p style={styles.subheadLine}>{expertLabel}</p>
+          <p style={styles.subheadTherapy}>{focusTitle}</p>
+          <p style={styles.subheadTags}>{pillars}</p>
         </div>
 
         {/* ---------- feature icons row ---------- */}
         <div style={styles.featureRow}>
           <Feature
-            color={theme?.highlight || "#e8608f"}
-            label={["Personalized", "Treatment Plans"]}
+            color={featureColors[0]}
+            label={features[0]}
             icon={<HeartsIcon />}
             styles={styles}
           />
           <Feature
-            color={theme?.accentColor || "#8a5fd6"}
-            label={["Advanced", "Fertility Solutions"]}
+            color={featureColors[1]}
+            label={features[1]}
             icon={<MicroscopeIcon />}
             styles={styles}
           />
           <Feature
-            color={theme?.headerBg || "#69b83e"}
-            label={["Support", "at Every Step"]}
+            color={featureColors[2]}
+            label={features[2]}
             icon={<PeopleIcon />}
             styles={styles}
           />
@@ -119,8 +147,16 @@ export default function DoctorPoster({
 
         {/* ---------- mother/child silhouette illustration ---------- */}
         {!photo && <MotherChildGlyph style={styles.motherChild} />}
-        <HeartGlyph color="#f2a4bd" size={34} style={styles.floatingHeart1} />
-        <HeartGlyph color="#f2a4bd" size={20} style={styles.floatingHeart2} />
+        <HeartGlyph
+          color={theme?.wash || "#f2a4bd"}
+          size={34}
+          style={styles.floatingHeart1}
+        />
+        <HeartGlyph
+          color={theme?.wash || "#f2a4bd"}
+          size={20}
+          style={styles.floatingHeart2}
+        />
 
         {/* ---------- doctor photo ---------- */}
         {photo && (
@@ -138,10 +174,8 @@ export default function DoctorPoster({
         {/* ---------- pink script strip ---------- */}
         <div style={styles.scriptStrip}>
           <p style={styles.scriptStripText}>
-            Because every family
-            <br />
-            has a story worth waiting for{" "}
-            <HeartGlyph color="#c22458" size={16} outline />
+            {quote}{" "}
+            <HeartGlyph color={theme?.footerBg || "#c22458"} size={16} outline />
           </p>
         </div>
 
@@ -158,15 +192,16 @@ export default function DoctorPoster({
           </div>
 
           <div style={styles.scriptBottomRight}>
-            New Hope
+            {scriptBottom[0]}
             <br />
-            Brighter Tomorrows <HeartGlyph color="#14276b" size={14} outline />
+            {scriptBottom[1]}{" "}
+            <HeartGlyph color={theme?.textTitle || "#14276b"} size={14} outline />
           </div>
         </div>
 
         {/* ---------- footer line ---------- */}
         <div style={styles.footerLine}>
-          <MegaphoneIcon />
+          <MegaphoneIcon color={theme?.highlight || "#c22458"} />
           <span style={styles.footerText}>
             Personalized Patient Education&nbsp;&nbsp;•&nbsp;&nbsp;Informative
             Health Posts&nbsp;&nbsp;•&nbsp;&nbsp;A Healthier Community
@@ -176,9 +211,7 @@ export default function DoctorPoster({
 
         {/* ---------- bottom banner ---------- */}
         <div style={styles.bottomBanner}>
-          <span style={styles.bottomBannerText}>
-            HEALTHY FAMILIES&nbsp;&nbsp;•&nbsp;&nbsp;HAPPIER TOMORROWS
-          </span>
+          <span style={styles.bottomBannerText}>{banner}</span>
         </div>
       </div>
     </div>
@@ -190,13 +223,18 @@ export default function DoctorPoster({
    ============================================================ */
 
 function Feature({ color, label, icon, styles }) {
+  const lines = Array.isArray(label) ? label : [String(label || '')];
   return (
     <div style={styles.feature}>
       <div style={{ ...styles.featureCircle, background: color }}>{icon}</div>
       <p style={styles.featureLabel}>
-        {label[0]}
-        <br />
-        {label[1]}
+        {lines[0]}
+        {lines[1] ? (
+          <>
+            <br />
+            {lines[1]}
+          </>
+        ) : null}
       </p>
     </div>
   );
@@ -260,12 +298,12 @@ function MotherChildGlyph({ style }) {
   );
 }
 
-function CalendarIcon() {
+function CalendarIcon({ color = "#14276b" }) {
   return (
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-      <rect x="3" y="5" width="18" height="16" rx="2" stroke="#14276b" strokeWidth="2" />
-      <path d="M3 10h18" stroke="#14276b" strokeWidth="2" />
-      <path d="M8 3v4M16 3v4" stroke="#14276b" strokeWidth="2" strokeLinecap="round" />
+      <rect x="3" y="5" width="18" height="16" rx="2" stroke={color} strokeWidth="2" />
+      <path d="M3 10h18" stroke={color} strokeWidth="2" />
+      <path d="M8 3v4M16 3v4" stroke={color} strokeWidth="2" strokeLinecap="round" />
     </svg>
   );
 }
@@ -315,10 +353,15 @@ function WhatsAppIcon() {
   );
 }
 
-function MegaphoneIcon() {
+function MegaphoneIcon({ color = "#c22458" }) {
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-      <path d="M3 11v2a2 2 0 0 0 2 2h1l2 5h2l-1.5-5H12l6 4V5l-6 4H5a2 2 0 0 0-2 2Z" stroke="#c22458" strokeWidth="1.5" fill="#c22458" />
+      <path
+        d="M3 11v2a2 2 0 0 0 2 2h1l2 5h2l-1.5-5H12l6 4V5l-6 4H5a2 2 0 0 0-2 2Z"
+        stroke={color}
+        strokeWidth="1.5"
+        fill={color}
+      />
     </svg>
   );
 }

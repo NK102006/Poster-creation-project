@@ -1,35 +1,47 @@
 :root {
-  --color-bg: #132821;
-  --color-bg-deep: #0c1a16;
-  --color-bg-elevated: #1a332c;
-  --color-surface: #f3ebe0;
-  --color-surface-soft: #efe6d8;
-  --color-surface-glass: rgba(243, 235, 224, 0.08);
-  --color-primary: #24473e;
-  --color-primary-rich: #1b3831;
-  --color-primary-hover: #16352e;
-  --color-primary-contrast: #f7f1e8;
-  --color-accent: #c6a46a;
-  --color-accent-soft: #e2c992;
-  --color-text: #1a2a25;
-  --color-text-on-dark: #f3ebe0;
-  --color-text-muted: #5f6e68;
-  --color-text-muted-dark: #a8b7b0;
-  --color-border: rgba(36, 71, 62, 0.18);
-  --color-border-dark: rgba(243, 235, 224, 0.14);
+  /* Soft sky canvas */
+  --color-bg: #e8f3fb;
+  --color-bg-deep: #d7ebf7;
+  --color-bg-elevated: #ffffff;
+  --color-surface: #ffffff;
+  --color-surface-soft: #f2f8fc;
+  --color-surface-glass: rgba(255, 255, 255, 0.55);
+
+  /* Cards — ice white instead of beige */
+  --color-card: #ffffff;
+  --color-card-soft: #f4f9fd;
+  --color-card-border: rgba(74, 159, 212, 0.22);
+
+  /* Brand blues */
+  --color-primary: #1f6f9f;
+  --color-primary-rich: #185a82;
+  --color-primary-hover: #154c6e;
+  --color-primary-contrast: #f5fafd;
+  --color-accent: #4a9fd4;
+  --color-accent-soft: #7ec0e8;
+  --color-accent-deep: #3487bc;
+
+  /* Text — sober navy-slate on light surfaces */
+  --color-text: #1a3040;
+  --color-text-on-dark: #1a3040;
+  --color-text-muted: #5a7385;
+  --color-text-muted-dark: #6b8496;
+
+  --color-border: rgba(31, 111, 159, 0.16);
+  --color-border-dark: rgba(31, 111, 159, 0.12);
   --color-error: #c45b4a;
   --color-error-bg: #f8e8e4;
 
-  --font-body: 'Outfit', sans-serif;
-  --font-display: 'Cormorant Garamond', Georgia, serif;
+  --font-body: 'Manrope', system-ui, sans-serif;
+  --font-display: 'Fraunces', Georgia, serif;
 
   --radius-sm: 10px;
-  --radius-md: 18px;
-  --radius-lg: 28px;
+  --radius-md: 16px;
+  --radius-lg: 24px;
 
-  --shadow-card: 0 28px 60px -28px rgba(8, 20, 16, 0.55);
-  --shadow-glow: 0 0 0 1px rgba(198, 164, 106, 0.28);
-  --focus-ring: 0 0 0 3px rgba(198, 164, 106, 0.35);
+  --shadow-card: 0 20px 48px -24px rgba(31, 111, 159, 0.28);
+  --shadow-glow: 0 0 0 1px rgba(74, 159, 212, 0.22);
+  --focus-ring: 0 0 0 3px rgba(74, 159, 212, 0.32);
 
   --page-max: 760px;
 }
@@ -47,25 +59,30 @@ body,
 body {
   margin: 0;
   font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.5;
   color: var(--color-text-on-dark);
   background:
-    radial-gradient(ellipse 80% 50% at 50% -10%, rgba(198, 164, 106, 0.14), transparent 55%),
-    radial-gradient(circle at 90% 80%, rgba(36, 71, 62, 0.65), transparent 40%),
-    linear-gradient(165deg, var(--color-bg-deep) 0%, var(--color-bg) 45%, #1f3d35 100%);
+    radial-gradient(ellipse 75% 50% at 50% -8%, rgba(126, 192, 232, 0.45), transparent 55%),
+    radial-gradient(circle at 8% 90%, rgba(74, 159, 212, 0.18), transparent 42%),
+    radial-gradient(circle at 92% 20%, rgba(31, 111, 159, 0.12), transparent 40%),
+    linear-gradient(168deg, var(--color-bg-deep) 0%, var(--color-bg) 48%, #f5fafd 100%);
   background-attachment: fixed;
   -webkit-font-smoothing: antialiased;
 }
 
+/* Soft clinical grid — barely there */
 body::before {
   content: '';
   position: fixed;
   inset: 0;
   pointer-events: none;
-  opacity: 0.045;
+  opacity: 0.035;
   background-image:
-    linear-gradient(rgba(243, 235, 224, 0.35) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(243, 235, 224, 0.35) 1px, transparent 1px);
-  background-size: 48px 48px;
+    linear-gradient(rgba(31, 111, 159, 0.35) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(31, 111, 159, 0.35) 1px, transparent 1px);
+  background-size: 56px 56px;
+  mask-image: radial-gradient(ellipse 75% 70% at 50% 45%, black 20%, transparent 85%);
   z-index: 0;
 }
 
