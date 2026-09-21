@@ -186,11 +186,6 @@
   font-weight: 600;
   position: relative;
   z-index: 0;
-  transition: opacity 0.2s ease;
-}
-
-.gridCard:hover .sendDate {
-  opacity: 0;
 }
 
 .sendDate strong {

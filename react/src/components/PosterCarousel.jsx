@@ -62,7 +62,7 @@ function ScaledRiskFactorPoster({
   );
 }
 
-export function PosterPage({
+function PosterPage({
   poster,
   label,
   pageStyle,
@@ -338,7 +338,6 @@ export default function PosterCarousel({
   onModeChange,
   theme,
   variant = 'grid',
-  onPosterClick,
   doctorFields = {
     clinicName: '',
     doctorName: '',
@@ -392,6 +391,15 @@ export default function PosterCarousel({
 
   return (
     <div className={styles.carousel}>
+      <Dropdowns
+        festival={festival}
+        slides={slides}
+        safeIndex={safeIndex}
+        generalPosters={generalPosters}
+        generalSelectValue={generalSelectValue}
+        onFestivalChange={handleFestivalChange}
+        onGeneralChange={handleGeneralChange}
+      />
 
       {variant === 'scroll' ? (
         <ScrollView
@@ -415,10 +423,7 @@ export default function PosterCarousel({
                 key={poster.id}
                 type="button"
                 className={`${styles.gridCard} ${isActive ? styles.gridCardActive : ''}`}
-                onClick={() => {
-                  goTo(index);
-                  if (onPosterClick) onPosterClick(poster);
-                }}
+                onClick={() => goTo(index)}
                 aria-label={label}
                 aria-current={isActive ? 'true' : undefined}
               >
