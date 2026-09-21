@@ -1,9 +1,11 @@
 // src/components/PosterGenerator.jsx
-import { useState, useRef } from 'react';
-import { toJpeg } from 'html-to-image';
-import { POSTER_THERAPIES, POSTER_THEMES, DEFAULT_DOCTOR_LOGO } from './Poster';
-import DoctorPoster from './DoctorPoster';
+import { useMemo, useState } from 'react';
+import JSZip from 'jszip';
+import { POSTER_THEMES } from './Poster';
+import PosterCarousel from './PosterCarousel';
 import LogoCanvas from './LogoCanvas';
+import { getGeneralPosters, getMonthlyPosters } from '../lib/posterCatalog';
+import { renderBlankPosterBlob } from '../lib/posterExport';
 import styles from './PosterGenerator.module.css';
 
 const STEPS = [
@@ -13,7 +15,7 @@ const STEPS = [
 ];
 
 export default function PosterGenerator({
-  formData = { name: '', contactnumber: '' },
+  formData = { name: '', contactnumber: '', clinicName: '' },
   setFormData,
   logoFile = null,
   setLogoFile,
@@ -21,38 +23,30 @@ export default function PosterGenerator({
   setLogoPreview,
   onAutoSave,
   doctor = null,
+  initialStep = 1,
 }) {
-  const [currentStep, setCurrentStep] = useState(1);
-  const [selectedTherapyId, setSelectedTherapyId] = useState('cardio');
+  const [currentStep, setCurrentStep] = useState(initialStep);
   const [selectedThemeId, setSelectedThemeId] = useState('theme-warm-red');
+  const [activePosterIndex, setActivePosterIndex] = useState(0);
+  const [posterMode, setPosterMode] = useState('general');
   const [isGenerating, setIsGenerating] = useState(false);
   const [downloadSuccess, setDownloadSuccess] = useState(false);
+  const [downloadMessage, setDownloadMessage] = useState('');
   const [stepError, setStepError] = useState(null);
-  
+
   const [originalLogoUrl, setOriginalLogoUrl] = useState(null);
   const [showCropModal, setShowCropModal] = useState(false);
   const [croppedLogoData, setCroppedLogoData] = useState(null);
   const [logoCropState, setLogoCropState] = useState(null);
   const [tempLogoCropState, setTempLogoCropState] = useState(null);
 
-  const todayFormatted = new Date().toLocaleDateString('en-GB', {
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-  });
+  const generalPosters = useMemo(() => getGeneralPosters(), []);
+  const monthlyPosters = useMemo(() => getMonthlyPosters(new Date()), []);
 
-  const canvasRef = useRef(null);
-
-  const selectedTherapy =
-    POSTER_THERAPIES.find((t) => t.id === selectedTherapyId) || POSTER_THERAPIES[0];
   const selectedTheme =
     POSTER_THEMES.find((t) => t.id === selectedThemeId) || POSTER_THEMES[0];
   const isStepComplete = (step) => currentStep > step;
-
-  const handleSelectTherapy = (therapy) => {
-    setSelectedTherapyId(therapy.id);
-    setSelectedThemeId(therapy.recommendedTheme);
-  };
+  const activePosterContent = monthlyPosters[activePosterIndex] || monthlyPosters[0];
 
   const handleFileChange = (e) => {
     const file = e.target.files?.[0];
@@ -96,9 +90,12 @@ export default function PosterGenerator({
     const hasLogo = Boolean(logoFile || logoPreview);
     const hasName = Boolean(formData.name?.trim());
     const hasContact = Boolean(formData.contactnumber?.trim());
+    const hasClinic = Boolean(formData.clinicName?.trim());
 
-    if (!hasName || !hasContact || !hasLogo) {
-      setStepError('Please fill in all three input fields (Name, Contact Number, and Logo) to proceed.');
+    if (!hasName || !hasContact || !hasClinic || !hasLogo) {
+      setStepError(
+        'Please fill in all required fields (Name, Clinic/Hospital, Contact, and Logo) to proceed.'
+      );
       return;
     }
 
@@ -110,14 +107,17 @@ export default function PosterGenerator({
     const hasLogo = Boolean(logoFile || logoPreview);
     const hasName = Boolean(formData.name?.trim());
     const hasContact = Boolean(formData.contactnumber?.trim());
+    const hasClinic = Boolean(formData.clinicName?.trim());
 
-    if (targetStep > 1 && (!hasName || !hasContact || !hasLogo)) {
-      setStepError('Please fill in all three input fields (Name, Contact Number, and Logo) to proceed.');
+    if (targetStep > 1 && (!hasName || !hasContact || !hasClinic || !hasLogo)) {
+      setStepError(
+        'Please fill in all required fields (Name, Clinic/Hospital, Contact, and Logo) to proceed.'
+      );
       return false;
     }
 
-    if (targetStep > 2 && (!selectedTherapyId || !selectedThemeId)) {
-      setStepError('Please choose a therapy and theme before previewing.');
+    if (targetStep > 2 && !selectedThemeId) {
+      setStepError('Please choose a theme before previewing.');
       return false;
     }
 
@@ -127,21 +127,13 @@ export default function PosterGenerator({
 
   const rawDocName = formData.name?.trim() || doctor?.name || 'Doctor Name';
   const formattedDoctorName = rawDocName.startsWith('Dr.') ? rawDocName : `Dr. ${rawDocName}`;
-  const whatsappNumber = formData.contactnumber?.trim() || doctor?.contactnumber || 'Contact for Consultation';
-  const activeLogo = logoPreview || doctor?.logo || DEFAULT_DOCTOR_LOGO;
 
-  const getThemeClass = (id) => {
-    switch (id) {
-      case 'theme-warm-red':
-        return styles.themeWarmRed;
-      case 'theme-green':
-        return styles.themeGreen;
-      case 'theme-purple':
-        return styles.themePurple;
-      case 'theme-blue':
-      default:
-        return styles.themeBlue;
-    }
+  const carouselProps = {
+    activeIndex: activePosterIndex,
+    onIndexChange: setActivePosterIndex,
+    mode: posterMode,
+    onModeChange: setPosterMode,
+    theme: selectedTheme,
   };
 
   const handleGenerateAndDownload = async () => {
@@ -149,16 +141,26 @@ export default function PosterGenerator({
       setIsGenerating(true);
       setDownloadSuccess(false);
 
-      const node = document.getElementById('doctor-poster-capture');
-      if (!node) throw new Error('Poster node not found');
+      const label =
+        activePosterContent?.kind === 'festival'
+          ? activePosterContent.festivalName || 'Festival'
+          : `Poster-${
+              activePosterContent?.kind === 'festival'
+                ? 1
+                : Math.max(
+                    1,
+                    generalPosters.findIndex((p) => p.id === activePosterContent?.id) + 1
+                  )
+            }`;
 
-      const dataUrl = await toJpeg(node, { quality: 0.95 });
-      const posterBlob = await (await fetch(dataUrl)).blob();
+      const posterBlob = await renderBlankPosterBlob(selectedTheme, label);
+      const dataUrl = URL.createObjectURL(posterBlob);
 
       const cleanDocName = formattedDoctorName
         .replace(/[^a-zA-Z0-9_-]/g, '_')
         .replace(/_+/g, '_');
-      const fileName = `Poster_${selectedTherapy.name}_${cleanDocName}.jpg`;
+      const posterLabel = activePosterContent?.id || 'poster';
+      const fileName = `Poster_${cleanDocName}_${posterLabel}.jpg`;
 
       if (onAutoSave) {
         onAutoSave(formData, logoFile, posterBlob).catch((err) => {
@@ -170,8 +172,10 @@ export default function PosterGenerator({
       link.download = fileName;
       link.href = dataUrl;
       link.click();
+      URL.revokeObjectURL(dataUrl);
 
       setIsGenerating(false);
+      setDownloadMessage('Poster downloaded.');
       setDownloadSuccess(true);
       setTimeout(() => setDownloadSuccess(false), 6000);
     } catch (err) {
@@ -181,10 +185,58 @@ export default function PosterGenerator({
     }
   };
 
-  return (
-    <section className={styles.container} id="poster-studio-section">
-      <canvas ref={canvasRef} style={{ display: 'none' }} />
+  const handleDownloadZip = async () => {
+    try {
+      setIsGenerating(true);
+      setDownloadSuccess(false);
 
+      const pack = getMonthlyPosters(new Date());
+      const zip = new JSZip();
+      const cleanDocName = formattedDoctorName
+        .replace(/[^a-zA-Z0-9_-]/g, '_')
+        .replace(/_+/g, '_');
+
+      let generalCounter = 0;
+      for (let i = 0; i < pack.length; i += 1) {
+        const poster = pack[i];
+        const label =
+          poster.kind === 'festival'
+            ? poster.festivalName || 'Festival'
+            : `Poster-${++generalCounter}`;
+        const blob = await renderBlankPosterBlob(selectedTheme, label);
+        const safeLabel = label.replace(/[^a-zA-Z0-9_-]/g, '_');
+        zip.file(`${String(i + 1).padStart(2, '0')}_${safeLabel}.jpg`, blob);
+      }
+
+      const zipBlob = await zip.generateAsync({ type: 'blob' });
+      const url = URL.createObjectURL(zipBlob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `Posters_${cleanDocName}.zip`;
+      link.click();
+      URL.revokeObjectURL(url);
+
+      if (onAutoSave && pack[0]) {
+        const firstBlob = await renderBlankPosterBlob(
+          selectedTheme,
+          pack[0].kind === 'festival' ? pack[0].festivalName : 'Poster-1'
+        );
+        onAutoSave(formData, logoFile, firstBlob).catch(() => {});
+      }
+
+      setIsGenerating(false);
+      setDownloadMessage(`Zip ready — ${pack.length} posters.`);
+      setDownloadSuccess(true);
+      setTimeout(() => setDownloadSuccess(false), 6000);
+    } catch (err) {
+      console.error('Failed to build zip:', err);
+      setIsGenerating(false);
+      alert('Could not create zip. Please try again.');
+    }
+  };
+
+  return (
+    <section className={styles.containerWide} id="poster-studio-section">
       <nav className={styles.topStepper} aria-label="Poster setup steps">
         <div className={styles.progressTrack} aria-hidden="true">
           <div
@@ -197,7 +249,7 @@ export default function PosterGenerator({
           {STEPS.map((step) => {
             const active = currentStep === step.id;
             const complete = isStepComplete(step.id);
-            
+
             return (
               <button
                 key={step.id}
@@ -234,7 +286,7 @@ export default function PosterGenerator({
               <div className={styles.formGrid}>
                 <div className={styles.formGroup}>
                   <label className={styles.formLabel} htmlFor="step-doc-name">
-                    Doctor full name
+                    Doctor full name <span className={styles.requiredStar}>*</span>
                   </label>
                   <input
                     id="step-doc-name"
@@ -246,12 +298,31 @@ export default function PosterGenerator({
                       setFormData?.((prev) => ({ ...prev, name: e.target.value }));
                       if (stepError) setStepError(null);
                     }}
+                    required
+                  />
+                </div>
+
+                <div className={styles.formGroup}>
+                  <label className={styles.formLabel} htmlFor="step-clinic-name">
+                    Clinic / Hospital name <span className={styles.requiredStar}>*</span>
+                  </label>
+                  <input
+                    id="step-clinic-name"
+                    type="text"
+                    placeholder="e.g. City Care Hospital"
+                    className={styles.inputField}
+                    value={formData.clinicName || ''}
+                    onChange={(e) => {
+                      setFormData?.((prev) => ({ ...prev, clinicName: e.target.value }));
+                      if (stepError) setStepError(null);
+                    }}
+                    required
                   />
                 </div>
 
                 <div className={styles.formGroup}>
                   <label className={styles.formLabel} htmlFor="step-doc-contact">
-                    WhatsApp contact number
+                    WhatsApp contact number <span className={styles.requiredStar}>*</span>
                   </label>
                   <input
                     id="step-doc-contact"
@@ -263,13 +334,14 @@ export default function PosterGenerator({
                       setFormData?.((prev) => ({ ...prev, contactnumber: e.target.value }));
                       if (stepError) setStepError(null);
                     }}
+                    required
                   />
                 </div>
               </div>
 
               <div className={styles.formGroup}>
                 <label className={styles.formLabel}>
-                  Doctor photo or clinic logo
+                  Doctor photo or clinic logo <span className={styles.requiredStar}>*</span>
                 </label>
 
                 <label className={styles.fileDrop} htmlFor="step-doc-logo">
@@ -289,10 +361,20 @@ export default function PosterGenerator({
                     <div className={styles.fileDetails}>
                       <span className={styles.fileName}>{logoFile?.name || 'Selected logo'}</span>
                     </div>
-                    <button type="button" onClick={handleAdjustClick} className={styles.primaryBtn} style={{marginRight: 8, padding: '4px 10px'}}>
+                    <button
+                      type="button"
+                      onClick={handleAdjustClick}
+                      className={styles.primaryBtn}
+                      style={{ marginRight: 8, padding: '4px 10px' }}
+                    >
                       Adjust
                     </button>
-                    <button type="button" onClick={handleRemoveLogo} className={styles.primaryBtn} style={{padding: '4px 10px'}}>
+                    <button
+                      type="button"
+                      onClick={handleRemoveLogo}
+                      className={styles.primaryBtn}
+                      style={{ padding: '4px 10px' }}
+                    >
                       Remove
                     </button>
                   </div>
@@ -306,7 +388,7 @@ export default function PosterGenerator({
                 type="button"
                 className={styles.primaryBtn}
                 onClick={handleContinueToDesign}
-                id="continue-to-therapy-button"
+                id="continue-to-design-button"
               >
                 Continue to Design
               </button>
@@ -318,41 +400,12 @@ export default function PosterGenerator({
           <div className={styles.stepContent}>
             <header className={styles.stepIntro}>
               <h2 className={styles.stepHeading}>Design</h2>
+              <p className={styles.stepHint}>
+                Pick a theme and review all posters. Hover a poster to enlarge it in place.
+              </p>
             </header>
 
             <div className={styles.atelier}>
-              <div className={styles.atelierBlock}>
-                <div className={styles.atelierHeader}>
-                  <h3 className={styles.atelierTitle}>Therapy area</h3>
-                </div>
-
-                <div className={styles.therapyOrbit} role="listbox" aria-label="Therapy area">
-                  {POSTER_THERAPIES.map((item, index) => {
-                    const isSelected = item.id === selectedTherapyId;
-                    return (
-                      <button
-                        key={item.id}
-                        type="button"
-                        role="option"
-                        aria-selected={isSelected}
-                        className={`${styles.therapyTile} ${isSelected ? styles.therapyTileActive : ''}`}
-                        style={{ '--tile-delay': `${index * 40}ms` }}
-                        onClick={() => handleSelectTherapy(item)}
-                      >
-                        <span className={styles.therapyGlow} aria-hidden="true" />
-                        <span className={styles.therapyIcon}>{item.icon}</span>
-                        <span className={styles.therapyName}>{item.name}</span>
-                        {isSelected && <span className={styles.selectedMark}>Selected</span>}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              <div className={styles.atelierDivider} aria-hidden="true">
-                <span />
-              </div>
-
               <div className={styles.atelierBlock}>
                 <div className={styles.atelierHeader}>
                   <h3 className={styles.atelierTitle}>Colour theme</h3>
@@ -387,12 +440,13 @@ export default function PosterGenerator({
               </div>
 
               <div className={styles.selectionSummary}>
-                <p className={styles.summaryValue}>
-                  {selectedTherapy.name}
-                  <span aria-hidden="true"> · </span>
-                  {selectedTheme.name}
-                </p>
+                <p className={styles.summaryValue}>{selectedTheme.name}</p>
               </div>
+            </div>
+
+            <div className={styles.designPreview}>
+              <h3 className={styles.previewHeading}>Live preview</h3>
+              <PosterCarousel key={selectedThemeId} variant="grid" {...carouselProps} />
             </div>
 
             <div className={styles.navRow}>
@@ -406,7 +460,7 @@ export default function PosterGenerator({
                   if (checkCanNavigate(3)) setCurrentStep(3);
                 }}
               >
-                Preview poster
+                Continue to download
               </button>
             </div>
           </div>
@@ -415,38 +469,42 @@ export default function PosterGenerator({
         {currentStep === 3 && (
           <div className={styles.stepContent}>
             <header className={styles.stepIntro}>
-              <h2 className={styles.stepHeading}>Preview</h2>
+              <h2 className={styles.stepHeading}>Preview & download</h2>
+              <p className={styles.stepHint}>
+                Slide through posters, check the send date, then download one or all as a zip.
+              </p>
             </header>
 
             <div className={styles.previewStage}>
-              <div style={{ display: 'flex', justifyContent: 'center', width: '100%', zoom: 0.8 }}>
-                <DoctorPoster
-                  doctorName={formattedDoctorName}
-                  credentials="Consultant Specialist"
-                  therapyName={selectedTherapy.therapyLabel || selectedTherapy.name}
-                  photo={activeLogo}
-                  date={todayFormatted}
-                  whatsapp={whatsappNumber}
-                  theme={selectedTheme}
-                />
-              </div>
+              <PosterCarousel key={`dl-${selectedThemeId}`} variant="scroll" {...carouselProps} />
 
               <div className={styles.previewActions}>
                 {downloadSuccess && (
                   <div className={styles.successAlert} role="status">
-                    Poster downloaded successfully.
+                    {downloadMessage || 'Download complete.'}
                   </div>
                 )}
 
-                <button
-                  type="button"
-                  className={styles.generateBtn}
-                  onClick={handleGenerateAndDownload}
-                  disabled={isGenerating}
-                  id="generate-download-poster-button"
-                >
-                  {isGenerating ? 'Rendering…' : 'Generate & download JPG'}
-                </button>
+                <div className={styles.downloadRow}>
+                  <button
+                    type="button"
+                    className={styles.generateBtn}
+                    onClick={handleGenerateAndDownload}
+                    disabled={isGenerating}
+                    id="generate-download-poster-button"
+                  >
+                    {isGenerating ? 'Preparing…' : 'Download this poster'}
+                  </button>
+                  <button
+                    type="button"
+                    className={styles.secondaryDownloadBtn}
+                    onClick={handleDownloadZip}
+                    disabled={isGenerating}
+                    id="download-all-posters-zip-button"
+                  >
+                    {isGenerating ? 'Preparing…' : 'Download all as ZIP'}
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -461,20 +519,72 @@ export default function PosterGenerator({
       </div>
 
       {showCropModal && originalLogoUrl && (
-        <div style={{position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center'}}>
-          <div style={{background: '#fff', padding: '24px', borderRadius: '12px', display: 'flex', flexDirection: 'column', gap: '16px', alignItems: 'center', boxShadow: '0 4px 20px rgba(0,0,0,0.15)'}}>
-            <h3 style={{margin: 0, fontSize: '18px', color: '#14276b', fontFamily: '"Poppins", sans-serif'}}>Adjust Photo</h3>
-            <LogoCanvas 
-              logoSrc={originalLogoUrl} 
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.5)',
+            zIndex: 9999,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <div
+            style={{
+              background: '#fff',
+              padding: '24px',
+              borderRadius: '12px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '16px',
+              alignItems: 'center',
+              boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
+            }}
+          >
+            <h3
+              style={{
+                margin: 0,
+                fontSize: '18px',
+                color: '#14276b',
+                fontFamily: '"Poppins", sans-serif',
+              }}
+            >
+              Adjust Photo
+            </h3>
+            <LogoCanvas
+              logoSrc={originalLogoUrl}
               initialState={logoCropState}
               onChange={(dataUrl, state) => {
                 setCroppedLogoData(dataUrl);
                 if (state) setTempLogoCropState(state);
-              }} 
+              }}
             />
-            <div style={{display: 'flex', gap: '12px', width: '100%', justifyContent: 'flex-end', marginTop: '8px'}}>
-              <button type="button" onClick={() => setShowCropModal(false)} className={styles.primaryBtn} style={{padding: '6px 16px', fontSize: '13px'}}>Cancel</button>
-              <button type="button" onClick={handleApplyCrop} className={styles.primaryBtn} style={{padding: '6px 16px', fontSize: '13px'}}>Apply</button>
+            <div
+              style={{
+                display: 'flex',
+                gap: '12px',
+                width: '100%',
+                justifyContent: 'flex-end',
+                marginTop: '8px',
+              }}
+            >
+              <button
+                type="button"
+                onClick={() => setShowCropModal(false)}
+                className={styles.primaryBtn}
+                style={{ padding: '6px 16px', fontSize: '13px' }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleApplyCrop}
+                className={styles.primaryBtn}
+                style={{ padding: '6px 16px', fontSize: '13px' }}
+              >
+                Apply
+              </button>
             </div>
           </div>
         </div>

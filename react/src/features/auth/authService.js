@@ -1,8 +1,8 @@
 import { apiRequest } from '../../lib/apiClient';
 
-export function login({ id }) {
+export function login({ id, password }) {
   return apiRequest('/login', {
     method: 'POST',
-    body: { id },
+    body: { id, password },
   });
 }

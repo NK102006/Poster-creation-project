@@ -1,0 +1,399 @@
+.carousel {
+  width: 100%;
+  max-width: 920px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  position: relative;
+}
+
+.dropdowns {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  max-width: 560px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.dropdownField {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  text-align: left;
+}
+
+.dropdownLabel {
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--color-accent-soft);
+  font-weight: 700;
+}
+
+.dropdown {
+  width: 100%;
+  appearance: none;
+  border-radius: 12px;
+  border: 1px solid rgba(36, 71, 62, 0.14);
+  background: linear-gradient(180deg, #f7f1e8 0%, var(--color-surface) 100%);
+  color: var(--color-text);
+  font-family: var(--font-body);
+  font-size: 14px;
+  font-weight: 550;
+  padding: 11px 36px 11px 14px;
+  outline: none;
+  box-shadow: 0 10px 24px rgba(8, 20, 16, 0.12);
+  background-image:
+    linear-gradient(45deg, transparent 50%, #5f6e68 50%),
+    linear-gradient(135deg, #5f6e68 50%, transparent 50%),
+    linear-gradient(180deg, #f7f1e8 0%, var(--color-surface) 100%);
+  background-position:
+    calc(100% - 16px) calc(50% - 3px),
+    calc(100% - 11px) calc(50% - 3px),
+    0 0;
+  background-size:
+    5px 5px,
+    5px 5px,
+    100% 100%;
+  background-repeat: no-repeat;
+  cursor: pointer;
+}
+
+.dropdown:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* —— Grid (design live preview) —— */
+.posterGridBox {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 14px;
+  padding: 22px 18px 18px;
+  border-radius: 20px;
+  border: 1px solid rgba(36, 71, 62, 0.12);
+  background: linear-gradient(180deg, #f7f1e8 0%, var(--color-surface) 100%);
+  box-shadow: 0 16px 36px rgba(8, 20, 16, 0.16);
+  overflow: visible;
+}
+
+.gridCard {
+  border: none;
+  background: transparent;
+  padding: 8px 4px 0;
+  cursor: pointer;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  position: relative;
+  z-index: 1;
+}
+
+.gridCard:hover {
+  z-index: 8;
+}
+
+.gridCardActive .blankPage {
+  box-shadow:
+    0 14px 28px rgba(8, 20, 16, 0.22),
+    0 0 0 2px rgba(198, 164, 106, 0.55);
+}
+
+.blankPage {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 3 / 4;
+  border-radius: 12px;
+  background: linear-gradient(180deg, #ffffff 0%, var(--color-surface) 100%);
+  border: 1px solid rgba(36, 71, 62, 0.1);
+  box-shadow: 0 10px 22px rgba(8, 20, 16, 0.14);
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  transform-origin: center center;
+  transition:
+    transform 0.32s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.32s ease,
+    filter 0.32s ease,
+    border-color 0.32s ease;
+}
+
+.gridCard:hover .blankPage {
+  transform: scale(1.55);
+  filter: brightness(1.04) saturate(1.05);
+  border-color: rgba(198, 164, 106, 0.55);
+  box-shadow:
+    0 28px 50px rgba(8, 20, 16, 0.32),
+    0 0 0 1px rgba(198, 164, 106, 0.35),
+    0 0 28px rgba(198, 164, 106, 0.22);
+}
+
+.gridCard:hover .blankLabel {
+  opacity: 0.7;
+  font-size: 1.05rem;
+}
+
+.blankSheen {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.55), transparent 42%),
+    radial-gradient(circle at 80% 18%, var(--page-wash, rgba(198, 164, 106, 0.18)), transparent 42%);
+  pointer-events: none;
+}
+
+.blankLabel {
+  position: relative;
+  z-index: 1;
+  font-family: var(--font-display);
+  font-size: clamp(0.85rem, 1.6vw, 1.15rem);
+  font-weight: 600;
+  color: var(--page-label, rgba(26, 42, 37, 0.4));
+  opacity: 0.45;
+  letter-spacing: -0.02em;
+  transition: opacity 0.28s ease, font-size 0.28s ease;
+}
+
+.sendDate {
+  margin: 0;
+  font-size: 11px;
+  color: var(--color-text-muted);
+  font-weight: 600;
+  position: relative;
+  z-index: 0;
+}
+
+.sendDate strong {
+  color: #8a6a35;
+  font-weight: 700;
+}
+
+/* —— Scroll (final preview) —— */
+.keyHint {
+  margin: 0;
+  text-align: center;
+  font-size: 12px;
+  color: var(--color-text-muted-dark);
+  letter-spacing: 0.04em;
+}
+
+.scrollStage {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 10px;
+}
+
+.scrollViewport {
+  position: relative;
+  overflow: hidden;
+  min-height: 420px;
+  border-radius: 18px;
+}
+
+.fadeLeft,
+.fadeRight {
+  pointer-events: none;
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: min(16%, 110px);
+  z-index: 3;
+}
+
+.fadeLeft {
+  left: 0;
+  background: linear-gradient(
+    90deg,
+    rgba(12, 26, 22, 0.75) 0%,
+    rgba(12, 26, 22, 0.2) 55%,
+    transparent 100%
+  );
+}
+
+.fadeRight {
+  right: 0;
+  background: linear-gradient(
+    270deg,
+    rgba(12, 26, 22, 0.75) 0%,
+    rgba(12, 26, 22, 0.2) 55%,
+    transparent 100%
+  );
+}
+
+.scrollTrack {
+  display: flex;
+  align-items: center;
+  gap: var(--slide-gap, 20px);
+  min-height: 420px;
+  will-change: transform;
+  transition: transform 0.55s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.scrollSlide {
+  flex: 0 0 var(--slide-w, 280px);
+  width: var(--slide-w, 280px);
+  border: none;
+  padding: 0;
+  background: transparent;
+  cursor: pointer;
+  transition:
+    transform 0.55s cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 0.55s ease,
+    filter 0.55s ease;
+}
+
+.slideActive {
+  opacity: 1;
+  filter: blur(0);
+  transform: scale(1);
+  z-index: 2;
+  cursor: default;
+}
+
+.slideActive .blankPage {
+  box-shadow:
+    0 22px 44px rgba(8, 20, 16, 0.3),
+    0 0 0 1px color-mix(in srgb, var(--carousel-accent, #c6a46a) 45%, transparent);
+}
+
+.slideNear {
+  opacity: 0.58;
+  filter: blur(2px);
+  transform: scale(0.9);
+}
+
+.slideFar {
+  opacity: 0.3;
+  filter: blur(4.5px);
+  transform: scale(0.82);
+}
+
+.arrow {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 1px solid rgba(36, 71, 62, 0.12);
+  background: linear-gradient(180deg, #f7f1e8 0%, var(--color-surface) 100%);
+  color: var(--color-text);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  box-shadow: 0 10px 22px rgba(8, 20, 16, 0.16);
+  z-index: 4;
+  transition: transform 0.2s ease, border-color 0.2s ease;
+}
+
+.arrow:hover:not(:disabled) {
+  transform: scale(1.05);
+  border-color: rgba(198, 164, 106, 0.55);
+}
+
+.arrow:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.scrollSendBar {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 12px 16px;
+  max-width: 280px;
+  margin: 0 auto;
+  border-radius: 14px;
+  background: linear-gradient(180deg, #f7f1e8 0%, var(--color-surface) 100%);
+  border: 1px solid rgba(36, 71, 62, 0.12);
+  box-shadow: 0 10px 22px rgba(8, 20, 16, 0.12);
+}
+
+.scrollSendLabel {
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #8a6a35;
+  font-weight: 700;
+}
+
+.scrollSendValue {
+  font-family: var(--font-display);
+  font-size: 1.25rem;
+  color: var(--color-text);
+  font-weight: 600;
+}
+
+.dots {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  border: none;
+  padding: 0;
+  background: rgba(243, 235, 224, 0.28);
+  cursor: pointer;
+  transition: width 0.28s ease, background 0.28s ease, box-shadow 0.28s ease;
+}
+
+.dotActive {
+  width: 22px;
+  background: var(--color-accent);
+  box-shadow: 0 0 0 3px rgba(198, 164, 106, 0.22);
+}
+
+@media (max-width: 900px) {
+  .posterGridBox {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .gridCard:hover .blankPage {
+    transform: scale(1.35);
+  }
+}
+
+@media (max-width: 720px) {
+  .scrollStage {
+    grid-template-columns: 1fr;
+  }
+
+  .arrowLeft,
+  .arrowRight {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+  }
+
+  .arrowLeft {
+    left: 4px;
+  }
+
+  .arrowRight {
+    right: 4px;
+  }
+}
+
+@media (max-width: 640px) {
+  .dropdowns {
+    grid-template-columns: 1fr;
+  }
+
+  .posterGridBox {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    padding: 12px;
+    gap: 10px;
+  }
+
+  .gridCard:hover .blankPage {
+    transform: scale(1.25);
+  }
+}

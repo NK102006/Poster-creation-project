@@ -6,6 +6,36 @@
   margin: 0 auto;
 }
 
+.containerWide {
+  width: 100%;
+  max-width: 980px;
+  margin: 0 auto;
+}
+
+.stepHint {
+  margin: 8px 0 0;
+  color: var(--color-text-muted-dark);
+  font-size: 14px;
+  font-weight: 300;
+  line-height: 1.45;
+}
+
+.designPreview {
+  margin-top: 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.previewHeading {
+  margin: 0;
+  text-align: center;
+  font-family: var(--font-display);
+  font-size: 1.35rem;
+  color: var(--color-text-on-dark);
+  font-weight: 600;
+}
+
 .topStepper {
   margin-bottom: 28px;
   text-align: center;
@@ -563,10 +593,47 @@
 
 .previewActions {
   width: 100%;
-  max-width: 420px;
+  max-width: 520px;
   display: flex;
   flex-direction: column;
   gap: 12px;
+}
+
+.downloadRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.secondaryDownloadBtn {
+  width: 100%;
+  border: 1px solid rgba(198, 164, 106, 0.45);
+  background: linear-gradient(180deg, #f7f1e8 0%, var(--color-surface) 100%);
+  color: var(--color-text);
+  border-radius: 14px;
+  padding: 14px 16px;
+  font-size: 14px;
+  font-weight: 700;
+  font-family: var(--font-body);
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  box-shadow: 0 10px 24px rgba(8, 20, 16, 0.14);
+}
+
+.secondaryDownloadBtn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 14px 28px rgba(8, 20, 16, 0.18);
+}
+
+.secondaryDownloadBtn:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+@media (max-width: 640px) {
+  .downloadRow {
+    grid-template-columns: 1fr;
+  }
 }
 
 .themeBlue {

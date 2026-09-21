@@ -27,6 +27,15 @@ export default function LoginForm({ onSuccess }) {
         error={fieldErrors.id}
       />
 
+      <TextField
+        label="Password"
+        type="password"
+        autoComplete="current-password"
+        value={values.password}
+        onChange={(v) => setField('password', v)}
+        error={fieldErrors.password}
+      />
+
       <Button type="submit" isLoading={isSubmitting}>
         Sign in
       </Button>

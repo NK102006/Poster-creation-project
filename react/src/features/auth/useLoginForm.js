@@ -1,13 +1,13 @@
 import { useCallback, useState } from 'react';
 import { login } from './authService';
-import { validateEmployeeId } from './validators';
+import { validateEmployeeId, validatePassword } from './validators';
 import { ApiError } from '../../lib/apiClient';
 
 const GENERIC_AUTH_ERROR =
-  'The employee ID you entered is incorrect. Please try again.';
+  'The employee ID or password you entered is incorrect. Please try again.';
 
 export function useLoginForm({ onSuccess } = {}) {
-  const [values, setValues] = useState({ id: '' });
+  const [values, setValues] = useState({ id: '', password: '' });
   const [fieldErrors, setFieldErrors] = useState({});
   const [formError, setFormError] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -25,6 +25,7 @@ export function useLoginForm({ onSuccess } = {}) {
 
       const errors = {
         id: validateEmployeeId(values.id),
+        password: validatePassword(values.password),
       };
 
       setFieldErrors(errors);
@@ -36,7 +37,7 @@ export function useLoginForm({ onSuccess } = {}) {
       setIsSubmitting(true);
 
       try {
-        const result = await login({ id: values.id });
+        const result = await login({ id: values.id, password: values.password });
         onSuccess?.(result);
       } catch (err) {
         if (err instanceof ApiError && (err.status === 401 || err.status === 400)) {

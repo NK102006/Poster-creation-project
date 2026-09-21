@@ -12,6 +12,7 @@ const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/poster
 const doctorSchema = new mongoose.Schema(
   {
     name: { type: String, required: true },
+    clinicName: { type: String, required: true },
     contactnumber: { type: Number, required: true },
     logo: { type: Buffer },
     poster: { type: Buffer },
@@ -22,6 +23,8 @@ const doctorSchema = new mongoose.Schema(
 const userSchema = new mongoose.Schema(
   {
     empid: { type: mongoose.Schema.Types.Mixed },
+    password: { type: String, required: true },
+    name: { type: String },
   },
   { strict: false, timestamps: true }
 );
@@ -80,6 +83,7 @@ async function seed() {
     const hue = (i * 17) % 360;
     doctors.push({
       name,
+      clinicName: `Clinic ${i + 1}`,
       contactnumber: 9000000000 + i,
       logo: logoSvg(initials, hue),
       poster: posterSvg(name.replace('Dr. Dummy ', ''), hue),
@@ -94,17 +98,23 @@ async function seed() {
       empid: 20000 + i,
       id: 20000 + i,
       name: `Dummy User ${i + 1}`,
+      password: 'pass1234',
     });
   }
   // Keep a few real login IDs available
   const loginSeeds = [
-    { empid: 12345, id: 12345, name: 'Employee One' },
-    { empid: 1001, id: 1001, name: 'Employee Two' },
-    { empid: 99999, id: 99999, name: 'Demo User' },
+    { empid: 12345, id: 12345, name: 'Employee One', password: 'pass1234' },
+    { empid: 1001, id: 1001, name: 'Employee Two', password: 'pass1234' },
+    { empid: 99999, id: 99999, name: 'Demo User', password: 'pass1234' },
   ];
   for (const u of loginSeeds) {
     const exists = await User.findOne({ empid: u.empid });
-    if (!exists) await User.create(u);
+    if (!exists) {
+      await User.create(u);
+    } else if (!exists.password) {
+      exists.password = u.password;
+      await exists.save();
+    }
   }
   await User.insertMany(users);
   console.log(`Inserted ${users.length} dummy users`);

@@ -16,6 +16,8 @@ function getItemId(item) {
 function formatLabel(key) {
   if (key === 'empid') return 'Employee ID';
   if (key === 'contactnumber') return 'Contact Number';
+  if (key === 'clinicName') return 'Clinic / Hospital';
+  if (key === 'password') return 'Password';
   if (key === 'createdAt') return 'Created';
   return key.charAt(0).toUpperCase() + key.slice(1);
 }
@@ -111,6 +113,11 @@ export default function AdminPortal() {
               `<code class="${styles.idCell}" title="${data}">${data}</code>`,
           },
           { title: 'Name', data: 'name', className: styles.nameCell },
+          {
+            title: 'Clinic / Hospital',
+            data: 'clinicName',
+            render: (data) => data || '—',
+          },
           {
             title: 'Contact Number',
             data: 'contactnumber',
@@ -260,9 +267,9 @@ export default function AdminPortal() {
   const openCreate = () => {
     setEditingItem(null);
     if (activeTab === 'doctors') {
-      setFormData({ name: '', contactnumber: '', logo: '', poster: '' });
+      setFormData({ name: '', clinicName: '', contactnumber: '', logo: '', poster: '' });
     } else {
-      setFormData({ empid: '', name: '' });
+      setFormData({ empid: '', name: '', password: '' });
     }
     setShowModal(true);
   };
@@ -307,8 +314,8 @@ export default function AdminPortal() {
 
   const formFields =
     activeTab === 'doctors'
-      ? ['name', 'contactnumber', 'logo', 'poster']
-      : ['empid', 'name'];
+      ? ['name', 'clinicName', 'contactnumber', 'logo', 'poster']
+      : ['empid', 'name', 'password'];
 
   if (!isLoggedIn) {
     return (
@@ -505,10 +512,11 @@ export default function AdminPortal() {
                     </div>
                   ) : (
                     <input
-                      type="text"
+                      type={f === 'password' ? 'password' : 'text'}
                       value={formData[f] ?? ''}
                       onChange={(e) => handleFieldChange(f, e.target.value)}
-                      required={f !== 'logo' && f !== 'poster' && f !== 'name'}
+                      required={f !== 'logo' && f !== 'poster'}
+                      autoComplete={f === 'password' ? 'new-password' : undefined}
                     />
                   )}
                 </label>
