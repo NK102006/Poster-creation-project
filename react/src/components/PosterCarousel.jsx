@@ -86,6 +86,26 @@ export function PosterPage({
     );
   }
 
+  if (poster.kind === 'video') {
+    return (
+      <div
+        className={`${styles.blankPage} ${styles.componentPage}`}
+        style={{ ...pageStyle, background: '#000' }}
+        id={isCaptureTarget ? 'doctor-poster-capture' : undefined}
+      >
+        <video
+          src={poster.videoUrl}
+          autoPlay
+          loop
+          muted
+          playsInline
+          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+        />
+        <span className={styles.blankLabel} style={{ position: 'absolute', bottom: 10, right: 10, color: 'rgba(255,255,255,0.7)' }}>{label}</span>
+      </div>
+    );
+  }
+
   return (
     <div
       className={styles.blankPage}
@@ -229,7 +249,7 @@ function ScrollView({
         style={{
           '--slide-w': `${slideWidth}px`,
           '--slide-gap': `${gap}px`,
-          '--carousel-accent': theme?.accentColor || '#c6a46a',
+          '--carousel-accent': theme?.accentColor || '#4a9fd4',
         }}
       >
         <button
@@ -351,7 +371,15 @@ export default function PosterCarousel({
   const generalPosters = useMemo(() => getGeneralPosters(), []);
   const monthlyPosters = useMemo(() => getMonthlyPosters(new Date()), []);
 
-  const slides = monthlyPosters;
+  const [filter, setFilter] = useState('all');
+
+  const slides = useMemo(() => {
+    if (filter === 'festivals') return monthlyPosters.filter((p) => p.kind === 'festival');
+    if (filter === 'videos') return monthlyPosters.filter((p) => p.kind === 'video');
+    if (filter === 'education') return monthlyPosters.filter((p) => p.kind === 'gk');
+    return monthlyPosters;
+  }, [monthlyPosters, filter]);
+
   const safeIndex = Math.max(0, Math.min(activeIndex, Math.max(slides.length - 1, 0)));
   const pageStyle = themePageStyle(theme);
 
@@ -369,40 +397,57 @@ export default function PosterCarousel({
     const idx = Number(value);
     onModeChange?.('general');
     const targetId = generalPosters[idx]?.id;
-    const packIndex = slides.findIndex((p) => p.id === targetId);
-    onIndexChange?.(packIndex >= 0 ? packIndex : idx);
+    const sIdx = slides.findIndex((p) => p.id === targetId);
+    onIndexChange?.(sIdx >= 0 ? sIdx : 0);
   };
 
   const goTo = useCallback(
     (index) => {
-      const poster = slides[index];
-      if (!poster) return;
-      onModeChange?.(poster.kind === 'festival' ? 'festival' : 'general');
+      onModeChange?.(slides[index]?.kind === 'festival' ? 'festival' : 'general');
       onIndexChange?.(index);
     },
     [onIndexChange, onModeChange, slides]
   );
 
-  const generalSelectValue = (() => {
-    const current = slides[safeIndex];
-    if (!current || current.kind === 'festival') return '';
-    const gIdx = generalPosters.findIndex((p) => p.id === current.id);
-    return gIdx >= 0 ? String(gIdx) : '';
-  })();
-
   return (
     <div className={styles.carousel}>
-      <Dropdowns
-        festival={festival}
-        slides={slides}
-        safeIndex={safeIndex}
-        generalPosters={generalPosters}
-        generalSelectValue={generalSelectValue}
-        onFestivalChange={handleFestivalChange}
-        onGeneralChange={handleGeneralChange}
-      />
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12, gap: '8px', flexWrap: 'wrap' }}>
+        {[
+          { id: 'all', label: 'All Categories' },
+          { id: 'education', label: 'Education' },
+          { id: 'festivals', label: 'Festivals' },
+          { id: 'videos', label: 'Videos' }
+        ].map(cat => (
+          <button
+            key={cat.id}
+            type="button"
+            onClick={() => {
+              setFilter(cat.id);
+              onIndexChange?.(0);
+            }}
+            style={{
+              padding: '6px 14px',
+              borderRadius: '20px',
+              border: filter === cat.id ? '1px solid #1f6f9f' : '1px solid rgba(31, 111, 159, 0.2)',
+              background: filter === cat.id ? '#1f6f9f' : '#f4f9fc',
+              color: filter === cat.id ? '#fff' : 'var(--color-text)',
+              fontSize: '13px',
+              cursor: 'pointer',
+              fontWeight: 500,
+              transition: 'all 0.2s ease',
+              outline: 'none'
+            }}
+          >
+            {cat.label}
+          </button>
+        ))}
+      </div>
 
-      {variant === 'scroll' ? (
+      {slides.length === 0 ? (
+        <div style={{ padding: '60px 20px', textAlign: 'center', color: 'var(--color-text-muted)', background: 'linear-gradient(180deg, #f4f9fc 0%, var(--color-surface) 100%)', borderRadius: 16, border: '1px solid rgba(31, 111, 159, 0.14)' }}>
+          No previews available in this category yet.
+        </div>
+      ) : variant === 'scroll' ? (
         <ScrollView
           slides={slides}
           safeIndex={safeIndex}

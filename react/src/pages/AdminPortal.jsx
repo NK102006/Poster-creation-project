@@ -30,7 +30,6 @@ export default function AdminPortal() {
   const [password, setPassword] = useState('');
   const [loginError, setLoginError] = useState('');
 
-  const [activeTab, setActiveTab] = useState('doctors');
   const [showModal, setShowModal] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
   const [formData, setFormData] = useState({});
@@ -78,7 +77,7 @@ export default function AdminPortal() {
     const removeRow = async (id) => {
       if (!window.confirm('Delete this record? This cannot be undone.')) return;
       try {
-        await apiRequest(`/admin/collections/${activeTab}/${id}`, { method: 'DELETE' });
+        await apiRequest(`/admin/collections/doctors/${id}`, { method: 'DELETE' });
         reloadTable();
       } catch (err) {
         alert('Delete failed: ' + err.message);
@@ -89,7 +88,7 @@ export default function AdminPortal() {
     return () => {
       delete window.__adminPortal;
     };
-  }, [isLoggedIn, activeTab]);
+  }, [isLoggedIn]);
 
   useEffect(() => {
     if (!isLoggedIn || !hostRef.current) return undefined;
@@ -101,97 +100,60 @@ export default function AdminPortal() {
     tableEl.style.width = '100%';
     host.appendChild(tableEl);
 
-    const isDoctors = activeTab === 'doctors';
-
-    const columns = isDoctors
-      ? [
-          {
-            title: 'ID',
-            data: 'id',
-            className: styles.colId,
-            render: (data) =>
-              `<code class="${styles.idCell}" title="${data}">${data}</code>`,
-          },
-          { title: 'Name', data: 'name', className: styles.nameCell },
-          {
-            title: 'Clinic / Hospital',
-            data: 'clinicName',
-            render: (data) => data || '—',
-          },
-          {
-            title: 'Contact Number',
-            data: 'contactnumber',
-            render: (data) => data || '—',
-          },
-          {
-            title: 'Logo',
-            data: 'logo',
-            orderable: false,
-            searchable: false,
-            render: (data) =>
-              data
-                ? `<img src="${data}" alt="" class="${styles.logoThumb}" />`
-                : `<span class="${styles.muted}">—</span>`,
-          },
-          {
-            title: 'Poster',
-            data: 'poster',
-            orderable: false,
-            searchable: false,
-            render: (data) =>
-              data
-                ? `<img src="${data}" alt="" class="${styles.posterThumb}" />`
-                : `<span class="${styles.muted}">null</span>`,
-          },
-          {
-            title: 'Actions',
-            data: null,
-            orderable: false,
-            searchable: false,
-            className: styles.colActions,
-            render: (_data, _type, row) => {
-              const id = getItemId(row);
-              return `<div class="${styles.actions}">
-                <button type="button" class="${styles.editBtn}" data-action="edit">Edit</button>
-                <button type="button" class="${styles.deleteBtn}" data-action="delete" data-id="${id}">Delete</button>
-              </div>`;
-            },
-          },
-        ]
-      : [
-          {
-            title: 'ID',
-            data: 'id',
-            className: styles.colId,
-            render: (data) =>
-              `<code class="${styles.idCell}" title="${data}">${data}</code>`,
-          },
-          {
-            title: 'Employee ID',
-            data: 'empid',
-            className: styles.nameCell,
-            render: (data, _type, row) => data ?? row.id ?? '—',
-          },
-          {
-            title: 'Name',
-            data: 'name',
-            render: (data) => data || '—',
-          },
-          {
-            title: 'Actions',
-            data: null,
-            orderable: false,
-            searchable: false,
-            className: styles.colActions,
-            render: (_data, _type, row) => {
-              const id = getItemId(row);
-              return `<div class="${styles.actions}">
-                <button type="button" class="${styles.editBtn}" data-action="edit">Edit</button>
-                <button type="button" class="${styles.deleteBtn}" data-action="delete" data-id="${id}">Delete</button>
-              </div>`;
-            },
-          },
-        ];
+    const columns = [
+      {
+        title: 'ID',
+        data: 'id',
+        className: styles.colId,
+        render: (data) =>
+          `<code class="${styles.idCell}" title="${data}">${data}</code>`,
+      },
+      { title: 'Name', data: 'name', className: styles.nameCell },
+      {
+        title: 'Clinic / Hospital',
+        data: 'clinicName',
+        render: (data) => data || '—',
+      },
+      {
+        title: 'Contact Number',
+        data: 'contactnumber',
+        render: (data) => data || '—',
+      },
+      {
+        title: 'Logo',
+        data: 'logo',
+        orderable: false,
+        searchable: false,
+        render: (data) =>
+          data
+            ? `<img src="${data}" alt="" class="${styles.logoThumb}" />`
+            : `<span class="${styles.muted}">—</span>`,
+      },
+      {
+        title: 'Poster',
+        data: 'poster',
+        orderable: false,
+        searchable: false,
+        render: (data) =>
+          data
+            ? `<img src="${data}" alt="" class="${styles.posterThumb}" />`
+            : `<span class="${styles.muted}">null</span>`,
+      },
+      {
+        title: 'Actions',
+        data: null,
+        orderable: false,
+        searchable: false,
+        className: styles.colActions,
+        render: (_data, _type, row) => {
+          const id = getItemId(row);
+          return `<div class="${styles.actions}">
+            <button type="button" class="${styles.editBtn}" data-action="edit">Edit</button>
+            <button type="button" class="${styles.deleteBtn}" data-action="delete" data-id="${id}">Delete</button>
+          </div>`;
+        },
+      },
+    ];
 
     const table = new DataTable(tableEl, {
       serverSide: true,
@@ -210,7 +172,7 @@ export default function AdminPortal() {
         bottomEnd: 'paging',
       },
       ajax: {
-        url: `${API_BASE_URL}/admin/datatables/${activeTab}`,
+        url: `${API_BASE_URL}/admin/datatables/doctors`,
         dataSrc: 'data',
       },
       columns,
@@ -227,8 +189,8 @@ export default function AdminPortal() {
         },
       },
       rowCallback(row) {
-        row.style.cursor = isDoctors ? 'pointer' : 'default';
-        row.dataset.hasMedia = isDoctors ? 'true' : 'false';
+        row.style.cursor = 'pointer';
+        row.dataset.hasMedia = 'true';
       },
     });
 
@@ -248,7 +210,6 @@ export default function AdminPortal() {
       }
 
       if (!tr || !host.contains(tr) || tr.parentElement?.tagName !== 'TBODY') return;
-      if (activeTab !== 'doctors') return;
       const rowData = table.row(tr).data();
       if (rowData) window.__adminPortal?.setPreviewItem(rowData);
     }
@@ -262,15 +223,11 @@ export default function AdminPortal() {
       tableRef.current = null;
       host.innerHTML = '';
     };
-  }, [isLoggedIn, activeTab]);
+  }, [isLoggedIn]);
 
   const openCreate = () => {
     setEditingItem(null);
-    if (activeTab === 'doctors') {
-      setFormData({ name: '', clinicName: '', contactnumber: '', logo: '', poster: '' });
-    } else {
-      setFormData({ empid: '', name: '', password: '' });
-    }
+    setFormData({ name: '', clinicName: '', contactnumber: '', logo: '', poster: '' });
     setShowModal(true);
   };
 
@@ -280,12 +237,12 @@ export default function AdminPortal() {
     try {
       const id = getItemId(editingItem);
       if (editingItem && id) {
-        await apiRequest(`/admin/collections/${activeTab}/${id}`, {
+        await apiRequest(`/admin/collections/doctors/${id}`, {
           method: 'PUT',
           body: formData,
         });
       } else {
-        await apiRequest(`/admin/collections/${activeTab}`, {
+        await apiRequest(`/admin/collections/doctors`, {
           method: 'POST',
           body: formData,
         });
@@ -312,10 +269,7 @@ export default function AdminPortal() {
     reader.readAsDataURL(file);
   };
 
-  const formFields =
-    activeTab === 'doctors'
-      ? ['name', 'clinicName', 'contactnumber', 'logo', 'poster']
-      : ['empid', 'name', 'password'];
+  const formFields = ['name', 'clinicName', 'contactnumber', 'logo', 'poster'];
 
   if (!isLoggedIn) {
     return (
@@ -374,19 +328,10 @@ export default function AdminPortal() {
           <p className={styles.navLabel}>Collections</p>
           <button
             type="button"
-            className={`${styles.navItem} ${activeTab === 'doctors' ? styles.navActive : ''}`}
-            onClick={() => setActiveTab('doctors')}
+            className={`${styles.navItem} ${styles.navActive}`}
           >
             <span className={styles.navIcon}>D</span>
             Doctors
-          </button>
-          <button
-            type="button"
-            className={`${styles.navItem} ${activeTab === 'users' ? styles.navActive : ''}`}
-            onClick={() => setActiveTab('users')}
-          >
-            <span className={styles.navIcon}>U</span>
-            Users
           </button>
         </nav>
 
@@ -399,10 +344,10 @@ export default function AdminPortal() {
         <header className={styles.topbar}>
           <div>
             <p className={styles.breadcrumb}>
-              Admin / {activeTab === 'doctors' ? 'Doctors' : 'Users'}
+              Admin / Doctors
             </p>
             <h1 className={styles.pageTitle}>
-              {activeTab === 'doctors' ? 'Doctors list' : 'Users list'}
+              Doctors list
             </h1>
             <p className={styles.pageHint}>
               DataTables with server-side pagination. Click a doctor row to preview logo & poster.
@@ -419,7 +364,7 @@ export default function AdminPortal() {
               Page size + search are handled by DataTables against MongoDB.
             </p>
             <button type="button" className={styles.primaryBtn} onClick={openCreate}>
-              + Add {activeTab === 'doctors' ? 'doctor' : 'user'}
+              + Add doctor
             </button>
           </div>
 
@@ -485,9 +430,7 @@ export default function AdminPortal() {
             onClick={(e) => e.stopPropagation()}
           >
             <h2 className={styles.modalTitle}>
-              {editingItem
-                ? `Edit ${activeTab === 'doctors' ? 'doctor' : 'user'}`
-                : `Add ${activeTab === 'doctors' ? 'doctor' : 'user'}`}
+              {editingItem ? 'Edit doctor' : 'Add doctor'}
             </h2>
             <form onSubmit={handleSave} className={styles.form}>
               {formFields.map((f) => (

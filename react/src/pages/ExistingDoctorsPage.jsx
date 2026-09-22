@@ -3,7 +3,7 @@ import { apiRequest } from '../lib/apiClient';
 import StudioShell from '../components/StudioShell';
 import styles from './ExistingDoctorsPage.module.css';
 
-export default function ExistingDoctorsPage({ onLogout, onBack, onSelectDoctor }) {
+export default function ExistingDoctorsPage({ user, onLogout, onBack, onSelectDoctor }) {
   const [doctors, setDoctors] = useState([]);
   const [total, setTotal] = useState(0);
   const [query, setQuery] = useState('');
@@ -19,6 +19,7 @@ export default function ExistingDoctorsPage({ onLogout, onBack, onSelectDoctor }
         const params = new URLSearchParams();
         params.set('includeInactive', 'true');
         if (query.trim()) params.set('q', query.trim());
+        if (user?._id) params.set('userId', user._id);
         const res = await apiRequest(`/doctors?${params.toString()}`);
         if (!active) return;
         setDoctors(res.doctors || []);
@@ -37,7 +38,7 @@ export default function ExistingDoctorsPage({ onLogout, onBack, onSelectDoctor }
       active = false;
       clearTimeout(timer);
     };
-  }, [query]);
+  }, [query, user?._id]);
 
   const shownLabel = useMemo(() => {
     if (query.trim()) return `${doctors.length} match${doctors.length === 1 ? '' : 'es'}`;
@@ -46,6 +47,7 @@ export default function ExistingDoctorsPage({ onLogout, onBack, onSelectDoctor }
 
   return (
     <StudioShell
+      userLabel={user ? `Employee ${user.empid || (user.id && String(user.id).length < 24 ? user.id : '')}`.trim() : 'Employee'}
       onLogout={onLogout}
       onBrandClick={onBack}
       headerActions={

@@ -23,20 +23,23 @@ app.use(session({
 
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 25 * 1024 * 1024 }, // 25MB limit for high-res posters
+  limits: { fileSize: 150 * 1024 * 1024 }, // 150MB limit for high-res posters and videos
 });
 
 const PORT = process.env.PORT || 3000;
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/posterCreation';
+const BASE_URL = process.env.PUBLIC_URL || `http://localhost:${PORT}`;
 
+app.use('/uploads', express.static(path.resolve('uploads')));
 app.use(cors());
-app.use(express.json({ limit: '25mb' }));
-app.use(express.urlencoded({ extended: true, limit: '25mb' }));
+app.use(express.json({ limit: '150mb' }));
+app.use(express.urlencoded({ extended: true, limit: '150mb' }));
 
 // Schemas & Models
 const posterEntrySchema = new mongoose.Schema(
   {
-    image: { type: Buffer, required: true },
+    image: { type: mongoose.Schema.Types.Mixed, required: true },
+    kind: { type: String, default: 'image' },
     downloads: { type: Number, default: 0 },
     createdAt: { type: Date, default: Date.now },
   },
@@ -48,11 +51,12 @@ const doctorSchema = new mongoose.Schema({
   clinicName: { type: String, required: true, trim: true },
   doctorDegree: { type: String, trim: true, default: '' },
   contactnumber: { type: Number, required: true },
-  logo: { type: Buffer },
-  poster: { type: Buffer }, // latest poster (legacy + convenience)
-  posters: { type: [posterEntrySchema], default: [] },
+  logo: { type: mongoose.Schema.Types.Mixed },
+  poster: { type: mongoose.Schema.Types.Mixed }, // latest poster (legacy + convenience)
+  contents: { type: [posterEntrySchema], default: [] },
   downloadCount: { type: Number, default: 0 },
   active: { type: Boolean, default: true },
+  createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
 }, { timestamps: true });
 
 const userSchema = new mongoose.Schema({
@@ -64,10 +68,20 @@ const userSchema = new mongoose.Schema({
 export const Doctor = mongoose.model('Doctor', doctorSchema);
 export const User = mongoose.model('User', userSchema);
 
-// Helper to format doctor document for frontend consumption
+function saveFile(buffer, prefix = 'file') {
+  if (!buffer || buffer.length === 0) return null;
+  const ext = prefix === 'video' ? 'mp4' : (prefix === 'logo' ? 'png' : 'jpg');
+  const safeName = `${prefix}-${Date.now()}-${Math.floor(Math.random() * 10000)}.${ext}`;
+  fs.writeFileSync(path.resolve('uploads', safeName), buffer);
+  return safeName;
+}
+
 function bufferToDataUrl(value, fallbackMime = 'image/png') {
   if (!value) return null;
-  if (typeof value === 'string') return value;
+  if (typeof value === 'string') {
+    if (value.startsWith('data:') || value.startsWith('http')) return value;
+    return `${BASE_URL}/uploads/${value}`;
+  }
 
   const buf = Buffer.isBuffer(value)
     ? value
@@ -84,16 +98,18 @@ function bufferToDataUrl(value, fallbackMime = 'image/png') {
 }
 
 function getPosterStats(obj) {
-  const posters = Array.isArray(obj.posters) ? obj.posters : [];
-  let postersMade = posters.length;
+  const contents = Array.isArray(obj.contents) ? obj.contents : [];
+  let postersMade = contents.filter((c) => c.kind !== 'video').length;
+  let videosMade = contents.filter((c) => c.kind === 'video').length;
+
   if (postersMade === 0 && obj.poster) postersMade = 1;
 
   let downloadCount = Number(obj.downloadCount) || 0;
-  if (downloadCount === 0 && posters.length > 0) {
-    downloadCount = posters.reduce((sum, p) => sum + (Number(p.downloads) || 0), 0);
+  if (downloadCount === 0 && contents.length > 0) {
+    downloadCount = contents.reduce((sum, p) => sum + (Number(p.downloads) || 0), 0);
   }
 
-  return { postersMade, downloadCount };
+  return { postersMade, videosMade, downloadCount };
 }
 
 function formatDoctor(doc, { includePosters = false, light = false } = {}) {
@@ -108,10 +124,13 @@ function formatDoctor(doc, { includePosters = false, light = false } = {}) {
     doctorDegree: obj.doctorDegree || '',
     contactnumber: obj.contactnumber,
     active: obj.active !== false,
+    contentsMade: postersMade + videosMade,
     postersMade,
+    videosMade,
     downloadCount,
     createdAt: obj.createdAt,
     updatedAt: obj.updatedAt,
+    createdBy: obj.createdBy,
   };
 
   if (light) {
@@ -128,20 +147,22 @@ function formatDoctor(doc, { includePosters = false, light = false } = {}) {
   };
 
   if (includePosters) {
-    const posters = Array.isArray(obj.posters) ? obj.posters : [];
-    formatted.posters = posters.map((p) => ({
+    const contents = Array.isArray(obj.contents) ? obj.contents : [];
+    formatted.contents = contents.map((p) => ({
       id: p._id,
-      image: bufferToDataUrl(p.image, 'image/jpeg'),
+      image: bufferToDataUrl(p.image, p.kind === 'video' ? 'video/mp4' : 'image/jpeg'),
+      kind: p.kind || 'image',
       downloads: Number(p.downloads) || 0,
       createdAt: p.createdAt,
     }));
 
     // Legacy single poster fallback for gallery
-    if (formatted.posters.length === 0 && formatted.poster) {
-      formatted.posters = [
+    if (formatted.contents.length === 0 && formatted.poster) {
+      formatted.contents = [
         {
           id: 'legacy',
           image: formatted.poster,
+          kind: 'image',
           downloads: downloadCount,
           createdAt: obj.updatedAt || obj.createdAt,
         },
@@ -198,7 +219,7 @@ app.post('/api/login', async (req, res) => {
     return res.status(200).json({
       success: true,
       message: 'Login successful',
-      user: { id: user.id || user.empid || id },
+      user: { id: user.empid || id, _id: user._id, empid: user.empid || id, name: user.name },
     });
   } catch (error) {
     console.error('Login error:', error);
@@ -225,19 +246,29 @@ app.get('/api/doctors', async (req, res) => {
   try {
     const q = String(req.query.q || '').trim();
     const includeInactive = String(req.query.includeInactive || '') === 'true';
+    const userId = req.query.userId;
     const filter = {};
 
     if (!includeInactive) {
       filter.active = { $ne: false };
     }
 
+    if (userId) {
+      filter.createdBy = userId;
+    }
+
     if (q) {
       filter.name = { $regex: q, $options: 'i' };
     }
 
+    const baseCountFilter = includeInactive ? {} : { active: { $ne: false } };
+    if (userId) {
+      baseCountFilter.createdBy = userId;
+    }
+
     const [doctors, total] = await Promise.all([
       Doctor.find(filter).sort({ createdAt: -1 }),
-      Doctor.countDocuments(includeInactive ? {} : { active: { $ne: false } }),
+      Doctor.countDocuments(baseCountFilter),
     ]);
 
     return res.status(200).json({
@@ -273,6 +304,10 @@ app.put('/api/doctors/:id', upload.any(), async (req, res) => {
     let logo = req.files?.find((f) => f.fieldname === 'logo')?.buffer || null;
     if (!logo && req.body.logo && typeof req.body.logo === 'string' && req.body.logo.startsWith('data:')) {
       logo = Buffer.from(req.body.logo.replace(/^data:image\/\w+;base64,/, ''), 'base64');
+    }
+
+    if (logo && Buffer.isBuffer(logo)) {
+      logo = saveFile(logo, 'logo');
     }
 
     if (name != null) doctor.name = String(name).trim() || doctor.name;
@@ -351,11 +386,11 @@ app.post('/api/doctors/:id/download', async (req, res) => {
     const posterId = req.body?.posterId;
     doctor.downloadCount = (Number(doctor.downloadCount) || 0) + 1;
 
-    if (posterId && Array.isArray(doctor.posters)) {
-      const entry = doctor.posters.id(posterId);
+    if (posterId && Array.isArray(doctor.contents)) {
+      const entry = doctor.contents.id(posterId);
       if (entry) entry.downloads = (Number(entry.downloads) || 0) + 1;
-    } else if (Array.isArray(doctor.posters) && doctor.posters.length > 0) {
-      const last = doctor.posters[doctor.posters.length - 1];
+    } else if (Array.isArray(doctor.contents) && doctor.contents.length > 0) {
+      const last = doctor.contents[doctor.contents.length - 1];
       last.downloads = (Number(last.downloads) || 0) + 1;
     }
 
@@ -372,8 +407,9 @@ app.post('/api/doctors/:id/download', async (req, res) => {
 
 // Create/update doctor profile and poster with multer file upload
 app.post('/api/doctors', upload.any(), async (req, res) => {
-  const { name, contactnumber, clinicName, doctorDegree, doctorId } = req.body;
+  const { name, contactnumber, clinicName, doctorDegree, doctorId, userId } = req.body;
   const countDownload = String(req.body.countDownload || '') === 'true';
+  const contentKind = req.body.contentKind || 'image';
   let logo = req.files?.find((f) => f.fieldname === 'logo')?.buffer || null;
   let poster = req.files?.find((f) => f.fieldname === 'poster')?.buffer || null;
 
@@ -383,9 +419,19 @@ app.post('/api/doctors', upload.any(), async (req, res) => {
     logo = Buffer.from(base64Data, 'base64');
   }
 
+  if (logo && Buffer.isBuffer(logo)) {
+    logo = saveFile(logo, 'logo');
+  } else if (!logo && req.body.logo && typeof req.body.logo === 'string' && !req.body.logo.startsWith('data:')) {
+    logo = req.body.logo.split('/').pop();
+  }
+
   if (!poster && req.body.poster && typeof req.body.poster === 'string' && req.body.poster.startsWith('data:')) {
-    const base64Data = req.body.poster.replace(/^data:image\/\w+;base64,/, '');
+    const base64Data = req.body.poster.replace(/^data:(image|video)\/\w+;base64,/, '');
     poster = Buffer.from(base64Data, 'base64');
+  }
+
+  if (poster && Buffer.isBuffer(poster)) {
+    poster = saveFile(poster, contentKind === 'video' ? 'video' : 'poster');
   }
 
   if (!String(clinicName || '').trim()) {
@@ -413,11 +459,12 @@ app.post('/api/doctors', upload.any(), async (req, res) => {
       doctor.contactnumber = cleanedContact;
       if (logo) doctor.logo = logo;
 
-      if (poster) {
-        doctor.poster = poster;
-        doctor.posters = doctor.posters || [];
-        doctor.posters.push({
-          image: poster,
+      if (poster || contentKind === 'video') {
+        if (contentKind === 'image' && poster) doctor.poster = poster;
+        doctor.contents = doctor.contents || [];
+        doctor.contents.push({
+          image: poster || 'static-video-reference',
+          kind: contentKind,
           downloads: countDownload ? 1 : 0,
           createdAt: new Date(),
         });
@@ -445,15 +492,19 @@ app.post('/api/doctors', upload.any(), async (req, res) => {
       contactnumber: cleanedContact,
       logo,
       active: true,
-      posters: [],
+      contents: [],
       downloadCount: 0,
     };
+    if (userId) {
+      docData.createdBy = userId;
+    }
 
-    if (poster) {
-      docData.poster = poster;
-      docData.posters = [
+    if (poster || contentKind === 'video') {
+      if (contentKind === 'image' && poster) docData.poster = poster;
+      docData.contents = [
         {
-          image: poster,
+          image: poster || 'static-video-reference',
+          kind: contentKind,
           downloads: countDownload ? 1 : 0,
           createdAt: new Date(),
         },
@@ -492,7 +543,7 @@ app.get('/api/admin/collections/:collection', async (req, res) => {
   try {
     const Model = models[req.params.collection];
     if (!Model) return res.status(404).json({ message: 'Collection not found' });
-    
+
     const docs = await Model.find().sort({ createdAt: -1 });
     if (req.params.collection === 'doctors') {
       return res.status(200).json(docs.map(formatDoctor));
@@ -523,7 +574,7 @@ app.get('/api/admin/datatables/:collection', async (req, res) => {
     );
     const orderDir =
       String(req.query.order?.[0]?.dir ?? req.query['order[0][dir]'] ?? 'asc').toLowerCase() ===
-      'desc'
+        'desc'
         ? -1
         : 1;
 
@@ -594,7 +645,7 @@ app.post('/api/admin/collections/:collection', async (req, res) => {
   try {
     const Model = models[req.params.collection];
     if (!Model) return res.status(404).json({ message: 'Collection not found' });
-    
+
     const createData = { ...req.body };
     if (req.params.collection === 'doctors') {
       if (createData.logo && typeof createData.logo === 'string' && createData.logo.startsWith('data:')) {
@@ -617,7 +668,7 @@ app.put('/api/admin/collections/:collection/:id', async (req, res) => {
   try {
     const Model = models[req.params.collection];
     if (!Model) return res.status(404).json({ message: 'Collection not found' });
-    
+
     const updateData = { ...req.body };
     if (req.params.collection === 'doctors') {
       if (updateData.logo && typeof updateData.logo === 'string' && updateData.logo.startsWith('data:')) {
@@ -630,7 +681,7 @@ app.put('/api/admin/collections/:collection/:id', async (req, res) => {
 
     const doc = await Model.findByIdAndUpdate(req.params.id, updateData, { new: true });
     if (!doc) return res.status(404).json({ message: 'Document not found' });
-    
+
     res.status(200).json({ success: true, data: req.params.collection === 'doctors' ? formatDoctor(doc) : doc });
   } catch (err) {
     res.status(500).json({ message: 'Error updating document', error: err.message });
@@ -641,10 +692,10 @@ app.delete('/api/admin/collections/:collection/:id', async (req, res) => {
   try {
     const Model = models[req.params.collection];
     if (!Model) return res.status(404).json({ message: 'Collection not found' });
-    
+
     const doc = await Model.findByIdAndDelete(req.params.id);
     if (!doc) return res.status(404).json({ message: 'Document not found' });
-    
+
     res.status(200).json({ success: true, message: 'Document deleted' });
   } catch (err) {
     res.status(500).json({ message: 'Error deleting document', error: err.message });

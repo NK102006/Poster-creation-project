@@ -13,7 +13,7 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 20px;
+  gap: 18px;
   animation: riseIn 0.6s ease-out both;
 }
 
@@ -27,11 +27,11 @@
   width: 42px;
   height: 42px;
   border-radius: 14px;
-  background: linear-gradient(145deg, var(--color-accent), #a8864a);
-  color: #1a2a25;
+  background: linear-gradient(145deg, var(--color-accent), var(--color-accent-deep));
+  color: #ffffff;
   display: grid;
   place-items: center;
-  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.28);
+  box-shadow: 0 10px 24px rgba(31, 111, 159, 0.22);
 }
 
 .logoMark {
@@ -41,18 +41,18 @@
 
 .wordmark {
   font-family: var(--font-display);
-  font-size: 34px;
+  font-size: 32px;
   font-weight: 600;
-  color: var(--color-text-on-dark);
+  color: var(--color-primary-rich);
   letter-spacing: -0.02em;
 }
 
 .tagline {
   margin: 0 0 4px;
-  font-size: 13.5px;
-  font-weight: 300;
-  letter-spacing: 0.04em;
-  color: var(--color-text-muted-dark);
+  font-size: 13px;
+  font-weight: 400;
+  letter-spacing: 0.02em;
+  color: var(--color-text-muted);
   text-align: center;
 }
 
@@ -60,8 +60,8 @@
   width: 100%;
   padding: 36px 32px;
   border-radius: var(--radius-lg);
-  background: linear-gradient(180deg, rgba(243, 235, 224, 0.97), rgba(239, 230, 216, 0.94));
-  border: 1px solid rgba(198, 164, 106, 0.25);
+  background: linear-gradient(180deg, var(--color-card) 0%, var(--color-card-soft) 100%);
+  border: 1px solid var(--color-card-border);
   box-shadow: var(--shadow-card), var(--shadow-glow);
   color: var(--color-text);
   text-align: left;
@@ -75,10 +75,10 @@
 
 .formCard h1 {
   font-family: var(--font-display);
-  font-size: 2.2rem;
+  font-size: 2rem;
   margin: 0 0 28px;
   font-weight: 600;
-  color: var(--color-text);
+  color: var(--color-primary-rich);
   letter-spacing: -0.02em;
 }
 

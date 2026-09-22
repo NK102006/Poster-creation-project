@@ -168,6 +168,35 @@ export default function PosterGenerator({
       setIsGenerating(true);
       setDownloadSuccess(false);
 
+      if (activePosterContent?.kind === 'video' && activePosterContent?.videoUrl) {
+        const cleanDocName = formattedDoctorName
+          .replace(/[^a-zA-Z0-9_-]/g, '_')
+          .replace(/_+/g, '_');
+        const fileName = `Video_${cleanDocName}_${activePosterContent.id}.mp4`;
+        
+        const response = await fetch(activePosterContent.videoUrl);
+        const videoBlob = await response.blob();
+        const dataUrl = URL.createObjectURL(videoBlob);
+        
+        const link = document.createElement('a');
+        link.download = fileName;
+        link.href = dataUrl;
+        link.click();
+        URL.revokeObjectURL(dataUrl);
+
+        if (onAutoSave) {
+          onAutoSave(formData, logoFile, videoBlob, 'video').catch((err) => {
+            console.warn('Auto save notice:', err);
+          });
+        }
+
+        setIsGenerating(false);
+        setDownloadMessage('Video downloaded.');
+        setDownloadSuccess(true);
+        setTimeout(() => setDownloadSuccess(false), 6000);
+        return;
+      }
+
       const label =
         activePosterContent?.kind === 'festival'
           ? activePosterContent.festivalName || 'Festival'
@@ -226,6 +255,13 @@ export default function PosterGenerator({
       let generalCounter = 0;
       for (let i = 0; i < pack.length; i += 1) {
         const poster = pack[i];
+        if (poster.kind === 'video' && poster.videoUrl) {
+          const response = await fetch(poster.videoUrl);
+          const blob = await response.blob();
+          zip.file(`${String(i + 1).padStart(2, '0')}_Video.mp4`, blob);
+          continue;
+        }
+
         const label =
           poster.kind === 'festival'
             ? poster.festivalName || 'Festival'
@@ -519,29 +555,33 @@ export default function PosterGenerator({
         )}
       </div>
 
-      {showCropModal && originalLogoUrl && (
+      {showCropModal && originalLogoUrl && createPortal(
         <div
           style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(0,0,0,0.5)',
-            zIndex: 9999,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
+            position: 'fixed', inset: 0, 
+            background: 'rgba(255,255,255,0.05)',
+            backdropFilter: 'blur(15px)',
+            WebkitBackdropFilter: 'blur(15px)',
+            zIndex: 999999,
+            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+            padding: '40px 20px',
           }}
+          onClick={() => setShowCropModal(false)}
         >
           <div
             style={{
+              position: 'relative',
               background: '#fff',
               padding: '24px',
-              borderRadius: '12px',
+              borderRadius: '16px',
               display: 'flex',
               flexDirection: 'column',
               gap: '16px',
               alignItems: 'center',
-              boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
+              boxShadow: '0 20px 50px rgba(0,0,0,0.2)',
+              maxHeight: '85vh',
             }}
+            onClick={(e) => e.stopPropagation()}
           >
             <h3
               style={{
@@ -588,7 +628,8 @@ export default function PosterGenerator({
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Poster Preview Modal */}
@@ -635,7 +676,7 @@ export default function PosterGenerator({
               disabled={isGenerating}
               style={{ padding: '16px 24px', fontSize: 16 }}
             >
-              {isGenerating ? 'Preparing…' : 'Download this poster'}
+              {isGenerating ? 'Preparing…' : activePosterContent?.kind === 'video' ? 'Download this video' : 'Download this poster'}
             </button>
           </div>
         </div>,

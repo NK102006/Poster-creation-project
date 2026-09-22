@@ -69,14 +69,14 @@ export default function LogoCanvas({ logoSrc, onChange, initialState }) {
     ctx.restore();
 
     ctx.save();
-    ctx.strokeStyle = logoImg ? 'rgba(198, 164, 106, 0.75)' : 'rgba(0, 0, 0, 0.12)';
+    ctx.strokeStyle = logoImg ? '#4a9fd4' : 'rgba(0, 0, 0, 0.12)';
     ctx.lineWidth = 3;
     ctx.strokeRect(1.5, 1.5, CANVAS_SIZE - 3, CANVAS_SIZE - 3);
     ctx.restore();
 
     if (dragging && logoImg) {
       ctx.save();
-      ctx.strokeStyle = 'rgba(198, 164, 106, 0.35)';
+      ctx.strokeStyle = 'rgba(74, 159, 212, 0.35)';
       ctx.lineWidth = 2;
       ctx.setLineDash([6, 4]);
       ctx.strokeRect(4, 4, CANVAS_SIZE - 8, CANVAS_SIZE - 8);

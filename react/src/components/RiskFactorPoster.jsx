@@ -108,14 +108,37 @@ const fitDegreeSize = (text, avail = 184) => {
   return Math.max(8.5, Math.min(11, (avail * 2 * 0.85 * SAFETY) / w));
 };
 
-// Split long names exactly at 31 characters (spaces count). Remainder goes on line 2.
+// Wrap at 31 characters, but never split a word.
+// If char 31 lands inside a word (e.g. the "o" in "John"), the whole word
+// moves to line 2. Only hard-cuts when a single word itself is longer than 31.
 const NAME_WRAP_LIMIT = 31;
 const splitDoctorName = (name, limit = NAME_WRAP_LIMIT) => {
   const str = String(name || '');
   if (str.length <= limit) return { line1: str, line2: '' };
+
+  const atLimit = str[limit]; // first char that would overflow (0-based index `limit`)
+  const beforeLimit = str[limit - 1];
+
+  // Mid-word: both sides of the cut are non-space → pull the whole word down
+  if (beforeLimit !== ' ' && atLimit && atLimit !== ' ') {
+    let wordStart = limit - 1;
+    while (wordStart > 0 && str[wordStart - 1] !== ' ') {
+      wordStart -= 1;
+    }
+    // First word alone is longer than the limit — unavoidable hard cut
+    if (wordStart === 0) {
+      return { line1: str.slice(0, limit), line2: str.slice(limit) };
+    }
+    return {
+      line1: str.slice(0, wordStart).trimEnd(),
+      line2: str.slice(wordStart).trimStart(),
+    };
+  }
+
+  // Cut lands on/after a space — break cleanly there
   return {
-    line1: str.slice(0, limit),
-    line2: str.slice(limit),
+    line1: str.slice(0, limit).trimEnd(),
+    line2: str.slice(limit).trimStart(),
   };
 };
 
@@ -240,9 +263,11 @@ const CSS = `
   font-weight: 600; display: flex; align-items: center; padding-left: 14px; white-space: nowrap; overflow: hidden; }
 .rfp-barR { position: absolute; top: 646px; left: 486px; right: 0; height: 48px; background: var(--rfp-barR); color: #fff;
   display: flex; flex-direction: column; justify-content: center; align-items: flex-start;
-  padding-left: 52px; padding-right: 6px; overflow: hidden; white-space: nowrap; }
-.rfp-doc { font-weight: 700; line-height: 1.15; }
-.rfp-phone { display: flex; align-items: center; margin-left: -28px; font-weight: 600; line-height: 1.15; }
+  padding-left: 52px; padding-right: 6px; overflow: hidden; }
+.rfp-barTall { top: 630px; height: 64px; }
+.rfp-doc { font-weight: 700; line-height: 1.12; }
+.rfp-docLine { display: block; white-space: nowrap; overflow: hidden; }
+.rfp-phone { display: flex; align-items: center; margin-left: -28px; font-weight: 600; line-height: 1.15; white-space: nowrap; }
 .rfp-phoneIcon { width: 22px; height: 22px; margin-right: 6px; flex-shrink: 0; }
 `;
 
@@ -277,9 +302,12 @@ const RiskFactorPoster = forwardRef(function RiskFactorPoster(
   };
 
   const { line1: nameLine1, line2: nameLine2 } = splitDoctorName(doctorName);
-  const nameFontSize = fitNameSize(
-    nameLine2 && nameLine2.length > nameLine1.length ? nameLine2 : nameLine1
-  );
+  const nameWrapped = Boolean(nameLine2);
+  const longestNameLine =
+    nameWrapped && nameLine2.length > nameLine1.length ? nameLine2 : nameLine1;
+  const nameFontSize = fitNameSize(longestNameLine);
+  const barNameFontSize = fitSize(longestNameLine, nameWrapped ? 15 : 19, 9, 190, 700);
+  const barClass = nameWrapped ? ' rfp-barTall' : '';
 
   return (
     <>
@@ -300,13 +328,13 @@ const RiskFactorPoster = forwardRef(function RiskFactorPoster(
         <div className="rfp-dot rfp-dot4" />
 
         {/* PROP `logo` + PROP `doctorName` + PROP `doctorDegree` (top-left) */}
-        <div className={`rfp-tab${nameLine2 ? ' rfp-tabTall' : ''}`}>
+        <div className={`rfp-tab${nameWrapped ? ' rfp-tabTall' : ''}`}>
           <div className="rfp-logo">
             {logo && <img src={logo} alt="Logo" style={{ objectFit: logoFit }} />}
           </div>
           <div className="rfp-tabName" style={{ fontSize: `${nameFontSize}px` }}>
             <span className="rfp-tabNameLine">{nameLine1}</span>
-            {nameLine2 ? <span className="rfp-tabNameLine">{nameLine2}</span> : null}
+            {nameWrapped ? <span className="rfp-tabNameLine">{nameLine2}</span> : null}
           </div>
           {doctorDegree && (
             <div className="rfp-tabDeg" style={{ fontSize: `${fitDegreeSize(doctorDegree)}px` }}>
@@ -339,13 +367,16 @@ const RiskFactorPoster = forwardRef(function RiskFactorPoster(
         </div>
 
         {/* PROP `clinicName` (bottom-left bar) */}
-        <div className="rfp-barL">
+        <div className={`rfp-barL${barClass}`}>
           <span style={{ fontSize: `${fitSize(clinicName, 30, 12, 456, 600)}px` }}>{clinicName}</span>
         </div>
 
-        {/* PROP `doctorName` (top line) + PROP `phone` (bottom line) — bottom-right */}
-        <div className="rfp-barR">
-          <span className="rfp-doc" style={{ fontSize: `${fitSize(doctorName, 19, 10, 190, 700)}px` }}>{doctorName}</span>
+        {/* PROP `doctorName` (wrapped) + PROP `phone` — bottom-right */}
+        <div className={`rfp-barR${barClass}`}>
+          <span className="rfp-doc" style={{ fontSize: `${barNameFontSize}px` }}>
+            <span className="rfp-docLine">{nameLine1}</span>
+            {nameWrapped ? <span className="rfp-docLine">{nameLine2}</span> : null}
+          </span>
           <span className="rfp-phone">
             <IconPhone />
             <span style={{ fontSize: `${fitSize(phone, 22, 10, 188, 600)}px` }}>{phone}</span>

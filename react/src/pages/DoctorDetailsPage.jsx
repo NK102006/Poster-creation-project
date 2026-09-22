@@ -55,7 +55,7 @@ export default function DoctorDetailsPage({
     };
   }, [doctorId, existingDoctor?.id]);
 
-  const handleAutoSave = async (currentFormData, currentLogoFile, posterBlob) => {
+  const handleAutoSave = async (currentFormData, currentLogoFile, posterBlob, kind = 'image') => {
     const name = currentFormData?.name?.trim() || formData.name?.trim();
     const contactnumber =
       currentFormData?.contactnumber?.trim() || formData.contactnumber?.trim();
@@ -75,6 +75,7 @@ export default function DoctorDetailsPage({
     if (clinicName) data.append('clinicName', clinicName);
     if (doctorDegree) data.append('doctorDegree', doctorDegree);
     if (doctor?.id) data.append('doctorId', doctor.id);
+    if (user?._id) data.append('userId', user._id);
     data.append('countDownload', 'true');
 
     if (file) {
@@ -83,7 +84,8 @@ export default function DoctorDetailsPage({
       data.append('logo', logoPreview);
     }
     if (posterBlob) {
-      data.append('poster', posterBlob, 'poster.jpg');
+      data.append('poster', posterBlob, kind === 'video' ? 'video.mp4' : 'poster.jpg');
+      data.append('contentKind', kind);
     }
 
     try {
@@ -103,6 +105,7 @@ export default function DoctorDetailsPage({
 
   return (
     <StudioShell
+      userLabel={user ? `Employee ${user.empid || (user.id && String(user.id).length < 24 ? user.id : '')}`.trim() : 'Employee'}
       onLogout={onLogout}
       onBrandClick={onBrandClick || onStartNew}
       headerActions={
