@@ -158,11 +158,6 @@ export default function AdminPortal() {
             render: (data, _type, row) => data ?? row.id ?? '—',
           },
           {
-            title: 'Name',
-            data: 'name',
-            render: (data) => data || '—',
-          },
-          {
             title: 'Actions',
             data: null,
             orderable: false,
@@ -246,7 +241,7 @@ export default function AdminPortal() {
     if (activeTab === 'doctors') {
       setFormData({ name: '', clinicName: '', contactnumber: '', doctorDegree: '' });
     } else {
-      setFormData({ empid: '', name: '', password: '' });
+      setFormData({ empid: '', password: '' });
     }
     setShowModal(true);
   };
@@ -283,7 +278,7 @@ export default function AdminPortal() {
   const formFields =
     activeTab === 'doctors'
       ? ['name', 'doctorDegree', 'clinicName', 'contactnumber']
-      : ['empid', 'name', 'password'];
+      : ['empid', 'password'];
 
   const handleExport = async () => {
     try {

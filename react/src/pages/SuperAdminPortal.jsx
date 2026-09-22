@@ -14,10 +14,22 @@ function downloadFile(blob, filename) {
   URL.revokeObjectURL(url);
 }
 
-function addDataUrlFile(zip, path, dataUrl) {
-  if (!dataUrl?.startsWith('data:')) return;
-  const [, base64 = ''] = dataUrl.split(',', 2);
-  if (base64) zip.file(path, base64, { base64: true });
+async function addFileToZip(zip, path, urlOrData) {
+  if (!urlOrData) return;
+  if (urlOrData.startsWith('data:')) {
+    const [, base64 = ''] = urlOrData.split(',', 2);
+    if (base64) zip.file(path, base64, { base64: true });
+  } else if (urlOrData.startsWith('http')) {
+    try {
+      const res = await fetch(urlOrData);
+      if (res.ok) {
+        const blob = await res.blob();
+        zip.file(path, blob);
+      }
+    } catch (err) {
+      console.warn('Failed to fetch file for zip:', urlOrData, err);
+    }
+  }
 }
 
 export default function SuperAdminPortal() {
@@ -108,8 +120,8 @@ export default function SuperAdminPortal() {
 
   const exportUsers = () => {
     const rows = [
-      ['ID', 'Employee ID', 'Name', 'Created'],
-      ...users.map((user) => [user.id, user.empid, user.name, user.createdAt || '']),
+      ['ID', 'Employee ID', 'Created'],
+      ...users.map((user) => [user.id, user.empid, user.createdAt || '']),
     ];
     downloadFile(new Blob([rows.map((row) => row.map(csvCell).join(',')).join('\n')], {
       type: 'text/csv;charset=utf-8;',
@@ -131,15 +143,19 @@ export default function SuperAdminPortal() {
       );
       const zip = new JSZip();
       const rows = [['ID', 'Name', 'Degree', 'Clinic / Hospital', 'Contact Number', 'Active', 'Posters Made', 'Downloads', 'Logo File', 'Poster Files']];
-      details.forEach((doctor) => {
+      for (const doctor of details) {
         const safeName = `${doctor.id}-${(doctor.name || 'doctor').replace(/[^a-z0-9]+/gi, '-').toLowerCase()}`;
-        const posterFiles = (doctor.posters || []).map((poster, index) => {
+        const posterFiles = [];
+        
+        for (let index = 0; index < (doctor.posters || []).length; index++) {
+          const poster = doctor.posters[index];
           const filename = `posters/${safeName}-${index + 1}.jpg`;
-          addDataUrlFile(zip, filename, poster.image);
-          return filename;
-        });
+          await addFileToZip(zip, filename, poster.image);
+          posterFiles.push(filename);
+        }
+
         const logoFile = doctor.logo ? `logos/${safeName}.png` : '';
-        if (logoFile) addDataUrlFile(zip, logoFile, doctor.logo);
+        if (logoFile) await addFileToZip(zip, logoFile, doctor.logo);
         rows.push([
           doctor.id,
           doctor.name,
@@ -152,9 +168,9 @@ export default function SuperAdminPortal() {
           logoFile,
           posterFiles.join('; '),
         ]);
-      });
+      }
       zip.file('doctors.csv', rows.map((row) => row.map(csvCell).join(',')).join('\n'));
-      downloadFile(await zip.generateAsync({ type: 'blob' }), `${selectedUser.name || 'user'}-doctors.zip`);
+      downloadFile(await zip.generateAsync({ type: 'blob' }), `${selectedUser.empid || 'user'}-doctors.zip`);
     } catch (err) {
       setError(err.message || 'Could not export doctors');
     } finally {
@@ -183,7 +199,7 @@ export default function SuperAdminPortal() {
     );
   }
 
-  const page = selectedDoctor ? 'Doctor details' : selectedUser ? `${selectedUser.name || 'User'}’s doctors` : 'Users';
+  const page = selectedDoctor ? 'Doctor details' : selectedUser ? `${selectedUser.empid || 'User'}’s doctors` : 'Users';
 
   return (
     <div className={styles.shell}>
@@ -212,7 +228,7 @@ export default function SuperAdminPortal() {
 
           {!selectedUser && <>
             <div className={styles.toolbar}><div /><button type="button" className={styles.secondaryBtn} onClick={exportUsers}>Export users</button></div>
-            <div className={styles.tableCard}><table className={styles.superTable}><thead><tr><th>ID</th><th>Employee ID</th><th>Name</th><th>Created</th><th>Doctors made</th><th /></tr></thead><tbody>{users.map((user) => <tr key={user.id}><td><code className={styles.idCell}>{user.id}</code></td><td>{user.empid || '—'}</td><td>{user.name || '—'}</td><td>{user.createdAt ? new Date(user.createdAt).toLocaleDateString() : '—'}</td><td>{user.doctorCount}</td><td><button type="button" className={styles.editBtn} onClick={() => selectUser(user)}>View doctors</button></td></tr>)}</tbody></table>{!loading && users.length === 0 && <p className={styles.emptyState}>No users found.</p>}</div>
+            <div className={styles.tableCard}><table className={styles.superTable}><thead><tr><th>ID</th><th>Employee ID</th><th>Created</th><th>Doctors made</th><th /></tr></thead><tbody>{users.map((user) => <tr key={user.id}><td><code className={styles.idCell}>{user.id}</code></td><td>{user.empid || '—'}</td><td>{user.createdAt ? new Date(user.createdAt).toLocaleDateString() : '—'}</td><td>{user.doctorCount}</td><td><button type="button" className={styles.editBtn} onClick={() => selectUser(user)}>View doctors</button></td></tr>)}</tbody></table>{!loading && users.length === 0 && <p className={styles.emptyState}>No users found.</p>}</div>
           </>}
 
           {selectedUser && !selectedDoctor && <>

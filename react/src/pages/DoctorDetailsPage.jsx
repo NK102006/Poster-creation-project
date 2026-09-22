@@ -84,7 +84,8 @@ export default function DoctorDetailsPage({
       data.append('logo', logoPreview);
     }
     if (posterBlob) {
-      data.append('poster', posterBlob, 'poster.jpg');
+      const ext = posterBlob.type && posterBlob.type.includes('video') ? 'mp4' : 'jpg';
+      data.append('poster', posterBlob, `poster.${ext}`);
     }
 
     try {

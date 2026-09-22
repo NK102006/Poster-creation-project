@@ -23,20 +23,25 @@ app.use(session({
 
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 25 * 1024 * 1024 }, // 25MB limit for high-res posters
+  limits: { fileSize: 500 * 1024 * 1024 }, // 500MB limit for high-res posters and videos
 });
 
 const PORT = process.env.PORT || 3000;
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/posterCreation';
 
 app.use(cors());
-app.use(express.json({ limit: '25mb' }));
-app.use(express.urlencoded({ extended: true, limit: '25mb' }));
+app.use(express.json({ limit: '500mb' }));
+app.use(express.urlencoded({ extended: true, limit: '500mb' }));
+
+const UPLOADS_DIR = path.resolve('uploads');
+fs.mkdirSync(path.join(UPLOADS_DIR, 'logos'), { recursive: true });
+fs.mkdirSync(path.join(UPLOADS_DIR, 'posters'), { recursive: true });
+app.use('/uploads', express.static(UPLOADS_DIR));
 
 // Schemas & Models
 const posterEntrySchema = new mongoose.Schema(
   {
-    image: { type: Buffer, required: true },
+    image: { type: mongoose.Schema.Types.Mixed, required: true },
     downloads: { type: Number, default: 0 },
     createdAt: { type: Date, default: Date.now },
   },
@@ -49,8 +54,8 @@ const doctorSchema = new mongoose.Schema({
   clinicName: { type: String, required: true, trim: true },
   doctorDegree: { type: String, trim: true, default: '' },
   contactnumber: { type: Number, required: true },
-  logo: { type: Buffer },
-  poster: { type: Buffer }, // latest poster (legacy + convenience)
+  logo: { type: mongoose.Schema.Types.Mixed },
+  poster: { type: mongoose.Schema.Types.Mixed }, // latest poster (legacy + convenience)
   posters: { type: [posterEntrySchema], default: [] },
   downloadCount: { type: Number, default: 0 },
   active: { type: Boolean, default: true },
@@ -59,16 +64,32 @@ const doctorSchema = new mongoose.Schema({
 const userSchema = new mongoose.Schema({
   empid: { type: mongoose.Schema.Types.Mixed },
   password: { type: String, required: true },
-  name: { type: String },
 }, { strict: false, timestamps: true });
 
 export const Doctor = mongoose.model('Doctor', doctorSchema);
 export const User = mongoose.model('User', userSchema);
 
+// Helper to save buffer to disk and return relative path
+async function saveFile(buffer, originalname, subfolder) {
+  if (!buffer) return null;
+  let ext = originalname ? path.extname(originalname).toLowerCase() : '';
+  if (!ext) ext = subfolder === 'logos' ? '.png' : '.jpg';
+  const filename = `${Date.now()}-${Math.round(Math.random() * 1e9)}${ext}`;
+  const relativePath = `uploads/${subfolder}/${filename}`;
+  const absolutePath = path.join(UPLOADS_DIR, subfolder, filename);
+  await fs.promises.writeFile(absolutePath, buffer);
+  return relativePath;
+}
+
 // Helper to format doctor document for frontend consumption
 function bufferToDataUrl(value, fallbackMime = 'image/png') {
   if (!value) return null;
-  if (typeof value === 'string') return value;
+  if (typeof value === 'string') {
+    if (value.startsWith('uploads/') || value.startsWith('uploads\\')) {
+      return `${process.env.VITE_API_BASE_URL || `http://localhost:${PORT}`}/${value.replace(/\\/g, '/')}`;
+    }
+    return value;
+  }
 
   const buf = Buffer.isBuffer(value)
     ? value
@@ -160,7 +181,6 @@ function formatUser(doc) {
   return {
     id: obj._id,
     empid: obj.empid ?? obj.id ?? null,
-    name: obj.name || '',
     createdAt: obj.createdAt,
   };
 }
@@ -276,9 +296,12 @@ app.put('/api/doctors/:id', upload.any(), async (req, res) => {
     if (!doctor) return res.status(404).json({ message: 'Doctor not found' });
 
     const { name, contactnumber, clinicName, doctorDegree, active } = req.body;
-    let logo = req.files?.find((f) => f.fieldname === 'logo')?.buffer || null;
-    if (!logo && req.body.logo && typeof req.body.logo === 'string' && req.body.logo.startsWith('data:')) {
-      logo = Buffer.from(req.body.logo.replace(/^data:image\/\w+;base64,/, ''), 'base64');
+    let logoFile = req.files?.find((f) => f.fieldname === 'logo');
+    let logoBuffer = logoFile?.buffer || null;
+    let originalName = logoFile?.originalname || '';
+
+    if (!logoBuffer && req.body.logo && typeof req.body.logo === 'string' && req.body.logo.startsWith('data:')) {
+      logoBuffer = Buffer.from(req.body.logo.replace(/^data:image\/\w+;base64,/, ''), 'base64');
     }
 
     if (name != null) doctor.name = String(name).trim() || doctor.name;
@@ -301,7 +324,10 @@ app.put('/api/doctors/:id', upload.any(), async (req, res) => {
         Number(String(contactnumber).replace(/\D/g, '')) || doctor.contactnumber;
     }
     if (active != null) doctor.active = String(active) !== 'false' && active !== false;
-    if (logo) doctor.logo = logo;
+    
+    if (logoBuffer) {
+      doctor.logo = await saveFile(logoBuffer, originalName, 'logos');
+    }
 
     await doctor.save();
     return res.status(200).json({
@@ -380,18 +406,23 @@ app.post('/api/doctors/:id/download', async (req, res) => {
 app.post('/api/doctors', upload.any(), async (req, res) => {
   const { name, contactnumber, clinicName, doctorDegree, doctorId, ownerUserId } = req.body;
   const countDownload = String(req.body.countDownload || '') === 'true';
-  let logo = req.files?.find((f) => f.fieldname === 'logo')?.buffer || null;
-  let poster = req.files?.find((f) => f.fieldname === 'poster')?.buffer || null;
+  let logoFile = req.files?.find((f) => f.fieldname === 'logo');
+  let logoBuffer = logoFile?.buffer || null;
+  let logoName = logoFile?.originalname || '';
+
+  let posterFile = req.files?.find((f) => f.fieldname === 'poster');
+  let posterBuffer = posterFile?.buffer || null;
+  let posterName = posterFile?.originalname || '';
 
   // Also support base64 fallback if sent in body
-  if (!logo && req.body.logo && typeof req.body.logo === 'string' && req.body.logo.startsWith('data:')) {
+  if (!logoBuffer && req.body.logo && typeof req.body.logo === 'string' && req.body.logo.startsWith('data:')) {
     const base64Data = req.body.logo.replace(/^data:image\/\w+;base64,/, '');
-    logo = Buffer.from(base64Data, 'base64');
+    logoBuffer = Buffer.from(base64Data, 'base64');
   }
 
-  if (!poster && req.body.poster && typeof req.body.poster === 'string' && req.body.poster.startsWith('data:')) {
+  if (!posterBuffer && req.body.poster && typeof req.body.poster === 'string' && req.body.poster.startsWith('data:')) {
     const base64Data = req.body.poster.replace(/^data:image\/\w+;base64,/, '');
-    poster = Buffer.from(base64Data, 'base64');
+    posterBuffer = Buffer.from(base64Data, 'base64');
   }
 
   if (!String(clinicName || '').trim()) {
@@ -417,13 +448,14 @@ app.post('/api/doctors', upload.any(), async (req, res) => {
       doctor.clinicName = String(clinicName).trim();
       doctor.doctorDegree = cleanedDegree;
       doctor.contactnumber = cleanedContact;
-      if (logo) doctor.logo = logo;
+      if (logoBuffer) doctor.logo = await saveFile(logoBuffer, logoName, 'logos');
 
-      if (poster) {
-        doctor.poster = poster;
+      if (posterBuffer) {
+        const posterPath = await saveFile(posterBuffer, posterName, 'posters');
+        doctor.poster = posterPath;
         doctor.posters = doctor.posters || [];
         doctor.posters.push({
-          image: poster,
+          image: posterPath,
           downloads: countDownload ? 1 : 0,
           createdAt: new Date(),
         });
@@ -440,9 +472,11 @@ app.post('/api/doctors', upload.any(), async (req, res) => {
       });
     }
 
-    if (!logo) {
+    if (!logoBuffer) {
       return res.status(400).json({ success: false, message: 'Doctor logo is required.' });
     }
+    
+    const logoPath = await saveFile(logoBuffer, logoName, 'logos');
 
     const docData = {
       ownerUser: mongoose.isValidObjectId(ownerUserId) ? ownerUserId : null,
@@ -450,17 +484,18 @@ app.post('/api/doctors', upload.any(), async (req, res) => {
       clinicName: String(clinicName).trim(),
       doctorDegree: cleanedDegree,
       contactnumber: cleanedContact,
-      logo,
+      logo: logoPath,
       active: true,
       posters: [],
       downloadCount: 0,
     };
 
-    if (poster) {
-      docData.poster = poster;
+    if (posterBuffer) {
+      const posterPath = await saveFile(posterBuffer, posterName, 'posters');
+      docData.poster = posterPath;
       docData.posters = [
         {
-          image: poster,
+          image: posterPath,
           downloads: countDownload ? 1 : 0,
           createdAt: new Date(),
         },
@@ -610,7 +645,7 @@ app.get('/api/admin/datatables/:collection', async (req, res) => {
         : 1;
 
     const doctorColumns = ['id', 'name', 'clinicName', 'contactnumber', 'logo', 'poster', null];
-    const userColumns = ['id', 'empid', 'name', null];
+    const userColumns = ['id', 'empid', null];
     const columns = collection === 'doctors' ? doctorColumns : userColumns;
     const sortField = columns[orderCol] && columns[orderCol] !== 'id' ? columns[orderCol] : 'createdAt';
     const sort = { [sortField === 'id' ? 'createdAt' : sortField]: orderDir };
@@ -632,7 +667,6 @@ app.get('/api/admin/datatables/:collection', async (req, res) => {
         filter.$or = or;
       } else {
         const or = [
-          { name: { $regex: searchValue, $options: 'i' } },
           { empid: { $regex: searchValue, $options: 'i' } },
         ];
         const asNumber = Number(searchValue);
@@ -680,10 +714,17 @@ app.post('/api/admin/collections/:collection', async (req, res) => {
     const createData = { ...req.body };
     if (req.params.collection === 'doctors') {
       if (createData.logo && typeof createData.logo === 'string' && createData.logo.startsWith('data:')) {
-        createData.logo = Buffer.from(createData.logo.replace(/^data:image\/\w+;base64,/, ''), 'base64');
+        const logoBuffer = Buffer.from(createData.logo.replace(/^data:image\/\w+;base64,/, ''), 'base64');
+        createData.logo = await saveFile(logoBuffer, null, 'logos');
       }
       if (createData.poster && typeof createData.poster === 'string' && createData.poster.startsWith('data:')) {
-        createData.poster = Buffer.from(createData.poster.replace(/^data:image\/\w+;base64,/, ''), 'base64');
+        const posterBuffer = Buffer.from(createData.poster.replace(/^data:image\/\w+;base64,/, ''), 'base64');
+        createData.poster = await saveFile(posterBuffer, null, 'posters');
+        createData.posters = [{
+          image: createData.poster,
+          downloads: 0,
+          createdAt: new Date()
+        }];
       }
     }
 
@@ -703,10 +744,12 @@ app.put('/api/admin/collections/:collection/:id', async (req, res) => {
     const updateData = { ...req.body };
     if (req.params.collection === 'doctors') {
       if (updateData.logo && typeof updateData.logo === 'string' && updateData.logo.startsWith('data:')) {
-        updateData.logo = Buffer.from(updateData.logo.replace(/^data:image\/\w+;base64,/, ''), 'base64');
+        const logoBuffer = Buffer.from(updateData.logo.replace(/^data:image\/\w+;base64,/, ''), 'base64');
+        updateData.logo = await saveFile(logoBuffer, null, 'logos');
       }
       if (updateData.poster && typeof updateData.poster === 'string' && updateData.poster.startsWith('data:')) {
-        updateData.poster = Buffer.from(updateData.poster.replace(/^data:image\/\w+;base64,/, ''), 'base64');
+        const posterBuffer = Buffer.from(updateData.poster.replace(/^data:image\/\w+;base64,/, ''), 'base64');
+        updateData.poster = await saveFile(posterBuffer, null, 'posters');
       }
     }
 

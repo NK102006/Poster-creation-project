@@ -180,26 +180,45 @@ export default function PosterGenerator({
                   )
             }`;
 
-      const posterBlob = await renderPosterBlob(activePosterContent, label);
-      const dataUrl = URL.createObjectURL(posterBlob);
-
       const cleanDocName = formattedDoctorName
         .replace(/[^a-zA-Z0-9_-]/g, '_')
         .replace(/_+/g, '_');
       const posterLabel = activePosterContent?.id || 'poster';
-      const fileName = `Poster_${cleanDocName}_${posterLabel}.jpg`;
 
-      if (onAutoSave) {
-        onAutoSave(formData, logoFile, posterBlob).catch((err) => {
-          console.warn('Auto save notice:', err);
-        });
+      if (activePosterContent?.kind === 'video') {
+        const res = await fetch(activePosterContent.videoUrl);
+        const videoBlob = await res.blob();
+        const dataUrl = URL.createObjectURL(videoBlob);
+        const fileName = `Video_${cleanDocName}_${posterLabel}.mp4`;
+        
+        if (onAutoSave) {
+          onAutoSave(formData, logoFile, videoBlob).catch((err) => {
+            console.warn('Auto save notice:', err);
+          });
+        }
+
+        const link = document.createElement('a');
+        link.download = fileName;
+        link.href = dataUrl;
+        link.click();
+        URL.revokeObjectURL(dataUrl);
+      } else {
+        const posterBlob = await renderPosterBlob(activePosterContent, label);
+        const dataUrl = URL.createObjectURL(posterBlob);
+        const fileName = `Poster_${cleanDocName}_${posterLabel}.jpg`;
+
+        if (onAutoSave) {
+          onAutoSave(formData, logoFile, posterBlob).catch((err) => {
+            console.warn('Auto save notice:', err);
+          });
+        }
+
+        const link = document.createElement('a');
+        link.download = fileName;
+        link.href = dataUrl;
+        link.click();
+        URL.revokeObjectURL(dataUrl);
       }
-
-      const link = document.createElement('a');
-      link.download = fileName;
-      link.href = dataUrl;
-      link.click();
-      URL.revokeObjectURL(dataUrl);
 
       setIsGenerating(false);
       setDownloadMessage('Poster downloaded.');
@@ -230,16 +249,29 @@ export default function PosterGenerator({
           poster.kind === 'festival'
             ? poster.festivalName || 'Festival'
             : `Poster-${++generalCounter}`;
-        const blob = await renderPosterBlob(poster, label);
         const safeLabel = label.replace(/[^a-zA-Z0-9_-]/g, '_');
-        zip.file(`${String(i + 1).padStart(2, '0')}_${safeLabel}.jpg`, blob);
+        
+        if (poster.kind === 'video') {
+          const res = await fetch(poster.videoUrl);
+          const videoBlob = await res.blob();
+          zip.file(`${String(i + 1).padStart(2, '0')}_${safeLabel}.mp4`, videoBlob);
+        } else {
+          const blob = await renderPosterBlob(poster, label);
+          zip.file(`${String(i + 1).padStart(2, '0')}_${safeLabel}.jpg`, blob);
+        }
       }
 
       if (onAutoSave && pack[0]) {
-        const firstBlob = await renderPosterBlob(
-          pack[0],
-          pack[0].kind === 'festival' ? pack[0].festivalName : 'Poster-1'
-        );
+        let firstBlob;
+        if (pack[0].kind === 'video') {
+          const res = await fetch(pack[0].videoUrl);
+          firstBlob = await res.blob();
+        } else {
+          firstBlob = await renderPosterBlob(
+            pack[0],
+            pack[0].kind === 'festival' ? pack[0].festivalName : 'Poster-1'
+          );
+        }
         onAutoSave(formData, logoFile, firstBlob).catch(() => {});
       }
 
