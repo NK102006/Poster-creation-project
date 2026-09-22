@@ -210,6 +210,9 @@
 
 .topbarRight {
   padding-top: 8px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
 .adminBadge {
@@ -225,6 +228,24 @@
   border: 1px solid var(--color-border);
 }
 
+.logoutBtn {
+  border: 1px solid var(--color-border);
+  background: #ffffff;
+  color: var(--color-text-muted);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  padding: 8px 14px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.logoutBtn:hover {
+  color: var(--color-primary);
+  border-color: rgba(74, 159, 212, 0.45);
+  background: rgba(74, 159, 212, 0.06);
+}
+
 .panel {
   padding: 16px 32px 32px;
   flex: 1;
@@ -237,6 +258,12 @@
   gap: 14px;
   margin-bottom: 16px;
   flex-wrap: wrap;
+}
+
+.toolbarActions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
 .toolbarHint {

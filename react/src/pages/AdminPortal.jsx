@@ -17,6 +17,7 @@ function formatLabel(key) {
   if (key === 'empid') return 'Employee ID';
   if (key === 'contactnumber') return 'Contact Number';
   if (key === 'clinicName') return 'Clinic / Hospital';
+  if (key === 'doctorDegree') return 'Degree';
   if (key === 'password') return 'Password';
   if (key === 'createdAt') return 'Created';
   return key.charAt(0).toUpperCase() + key.slice(1);
@@ -35,7 +36,6 @@ export default function AdminPortal() {
   const [editingItem, setEditingItem] = useState(null);
   const [formData, setFormData] = useState({});
   const [saving, setSaving] = useState(false);
-  const [previewItem, setPreviewItem] = useState(null);
 
   const hostRef = useRef(null);
   const tableRef = useRef(null);
@@ -85,7 +85,7 @@ export default function AdminPortal() {
       }
     };
 
-    window.__adminPortal = { openEdit, removeRow, setPreviewItem };
+    window.__adminPortal = { openEdit, removeRow };
     return () => {
       delete window.__adminPortal;
     };
@@ -124,24 +124,9 @@ export default function AdminPortal() {
             render: (data) => data || '—',
           },
           {
-            title: 'Logo',
-            data: 'logo',
-            orderable: false,
-            searchable: false,
-            render: (data) =>
-              data
-                ? `<img src="${data}" alt="" class="${styles.logoThumb}" />`
-                : `<span class="${styles.muted}">—</span>`,
-          },
-          {
-            title: 'Poster',
-            data: 'poster',
-            orderable: false,
-            searchable: false,
-            render: (data) =>
-              data
-                ? `<img src="${data}" alt="" class="${styles.posterThumb}" />`
-                : `<span class="${styles.muted}">null</span>`,
+            title: 'Degree',
+            data: 'doctorDegree',
+            render: (data) => data || '—',
           },
           {
             title: 'Actions',
@@ -226,10 +211,6 @@ export default function AdminPortal() {
           next: 'Next',
         },
       },
-      rowCallback(row) {
-        row.style.cursor = isDoctors ? 'pointer' : 'default';
-        row.dataset.hasMedia = isDoctors ? 'true' : 'false';
-      },
     });
 
     function onClick(e) {
@@ -247,10 +228,6 @@ export default function AdminPortal() {
         return;
       }
 
-      if (!tr || !host.contains(tr) || tr.parentElement?.tagName !== 'TBODY') return;
-      if (activeTab !== 'doctors') return;
-      const rowData = table.row(tr).data();
-      if (rowData) window.__adminPortal?.setPreviewItem(rowData);
     }
 
     host.addEventListener('click', onClick);
@@ -267,7 +244,7 @@ export default function AdminPortal() {
   const openCreate = () => {
     setEditingItem(null);
     if (activeTab === 'doctors') {
-      setFormData({ name: '', clinicName: '', contactnumber: '', logo: '', poster: '' });
+      setFormData({ name: '', clinicName: '', contactnumber: '', doctorDegree: '' });
     } else {
       setFormData({ empid: '', name: '', password: '' });
     }
@@ -303,19 +280,36 @@ export default function AdminPortal() {
     setFormData((prev) => ({ ...prev, [key]: val }));
   };
 
-  const handleFileChange = (key, file) => {
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      setFormData((prev) => ({ ...prev, [key]: ev.target.result }));
-    };
-    reader.readAsDataURL(file);
-  };
-
   const formFields =
     activeTab === 'doctors'
-      ? ['name', 'clinicName', 'contactnumber', 'logo', 'poster']
+      ? ['name', 'doctorDegree', 'clinicName', 'contactnumber']
       : ['empid', 'name', 'password'];
+
+  const handleExport = async () => {
+    try {
+      const doctors = await apiRequest('/admin/collections/doctors');
+      const rows = [
+        ['Name', 'Degree', 'Clinic / Hospital', 'Contact Number'],
+        ...doctors.map((doctor) => [
+          doctor.name || '',
+          doctor.doctorDegree || '',
+          doctor.clinicName || '',
+          doctor.contactnumber || '',
+        ]),
+      ];
+      const csv = rows
+        .map((row) => row.map((value) => `"${String(value).replaceAll('"', '""')}"`).join(','))
+        .join('\n');
+      const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }));
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'doctors.csv';
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      alert('Export failed: ' + err.message);
+    }
+  };
 
   if (!isLoggedIn) {
     return (
@@ -329,7 +323,6 @@ export default function AdminPortal() {
             </div>
           </div>
           <h1 className={styles.loginTitle}>Sign in</h1>
-          <p className={styles.loginHint}>Manage doctors and employee users.</p>
           {loginError && <p className={styles.error}>{loginError}</p>}
           <label className={styles.field}>
             <span>Username</span>
@@ -380,47 +373,33 @@ export default function AdminPortal() {
             <span className={styles.navIcon}>D</span>
             Doctors
           </button>
-          <button
-            type="button"
-            className={`${styles.navItem} ${activeTab === 'users' ? styles.navActive : ''}`}
-            onClick={() => setActiveTab('users')}
-          >
-            <span className={styles.navIcon}>U</span>
-            Users
-          </button>
         </nav>
-
-        <button type="button" className={styles.sidebarLogout} onClick={handleLogout}>
-          Log out
-        </button>
       </aside>
 
       <div className={styles.main}>
         <header className={styles.topbar}>
           <div>
-            <p className={styles.breadcrumb}>
-              Admin / {activeTab === 'doctors' ? 'Doctors' : 'Users'}
-            </p>
-            <h1 className={styles.pageTitle}>
-              {activeTab === 'doctors' ? 'Doctors list' : 'Users list'}
-            </h1>
-            <p className={styles.pageHint}>
-              DataTables with server-side pagination. Click a doctor row to preview logo & poster.
-            </p>
+            <h1 className={styles.pageTitle}>Doctors list</h1>
           </div>
           <div className={styles.topbarRight}>
             <span className={styles.adminBadge}>Administrator</span>
+            <button type="button" className={styles.logoutBtn} onClick={handleLogout}>
+              Log out
+            </button>
           </div>
         </header>
 
         <section className={styles.panel}>
           <div className={styles.toolbar}>
-            <p className={styles.toolbarHint}>
-              Page size + search are handled by DataTables against MongoDB.
-            </p>
-            <button type="button" className={styles.primaryBtn} onClick={openCreate}>
-              + Add {activeTab === 'doctors' ? 'doctor' : 'user'}
-            </button>
+            <div />
+            <div className={styles.toolbarActions}>
+              <button type="button" className={styles.secondaryBtn} onClick={handleExport}>
+                Export
+              </button>
+              <button type="button" className={styles.primaryBtn} onClick={openCreate}>
+                + Add doctor
+              </button>
+            </div>
           </div>
 
           <div className={styles.tableCard}>
@@ -428,53 +407,6 @@ export default function AdminPortal() {
           </div>
         </section>
       </div>
-
-      {previewItem && (
-        <div className={styles.modalOverlay} onClick={() => setPreviewItem(null)}>
-          <div
-            className={styles.previewModal}
-            role="dialog"
-            aria-modal="true"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className={styles.previewHeader}>
-              <div>
-                <p className={styles.previewEyebrow}>Doctor preview</p>
-                <h2 className={styles.modalTitle}>{previewItem.name || 'Doctor'}</h2>
-                <p className={styles.previewMeta}>
-                  Contact: {previewItem.contactnumber || '—'} · ID:{' '}
-                  <code>{getItemId(previewItem)}</code>
-                </p>
-              </div>
-              <button
-                type="button"
-                className={styles.secondaryBtn}
-                onClick={() => setPreviewItem(null)}
-              >
-                Close
-              </button>
-            </div>
-            <div className={styles.previewGrid}>
-              <div className={styles.previewPane}>
-                <h3>Logo</h3>
-                {previewItem.logo ? (
-                  <img src={previewItem.logo} alt="Logo" className={styles.previewLogo} />
-                ) : (
-                  <p className={styles.muted}>No logo</p>
-                )}
-              </div>
-              <div className={styles.previewPane}>
-                <h3>Poster</h3>
-                {previewItem.poster ? (
-                  <img src={previewItem.poster} alt="Poster" className={styles.previewPoster} />
-                ) : (
-                  <p className={styles.muted}>No poster</p>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
       {showModal && (
         <div className={styles.modalOverlay} onClick={() => setShowModal(false)}>
@@ -493,32 +425,13 @@ export default function AdminPortal() {
               {formFields.map((f) => (
                 <label key={f} className={styles.field}>
                   <span>{formatLabel(f)}</span>
-                  {f === 'logo' || f === 'poster' ? (
-                    <div className={styles.fileBlock}>
-                      {formData[f] ? (
-                        <img
-                          src={formData[f]}
-                          alt=""
-                          className={f === 'logo' ? styles.formLogo : styles.formPoster}
-                        />
-                      ) : (
-                        <span className={styles.muted}>No image</span>
-                      )}
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={(e) => handleFileChange(f, e.target.files?.[0])}
-                      />
-                    </div>
-                  ) : (
-                    <input
-                      type={f === 'password' ? 'password' : 'text'}
-                      value={formData[f] ?? ''}
-                      onChange={(e) => handleFieldChange(f, e.target.value)}
-                      required={f !== 'logo' && f !== 'poster'}
-                      autoComplete={f === 'password' ? 'new-password' : undefined}
-                    />
-                  )}
+                  <input
+                    type={f === 'password' ? 'password' : 'text'}
+                    value={formData[f] ?? ''}
+                    onChange={(e) => handleFieldChange(f, e.target.value)}
+                    required
+                    autoComplete={f === 'password' ? 'new-password' : undefined}
+                  />
                 </label>
               ))}
               <div className={styles.modalActions}>
