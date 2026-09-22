@@ -5,21 +5,18 @@
 //
 // WHICH PROP FEEDS WHICH SPOT ON THE POSTER
 // ┌──────────────┬────────────────────────────────────────────────────────────┐
-// │ logo         │ square logo / doctor photo, top-left (image URL / data URL)│
-// │ doctorName   │ (a) top-left, under the logo   (b) bottom-right red bar,   │
-// │              │     top line (was "Call For Appointment")                  │
-// │ doctorDegree │ top-left, in small text under the doctor's name            │
-// │ clinicName   │ bottom-left coloured bar                                   │
-// │ phone        │ bottom-right red bar, BOTTOM line (next to the phone icon) │
+// │ logo         │ bottom-left footer, small square beside clinic name        │
+// │ doctorName   │ bottom-right bar, next to phone                            │
+// │ doctorDegree │ bottom-right bar, under the doctor's name                  │
+// │ clinicName   │ bottom-left bar, beside the logo                           │
+// │ phone        │ bottom-right bar, beside doctor name (WhatsApp icon)       │
 // │ theme        │ 'blue' | 'red' | 'green' | 'purple'  → colours everything  │
-// │ logoFit      │ (optional) 'cover' (default, fills the square, may crop)   │
-// │              │     or 'contain' (shows the whole image, may leave margins)│
+// │ logoFit      │ (optional) 'cover' (default) or 'contain'                  │
 // │ photo        │ (optional) blood-pressure photo; defaults to bp-photo.jpg  │
 // │ id           │ (optional) DOM id, handy for html-to-image / html2canvas   │
 // └──────────────┴────────────────────────────────────────────────────────────┘
 // Text is used exactly as you pass it (so pass "Dr. Prisha Shah" if you want "Dr.").
-// Long names / degrees shrink automatically so they never spill out of their box.
-// The logo is never stretched: it is always scaled with its proportions kept.
+// Long names / degrees / clinic / phone shrink automatically so they never overflow.
 // You can also pass a ref:  <RiskFactorPoster ref={myRef} ... />
 //
 // Usage:
@@ -48,32 +45,31 @@ import bpPhoto from '../assets/bp-photo.jpg';
 //   ink              normal text ("Unmasking the…", risk-factor labels)
 //   headA / headB    "HYPERTENSION'S" and "RISK FACTORS."
 //   ring             outline of the small round icons
-//   nameA / nameB    doctor name / degree under the logo (top-left)
-//   barL / barR      bottom-left bar (clinic) and bottom-right bar (doctor + phone)
+//   barL / barR      bottom row: clinic (left) and doctor + phone (right)
 export const RISK_POSTER_THEMES = {
   blue: {
     bg1: '#e3f1fc', bg2: '#c4dff5', band: '#a6cbea', panel: '#8fbfe8', frameBorder: '#a9cfee',
     dotA: 'rgba(15, 60, 120, 0.28)', dotB: 'rgba(230, 80, 90, 0.55)',
     ink: '#0c2a4a', headA: '#0a559f', headB: '#c62020', ring: '#1f6fb8',
-    nameA: '#12408a', nameB: '#d62b1f', barL: '#12408a', barR: '#d62b1f',
+    barL: '#12408a', barR: '#d62b1f',
   },
   red: {
     bg1: '#feeae7', bg2: '#f9cfca', band: '#f0aaa3', panel: '#ee9b93', frameBorder: '#f3b3ac',
     dotA: 'rgba(120, 20, 25, 0.28)', dotB: 'rgba(230, 70, 70, 0.5)',
     ink: '#4a0f12', headA: '#7f1015', headB: '#c4161c', ring: '#b3262c',
-    nameA: '#7f1015', nameB: '#c4161c', barL: '#7f1015', barR: '#c4161c',
+    barL: '#7f1015', barR: '#c4161c',
   },
   green: {
     bg1: '#e6f6e9', bg2: '#c7e8cf', band: '#a3d5b0', panel: '#8ccb9c', frameBorder: '#a9d9b6',
     dotA: 'rgba(15, 90, 50, 0.28)', dotB: 'rgba(240, 170, 60, 0.55)',
     ink: '#0d3320', headA: '#14683a', headB: '#b45309', ring: '#1b7a45',
-    nameA: '#14683a', nameB: '#b45309', barL: '#14683a', barR: '#b45309',
+    barL: '#14683a', barR: '#b45309',
   },
   purple: {
     bg1: '#f1e9fb', bg2: '#dccbf3', band: '#c3a9e8', panel: '#b391e0', frameBorder: '#c9b0ec',
     dotA: 'rgba(70, 25, 140, 0.28)', dotB: 'rgba(230, 80, 150, 0.5)',
     ink: '#2b1454', headA: '#5b21b6', headB: '#be185d', ring: '#6d32c4',
-    nameA: '#4a1d96', nameB: '#be185d', barL: '#4a1d96', barR: '#be185d',
+    barL: '#4a1d96', barR: '#be185d',
   },
 };
 
@@ -97,35 +93,20 @@ const SAFETY = 0.92;
 const fitSize = (text, base, min, avail, weight = 600) =>
   Math.max(min, Math.min(base, (avail * SAFETY) / widthPerPx(text, weight)));
 
-// Doctor name under the logo: one line, shrinks if long.
-const fitNameSize = (text) => fitSize(text, 17, 9, 178, 700);
-
-// Degree under the doctor's name: one line if it fits, otherwise two small lines.
-const fitDegreeSize = (text, avail = 184) => {
-  const w = widthPerPx(text, 600);
-  const oneLine = (avail * SAFETY) / w;
-  if (oneLine >= 10.5) return Math.min(12.5, oneLine);
-  return Math.max(8.5, Math.min(11, (avail * 2 * 0.85 * SAFETY) / w));
-};
-
-// Wrap at 31 characters, but never split a word.
-// If char 31 lands inside a word (e.g. the "o" in "John"), the whole word
-// moves to line 2. Only hard-cuts when a single word itself is longer than 31.
-const NAME_WRAP_LIMIT = 31;
+// Wrap at 28 characters, but never split a word.
+const NAME_WRAP_LIMIT = 28;
 const splitDoctorName = (name, limit = NAME_WRAP_LIMIT) => {
   const str = String(name || '');
   if (str.length <= limit) return { line1: str, line2: '' };
 
-  const atLimit = str[limit]; // first char that would overflow (0-based index `limit`)
+  const atLimit = str[limit];
   const beforeLimit = str[limit - 1];
 
-  // Mid-word: both sides of the cut are non-space → pull the whole word down
   if (beforeLimit !== ' ' && atLimit && atLimit !== ' ') {
     let wordStart = limit - 1;
     while (wordStart > 0 && str[wordStart - 1] !== ' ') {
       wordStart -= 1;
     }
-    // First word alone is longer than the limit — unavoidable hard cut
     if (wordStart === 0) {
       return { line1: str.slice(0, limit), line2: str.slice(limit) };
     }
@@ -135,7 +116,6 @@ const splitDoctorName = (name, limit = NAME_WRAP_LIMIT) => {
     };
   }
 
-  // Cut lands on/after a space — break cleanly there
   return {
     line1: str.slice(0, limit).trimEnd(),
     line2: str.slice(limit).trimStart(),
@@ -222,53 +202,47 @@ const CSS = `
 .rfp p { margin: 0; }
 
 .rfp-band  { position: absolute; top: 76px; left: 0; right: 0; height: 8px; background: var(--rfp-band); }
-.rfp-panel { position: absolute; top: 78px; right: 0; width: 203px; height: 522px; background: var(--rfp-panel); }
+.rfp-panel { position: absolute; top: 78px; right: 0; width: 203px; height: 600px; background: var(--rfp-panel); }
 .rfp-dot   { position: absolute; width: 38px; height: 38px; border-radius: 50%; }
 .rfp-dot1 { top: 128px; left: 475px; background: var(--rfp-dotA); }
 .rfp-dot2 { top: 128px; left: 507px; background: var(--rfp-dotB); }
 .rfp-dot3 { top: 416px; left: 281px; background: var(--rfp-dotB); }
 .rfp-dot4 { top: 449px; left: 281px; background: var(--rfp-dotA); }
 
-.rfp-tab { position: absolute; top: 0; left: 34px; width: 204px; height: 156px; background: #fff;
-  border-radius: 0 0 20px 20px; box-shadow: 0 6px 16px rgba(20, 30, 60, 0.14);
-  display: flex; flex-direction: column; align-items: center; padding-top: 10px; z-index: 3; }
-.rfp-tabTall { height: 172px; padding-top: 8px; }
-.rfp-tabTall .rfp-logo { width: 88px; height: 88px; }
-.rfp-logo { width: 98px; height: 98px; border-radius: 0; background: transparent; overflow: hidden;
-  display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-.rfp-logo img { width: 100%; height: 100%; display: block; object-fit: cover; transform: scale(1.08); transform-origin: center center; }
-.rfp-tabName { margin-top: 6px; width: 100%; padding: 0 10px; text-align: center; font-weight: 700;
-  line-height: 1.15; letter-spacing: 0.2px; color: var(--rfp-nameA); }
-.rfp-tabNameLine { display: block; white-space: nowrap; overflow: visible; text-align: center; width: 100%; }
-.rfp-tabDeg { margin-top: 2px; width: 100%; padding: 0 10px; text-align: center; font-weight: 600;
-  line-height: 1.2; color: var(--rfp-nameB); }
-
-.rfp-headline { position: absolute; top: 168px; left: 40px; }
+.rfp-headline { position: absolute; top: 110px; left: 40px; }
 .rfp-h1 { font-size: 26px; font-weight: 500; line-height: 1.35; color: var(--rfp-ink); }
 .rfp-hA { margin-top: 10px !important; font-size: 35px; font-weight: 800; line-height: 1.4; color: var(--rfp-headA); letter-spacing: 0.2px; }
 .rfp-hB { font-size: 35px; font-weight: 800; line-height: 1.4; color: var(--rfp-headB); letter-spacing: 0.2px; }
 
-.rfp-list { position: absolute; top: 355px; left: 68px; margin: 0; padding: 0; list-style: none; }
+.rfp-list { position: absolute; top: 340px; left: 68px; margin: 0; padding: 0; list-style: none; }
 .rfp-row { display: flex; align-items: center; height: 41px; }
 .rfp-ring { width: 38px; height: 38px; border-radius: 50%; border: 2px solid var(--rfp-ring); background: #fff;
   display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
 .rfp-ring svg { width: 26px; height: 26px; }
 .rfp-label { margin-left: 11px; max-width: 165px; font-size: 16.5px; font-weight: 500; line-height: 1.25; color: var(--rfp-ink); }
 
-.rfp-frame { position: absolute; top: 183px; left: 372px; width: 318px; height: 417px; padding: 18px;
+.rfp-frame { position: absolute; top: 168px; left: 372px; width: 318px; height: 450px; padding: 18px;
   border-radius: 74px; background: #fff; border: 7px solid var(--rfp-frameBorder); z-index: 2; }
 .rfp-frame img { width: 100%; height: 100%; object-fit: cover; border-radius: 54px; display: block; }
 
-.rfp-barL { position: absolute; top: 646px; left: 0; width: 486px; height: 48px; background: var(--rfp-barL); color: #fff;
-  font-weight: 600; display: flex; align-items: center; padding-left: 14px; white-space: nowrap; overflow: hidden; }
-.rfp-barR { position: absolute; top: 646px; left: 486px; right: 0; height: 48px; background: var(--rfp-barR); color: #fff;
-  display: flex; flex-direction: column; justify-content: center; align-items: flex-start;
-  padding-left: 52px; padding-right: 6px; overflow: hidden; }
-.rfp-barTall { top: 630px; height: 64px; }
-.rfp-doc { font-weight: 700; line-height: 1.12; }
-.rfp-docLine { display: block; white-space: nowrap; overflow: hidden; }
-.rfp-phone { display: flex; align-items: center; margin-left: -28px; font-weight: 600; line-height: 1.15; white-space: nowrap; }
-.rfp-phoneIcon { width: 22px; height: 22px; margin-right: 6px; flex-shrink: 0; }
+.rfp-barL, .rfp-barR { position: absolute; bottom: 0; height: 64px; color: #fff; z-index: 3;
+  display: flex; align-items: center; overflow: hidden; }
+.rfp-barL { left: 0; width: 430px; background: var(--rfp-barL);
+  padding: 0 16px 0 10px; gap: 12px; font-weight: 600; white-space: nowrap; }
+.rfp-barR { left: 430px; right: 0; background: var(--rfp-barR);
+  padding: 0 16px 0 18px; gap: 14px; justify-content: space-between; }
+.rfp-barTall { height: 76px; }
+.rfp-logo { width: 48px; height: 48px; border-radius: 8px; background: #fff; overflow: hidden;
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12); }
+.rfp-barTall .rfp-logo { width: 56px; height: 56px; border-radius: 10px; }
+.rfp-logo img { width: 100%; height: 100%; display: block; object-fit: cover; }
+.rfp-clinic { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.rfp-doc { display: flex; flex-direction: column; justify-content: center; min-width: 0; flex: 1; }
+.rfp-docName { font-weight: 700; line-height: 1.15; white-space: nowrap; overflow: hidden; }
+.rfp-docDeg { font-weight: 500; line-height: 1.15; opacity: 0.92; white-space: nowrap; overflow: hidden; margin-top: 2px; }
+.rfp-phone { display: flex; align-items: center; flex-shrink: 0; font-weight: 600; line-height: 1; white-space: nowrap; }
+.rfp-phoneIcon { width: 22px; height: 22px; margin-right: 7px; flex-shrink: 0; }
 `;
 
 // ─── The component ───────────────────────────────────────────────────────────
@@ -298,16 +272,20 @@ const RiskFactorPoster = forwardRef(function RiskFactorPoster(
     '--rfp-bg1': t.bg1, '--rfp-bg2': t.bg2, '--rfp-band': t.band, '--rfp-panel': t.panel,
     '--rfp-frameBorder': t.frameBorder, '--rfp-dotA': t.dotA, '--rfp-dotB': t.dotB,
     '--rfp-ink': t.ink, '--rfp-headA': t.headA, '--rfp-headB': t.headB, '--rfp-ring': t.ring,
-    '--rfp-nameA': t.nameA, '--rfp-nameB': t.nameB, '--rfp-barL': t.barL, '--rfp-barR': t.barR,
+    '--rfp-barL': t.barL, '--rfp-barR': t.barR,
   };
 
   const { line1: nameLine1, line2: nameLine2 } = splitDoctorName(doctorName);
   const nameWrapped = Boolean(nameLine2);
   const longestNameLine =
     nameWrapped && nameLine2.length > nameLine1.length ? nameLine2 : nameLine1;
-  const nameFontSize = fitNameSize(longestNameLine);
-  const barNameFontSize = fitSize(longestNameLine, nameWrapped ? 15 : 19, 9, 190, 700);
-  const barClass = nameWrapped ? ' rfp-barTall' : '';
+  const hasDegree = Boolean(doctorDegree?.trim());
+  const barTall = nameWrapped || hasDegree;
+  const nameFontSize = fitSize(longestNameLine, nameWrapped ? 15 : 17, 10, 160, 700);
+  const degreeFontSize = fitSize(doctorDegree, 12, 9, 160, 500);
+  // clinic sits beside ~48–56px logo + gaps inside the 430px left bar
+  const clinicFontSize = fitSize(clinicName, 20, 11, logo ? 330 : 386, 600);
+  const phoneFontSize = fitSize(phone, 18, 11, 130, 600);
 
   return (
     <>
@@ -326,22 +304,6 @@ const RiskFactorPoster = forwardRef(function RiskFactorPoster(
         <div className="rfp-dot rfp-dot2" />
         <div className="rfp-dot rfp-dot3" />
         <div className="rfp-dot rfp-dot4" />
-
-        {/* PROP `logo` + PROP `doctorName` + PROP `doctorDegree` (top-left) */}
-        <div className={`rfp-tab${nameWrapped ? ' rfp-tabTall' : ''}`}>
-          <div className="rfp-logo">
-            {logo && <img src={logo} alt="Logo" style={{ objectFit: logoFit }} />}
-          </div>
-          <div className="rfp-tabName" style={{ fontSize: `${nameFontSize}px` }}>
-            <span className="rfp-tabNameLine">{nameLine1}</span>
-            {nameWrapped ? <span className="rfp-tabNameLine">{nameLine2}</span> : null}
-          </div>
-          {doctorDegree && (
-            <div className="rfp-tabDeg" style={{ fontSize: `${fitDegreeSize(doctorDegree)}px` }}>
-              {doctorDegree}
-            </div>
-          )}
-        </div>
 
         {/* fixed headline */}
         <div className="rfp-headline">
@@ -366,20 +328,30 @@ const RiskFactorPoster = forwardRef(function RiskFactorPoster(
           <img src={photo} alt="Blood pressure check" />
         </div>
 
-        {/* PROP `clinicName` (bottom-left bar) */}
-        <div className={`rfp-barL${barClass}`}>
-          <span style={{ fontSize: `${fitSize(clinicName, 30, 12, 456, 600)}px` }}>{clinicName}</span>
+        {/* Footer: logo + clinic | doctor name (+ degree) + phone */}
+        <div className={`rfp-barL${barTall ? ' rfp-barTall' : ''}`}>
+          {logo ? (
+            <div className="rfp-logo">
+              <img src={logo} alt="" style={{ objectFit: logoFit }} />
+            </div>
+          ) : null}
+          <span className="rfp-clinic" style={{ fontSize: `${clinicFontSize}px` }}>{clinicName}</span>
         </div>
-
-        {/* PROP `doctorName` (wrapped) + PROP `phone` — bottom-right */}
-        <div className={`rfp-barR${barClass}`}>
-          <span className="rfp-doc" style={{ fontSize: `${barNameFontSize}px` }}>
-            <span className="rfp-docLine">{nameLine1}</span>
-            {nameWrapped ? <span className="rfp-docLine">{nameLine2}</span> : null}
-          </span>
+        <div className={`rfp-barR${barTall ? ' rfp-barTall' : ''}`}>
+          <div className="rfp-doc">
+            <span className="rfp-docName" style={{ fontSize: `${nameFontSize}px` }}>
+              {nameLine1}
+              {nameWrapped ? <><br />{nameLine2}</> : null}
+            </span>
+            {hasDegree ? (
+              <span className="rfp-docDeg" style={{ fontSize: `${degreeFontSize}px` }}>
+                {doctorDegree}
+              </span>
+            ) : null}
+          </div>
           <span className="rfp-phone">
             <IconPhone />
-            <span style={{ fontSize: `${fitSize(phone, 22, 10, 188, 600)}px` }}>{phone}</span>
+            <span style={{ fontSize: `${phoneFontSize}px` }}>{phone}</span>
           </span>
         </div>
       </div>
