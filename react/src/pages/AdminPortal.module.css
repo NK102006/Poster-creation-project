@@ -681,6 +681,94 @@
   font-size: 14px;
 }
 
+.statusText {
+  margin: 0 0 14px;
+  color: var(--color-text-muted);
+  font-size: 14px;
+}
+
+.superTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.superTable th,
+.superTable td {
+  padding: 14px 12px;
+  text-align: left;
+  border-bottom: 1px solid rgba(31, 111, 159, 0.1);
+  vertical-align: middle;
+}
+
+.superTable th {
+  color: var(--color-text-muted);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.superTable tbody tr:hover {
+  background: rgba(74, 159, 212, 0.04);
+}
+
+.detailCard {
+  display: grid;
+  grid-template-columns: 150px 1fr;
+  gap: 28px;
+  background: #ffffff;
+  border: 1px solid rgba(31, 111, 159, 0.1);
+  border-radius: 16px;
+  padding: 28px;
+  box-shadow: 0 10px 30px -18px rgba(31, 111, 159, 0.25);
+}
+
+.detailLogo {
+  width: 150px;
+  height: 150px;
+  border-radius: 16px;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  background: rgba(31, 111, 159, 0.08);
+  color: var(--color-text-muted);
+}
+
+.detailLogo img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background: #fff;
+}
+
+.detailGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.detailField {
+  padding: 14px;
+  border-radius: 12px;
+  background: rgba(74, 159, 212, 0.06);
+}
+
+.detailField span {
+  display: block;
+  margin-bottom: 5px;
+  font-size: 11px;
+  color: var(--color-text-muted);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.detailField strong {
+  color: var(--color-text);
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+
 /* —— Modal —— */
 .modalOverlay {
   position: fixed;
@@ -818,5 +906,28 @@
   .panel {
     padding-left: 18px;
     padding-right: 18px;
+  }
+
+  .detailCard {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 650px) {
+  .topbar {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .superTable {
+    min-width: 760px;
+  }
+
+  .tableCard {
+    overflow-x: auto;
+  }
+
+  .detailGrid {
+    grid-template-columns: 1fr;
   }
 }

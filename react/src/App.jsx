@@ -6,9 +6,10 @@ import DoctorDetailsPage from './pages/DoctorDetailsPage.jsx';
 import ExistingDoctorsPage from './pages/ExistingDoctorsPage.jsx';
 import DoctorManagePage from './pages/DoctorManagePage.jsx';
 import AdminPortal from './pages/AdminPortal.jsx';
+import SuperAdminPortal from './pages/SuperAdminPortal.jsx';
 
 const VIEW_STATE_KEY = 'app_view_state';
-const ALLOWED_VIEWS = new Set(['hub', 'new', 'existing', 'manage', 'admin']);
+const ALLOWED_VIEWS = new Set(['hub', 'new', 'existing', 'manage', 'admin', 'super-admin']);
 
 function readSavedViewState() {
   try {
@@ -20,7 +21,7 @@ function readSavedViewState() {
 
 function writeSavedViewState(view, doctorId) {
   try {
-    if (view === 'login' || view === 'admin') return;
+    if (view === 'login' || view === 'admin' || view === 'super-admin') return;
     sessionStorage.setItem(
       VIEW_STATE_KEY,
       JSON.stringify({ view, doctorId: doctorId || null })
@@ -38,13 +39,20 @@ function isAdminPath() {
   return window.location.pathname === '/admin';
 }
 
+function isSuperAdminPath() {
+  return window.location.pathname === '/super-admin';
+}
+
 function setAppView(view, { doctorId, replace = false } = {}) {
   const nextUrl = new URL(window.location.href);
   if (view === 'admin') {
     nextUrl.pathname = '/admin';
     nextUrl.search = '';
+  } else if (view === 'super-admin') {
+    nextUrl.pathname = '/super-admin';
+    nextUrl.search = '';
   } else {
-    if (nextUrl.pathname === '/admin') nextUrl.pathname = '/';
+    if (nextUrl.pathname === '/admin' || nextUrl.pathname === '/super-admin') nextUrl.pathname = '/';
     nextUrl.searchParams.set('view', view);
     if (doctorId) nextUrl.searchParams.set('doctorId', doctorId);
     else nextUrl.searchParams.delete('doctorId');
@@ -60,12 +68,15 @@ function resolveAuthenticatedView() {
   if (isAdminPath()) {
     return { view: 'admin', doctorId: null };
   }
+  if (isSuperAdminPath()) {
+    return { view: 'super-admin', doctorId: null };
+  }
 
   const saved = readSavedViewState();
   let view = saved?.view;
   let doctorId = saved?.doctorId || null;
 
-  if (!ALLOWED_VIEWS.has(view) || view === 'admin') {
+  if (!ALLOWED_VIEWS.has(view) || view === 'admin' || view === 'super-admin') {
     view = 'hub';
     doctorId = null;
   }
@@ -95,6 +106,7 @@ export default function App() {
 
   const [view, setView] = useState(() => {
     if (isAdminPath()) return 'admin';
+    if (isSuperAdminPath()) return 'super-admin';
     return initialAuthView?.view || 'login';
   });
   const [doctorId, setDoctorId] = useState(() => initialAuthView?.doctorId || null);
@@ -106,7 +118,7 @@ export default function App() {
       const stored = localStorage.getItem('auth_session');
       if (!stored) {
         setCurrentUser(null);
-        setView(isAdminPath() ? 'admin' : 'login');
+        setView(isAdminPath() ? 'admin' : isSuperAdminPath() ? 'super-admin' : 'login');
         setDoctorId(null);
         return;
       }
@@ -115,6 +127,11 @@ export default function App() {
 
     if (isAdminPath()) {
       setView('admin');
+      setDoctorId(null);
+      return;
+    }
+    if (isSuperAdminPath()) {
+      setView('super-admin');
       setDoctorId(null);
       return;
     }
@@ -127,7 +144,7 @@ export default function App() {
     let nextView = candidate?.view;
     let nextDoctorId = candidate?.doctorId || null;
 
-    if (!ALLOWED_VIEWS.has(nextView) || nextView === 'admin') {
+    if (!ALLOWED_VIEWS.has(nextView) || nextView === 'admin' || nextView === 'super-admin') {
       nextView = 'hub';
       nextDoctorId = null;
     }
@@ -197,6 +214,8 @@ export default function App() {
 
   if (view === 'admin') {
     screen = <AdminPortal />;
+  } else if (view === 'super-admin') {
+    screen = <SuperAdminPortal />;
   } else if (!currentUser) {
     screen = <LoginPage onLoginSuccess={handleLoginSuccess} />;
   } else if (view === 'hub') {

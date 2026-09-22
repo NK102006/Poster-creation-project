@@ -75,6 +75,7 @@ export default function DoctorDetailsPage({
     if (clinicName) data.append('clinicName', clinicName);
     if (doctorDegree) data.append('doctorDegree', doctorDegree);
     if (doctor?.id) data.append('doctorId', doctor.id);
+    if (!doctor?.id && user?.id) data.append('ownerUserId', user.id);
     data.append('countDownload', 'true');
 
     if (file) {

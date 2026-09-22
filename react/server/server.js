@@ -44,6 +44,7 @@ const posterEntrySchema = new mongoose.Schema(
 );
 
 const doctorSchema = new mongoose.Schema({
+  ownerUser: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null, index: true },
   name: { type: String, required: true },
   clinicName: { type: String, required: true, trim: true },
   doctorDegree: { type: String, trim: true, default: '' },
@@ -110,6 +111,7 @@ function formatDoctor(doc, { includePosters = false, light = false } = {}) {
     active: obj.active !== false,
     postersMade,
     downloadCount,
+    ownerUser: obj.ownerUser ? String(obj.ownerUser) : null,
     createdAt: obj.createdAt,
     updatedAt: obj.updatedAt,
   };
@@ -198,7 +200,11 @@ app.post('/api/login', async (req, res) => {
     return res.status(200).json({
       success: true,
       message: 'Login successful',
-      user: { id: user.id || user.empid || id },
+      user: {
+        id: String(user._id),
+        empid: user.empid ?? user.id ?? id,
+        name: user.name || '',
+      },
     });
   } catch (error) {
     console.error('Login error:', error);
@@ -372,7 +378,7 @@ app.post('/api/doctors/:id/download', async (req, res) => {
 
 // Create/update doctor profile and poster with multer file upload
 app.post('/api/doctors', upload.any(), async (req, res) => {
-  const { name, contactnumber, clinicName, doctorDegree, doctorId } = req.body;
+  const { name, contactnumber, clinicName, doctorDegree, doctorId, ownerUserId } = req.body;
   const countDownload = String(req.body.countDownload || '') === 'true';
   let logo = req.files?.find((f) => f.fieldname === 'logo')?.buffer || null;
   let poster = req.files?.find((f) => f.fieldname === 'poster')?.buffer || null;
@@ -439,6 +445,7 @@ app.post('/api/doctors', upload.any(), async (req, res) => {
     }
 
     const docData = {
+      ownerUser: mongoose.isValidObjectId(ownerUserId) ? ownerUserId : null,
       name: name?.trim() || 'Doctor',
       clinicName: String(clinicName).trim(),
       doctorDegree: cleanedDegree,
@@ -486,6 +493,81 @@ app.post('/api/admin/login', (req, res) => {
     return res.status(200).json({ success: true, message: 'Admin login successful' });
   }
   return res.status(401).json({ success: false, message: 'Invalid admin credentials' });
+});
+
+app.post('/api/super-admin/login', (req, res) => {
+  const { username, password } = req.body;
+  if (username === 'superadmin' && password === 'superadmin123') {
+    return res.status(200).json({ success: true, message: 'Super admin login successful' });
+  }
+  return res.status(401).json({ success: false, message: 'Invalid super admin credentials' });
+});
+
+app.get('/api/super-admin/users', async (_req, res) => {
+  try {
+    const users = await User.aggregate([
+      {
+        $lookup: {
+          from: Doctor.collection.name,
+          localField: '_id',
+          foreignField: 'ownerUser',
+          as: 'doctors',
+        },
+      },
+      { $sort: { createdAt: -1 } },
+      {
+        $project: {
+          password: 0,
+          doctors: 0,
+        },
+      },
+    ]);
+    const doctorCounts = await Doctor.aggregate([
+      { $match: { ownerUser: { $ne: null } } },
+      { $group: { _id: '$ownerUser', count: { $sum: 1 } } },
+    ]);
+    const countByUser = new Map(doctorCounts.map((item) => [String(item._id), item.count]));
+    return res.json({
+      users: users.map((user) => ({
+        ...formatUser(user),
+        doctorCount: countByUser.get(String(user._id)) || 0,
+      })),
+    });
+  } catch (error) {
+    console.error('Error fetching super admin users:', error);
+    return res.status(500).json({ message: 'Failed to retrieve users' });
+  }
+});
+
+app.get('/api/super-admin/users/:userId/doctors', async (req, res) => {
+  try {
+    if (!mongoose.isValidObjectId(req.params.userId)) {
+      return res.status(400).json({ message: 'Invalid user ID' });
+    }
+    const [user, doctors] = await Promise.all([
+      User.findById(req.params.userId),
+      Doctor.find({ ownerUser: req.params.userId }).sort({ createdAt: -1 }),
+    ]);
+    if (!user) return res.status(404).json({ message: 'User not found' });
+    return res.json({ user: formatUser(user), doctors: doctors.map((doctor) => formatDoctor(doctor, { light: true })) });
+  } catch (error) {
+    console.error('Error fetching user doctors:', error);
+    return res.status(500).json({ message: 'Failed to retrieve doctors' });
+  }
+});
+
+app.get('/api/super-admin/users/:userId/doctors/:doctorId', async (req, res) => {
+  try {
+    if (!mongoose.isValidObjectId(req.params.userId) || !mongoose.isValidObjectId(req.params.doctorId)) {
+      return res.status(400).json({ message: 'Invalid user or doctor ID' });
+    }
+    const doctor = await Doctor.findOne({ _id: req.params.doctorId, ownerUser: req.params.userId });
+    if (!doctor) return res.status(404).json({ message: 'Doctor not found for this user' });
+    return res.json({ doctor: formatDoctor(doctor, { includePosters: true }) });
+  } catch (error) {
+    console.error('Error fetching super admin doctor:', error);
+    return res.status(500).json({ message: 'Failed to retrieve doctor' });
+  }
 });
 
 app.get('/api/admin/collections/:collection', async (req, res) => {
