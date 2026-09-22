@@ -5,13 +5,15 @@
 //
 // WHICH PROP FEEDS WHICH SPOT ON THE POSTER
 // ┌──────────────┬────────────────────────────────────────────────────────────┐
-// │ logo         │ square logo, bottom-left bar (beside doctor name)          │
-// │ doctorName   │ bottom-left bar, next to the logo (wraps at 31 chars)      │
-// │ doctorDegree │ bottom-left bar, under the doctor's name                   │
-// │ clinicName   │ bottom-left coloured bar, beside the logo/name block       │
-// │ phone        │ bottom-right red bar (next to the phone icon)              │
+// │ logo         │ square logo / doctor photo, top-left (image URL / data URL)│
+// │ doctorName   │ (a) top-left, under the logo   (b) bottom-right red bar,   │
+// │              │     top line (was "Call For Appointment")                  │
+// │ doctorDegree │ top-left, in small text under the doctor's name            │
+// │ clinicName   │ bottom-left coloured bar                                   │
+// │ phone        │ bottom-right red bar, BOTTOM line (next to the phone icon) │
 // │ theme        │ 'blue' | 'red' | 'green' | 'purple'  → colours everything  │
-// │ logoFit      │ (optional) 'cover' (default) or 'contain'                  │
+// │ logoFit      │ (optional) 'cover' (default, fills the square, may crop)   │
+// │              │     or 'contain' (shows the whole image, may leave margins)│
 // │ photo        │ (optional) blood-pressure photo; defaults to bp-photo.jpg  │
 // │ id           │ (optional) DOM id, handy for html-to-image / html2canvas   │
 // └──────────────┴────────────────────────────────────────────────────────────┘
@@ -95,8 +97,8 @@ const SAFETY = 0.92;
 const fitSize = (text, base, min, avail, weight = 600) =>
   Math.max(min, Math.min(base, (avail * SAFETY) / widthPerPx(text, weight)));
 
-// Doctor name under the logo / in the bottom bar: one line, shrinks if long.
-const fitNameSize = (text, avail = 178) => fitSize(text, 17, 9, avail, 700);
+// Doctor name under the logo: one line, shrinks if long.
+const fitNameSize = (text) => fitSize(text, 17, 9, 178, 700);
 
 // Degree under the doctor's name: one line if it fits, otherwise two small lines.
 const fitDegreeSize = (text, avail = 184) => {
@@ -227,12 +229,26 @@ const CSS = `
 .rfp-dot3 { top: 416px; left: 281px; background: var(--rfp-dotB); }
 .rfp-dot4 { top: 449px; left: 281px; background: var(--rfp-dotA); }
 
-.rfp-headline { position: absolute; top: 110px; left: 40px; }
+.rfp-tab { position: absolute; top: 0; left: 34px; width: 204px; height: 156px; background: #fff;
+  border-radius: 0 0 20px 20px; box-shadow: 0 6px 16px rgba(20, 30, 60, 0.14);
+  display: flex; flex-direction: column; align-items: center; padding-top: 10px; z-index: 3; }
+.rfp-tabTall { height: 172px; padding-top: 8px; }
+.rfp-tabTall .rfp-logo { width: 88px; height: 88px; }
+.rfp-logo { width: 98px; height: 98px; border-radius: 0; background: transparent; overflow: hidden;
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.rfp-logo img { width: 100%; height: 100%; display: block; object-fit: cover; transform: scale(1.08); transform-origin: center center; }
+.rfp-tabName { margin-top: 6px; width: 100%; padding: 0 10px; text-align: center; font-weight: 700;
+  line-height: 1.15; letter-spacing: 0.2px; color: var(--rfp-nameA); }
+.rfp-tabNameLine { display: block; white-space: nowrap; overflow: visible; text-align: center; width: 100%; }
+.rfp-tabDeg { margin-top: 2px; width: 100%; padding: 0 10px; text-align: center; font-weight: 600;
+  line-height: 1.2; color: var(--rfp-nameB); }
+
+.rfp-headline { position: absolute; top: 168px; left: 40px; }
 .rfp-h1 { font-size: 26px; font-weight: 500; line-height: 1.35; color: var(--rfp-ink); }
 .rfp-hA { margin-top: 10px !important; font-size: 35px; font-weight: 800; line-height: 1.4; color: var(--rfp-headA); letter-spacing: 0.2px; }
 .rfp-hB { font-size: 35px; font-weight: 800; line-height: 1.4; color: var(--rfp-headB); letter-spacing: 0.2px; }
 
-.rfp-list { position: absolute; top: 300px; left: 68px; margin: 0; padding: 0; list-style: none; }
+.rfp-list { position: absolute; top: 355px; left: 68px; margin: 0; padding: 0; list-style: none; }
 .rfp-row { display: flex; align-items: center; height: 41px; }
 .rfp-ring { width: 38px; height: 38px; border-radius: 50%; border: 2px solid var(--rfp-ring); background: #fff;
   display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
@@ -243,25 +259,15 @@ const CSS = `
   border-radius: 74px; background: #fff; border: 7px solid var(--rfp-frameBorder); z-index: 2; }
 .rfp-frame img { width: 100%; height: 100%; object-fit: cover; border-radius: 54px; display: block; }
 
-.rfp-barL { position: absolute; top: 646px; left: 0; width: 486px; height: 56px; background: var(--rfp-barL); color: #fff;
-  display: flex; align-items: center; gap: 10px; padding: 6px 12px; overflow: hidden; }
-.rfp-barR { position: absolute; top: 646px; left: 486px; right: 0; height: 56px; background: var(--rfp-barR); color: #fff;
+.rfp-barL { position: absolute; top: 646px; left: 0; width: 486px; height: 48px; background: var(--rfp-barL); color: #fff;
+  font-weight: 600; display: flex; align-items: center; padding-left: 14px; white-space: nowrap; overflow: hidden; }
+.rfp-barR { position: absolute; top: 646px; left: 486px; right: 0; height: 48px; background: var(--rfp-barR); color: #fff;
   display: flex; flex-direction: column; justify-content: center; align-items: flex-start;
-  padding-left: 28px; padding-right: 6px; overflow: hidden; }
-.rfp-barTall { top: 628px; height: 74px; }
-.rfp-barLogo { width: 44px; height: 44px; border-radius: 0; background: transparent; overflow: hidden;
-  display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-.rfp-barTall .rfp-barLogo { width: 52px; height: 52px; }
-.rfp-barLogo img { width: 100%; height: 100%; display: block; object-fit: cover; }
-.rfp-barIdentity { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; justify-content: center;
-  max-width: 200px; }
-.rfp-barClinic { flex: 1 1 0; min-width: 0; display: flex; align-items: center; justify-content: flex-start;
-  padding-left: 12px; border-left: 1px solid rgba(255,255,255,0.35); height: 100%;
-  font-weight: 600; white-space: nowrap; overflow: hidden; }
-.rfp-doc { font-weight: 700; line-height: 1.12; color: #fff; }
+  padding-left: 52px; padding-right: 6px; overflow: hidden; }
+.rfp-barTall { top: 630px; height: 64px; }
+.rfp-doc { font-weight: 700; line-height: 1.12; }
 .rfp-docLine { display: block; white-space: nowrap; overflow: hidden; }
-.rfp-barDeg { margin-top: 1px; font-weight: 600; line-height: 1.15; color: rgba(255,255,255,0.92); white-space: nowrap; overflow: hidden; }
-.rfp-phone { display: flex; align-items: center; font-weight: 600; line-height: 1.15; white-space: nowrap; }
+.rfp-phone { display: flex; align-items: center; margin-left: -28px; font-weight: 600; line-height: 1.15; white-space: nowrap; }
 .rfp-phoneIcon { width: 22px; height: 22px; margin-right: 6px; flex-shrink: 0; }
 `;
 
@@ -299,9 +305,8 @@ const RiskFactorPoster = forwardRef(function RiskFactorPoster(
   const nameWrapped = Boolean(nameLine2);
   const longestNameLine =
     nameWrapped && nameLine2.length > nameLine1.length ? nameLine2 : nameLine1;
-  const barNameFontSize = fitNameSize(longestNameLine, 190);
-  const barDegFontSize = fitDegreeSize(doctorDegree, 190);
-  const clinicFontSize = fitSize(clinicName, 22, 11, 200, 600);
+  const nameFontSize = fitNameSize(longestNameLine);
+  const barNameFontSize = fitSize(longestNameLine, nameWrapped ? 15 : 19, 9, 190, 700);
   const barClass = nameWrapped ? ' rfp-barTall' : '';
 
   return (
@@ -321,6 +326,22 @@ const RiskFactorPoster = forwardRef(function RiskFactorPoster(
         <div className="rfp-dot rfp-dot2" />
         <div className="rfp-dot rfp-dot3" />
         <div className="rfp-dot rfp-dot4" />
+
+        {/* PROP `logo` + PROP `doctorName` + PROP `doctorDegree` (top-left) */}
+        <div className={`rfp-tab${nameWrapped ? ' rfp-tabTall' : ''}`}>
+          <div className="rfp-logo">
+            {logo && <img src={logo} alt="Logo" style={{ objectFit: logoFit }} />}
+          </div>
+          <div className="rfp-tabName" style={{ fontSize: `${nameFontSize}px` }}>
+            <span className="rfp-tabNameLine">{nameLine1}</span>
+            {nameWrapped ? <span className="rfp-tabNameLine">{nameLine2}</span> : null}
+          </div>
+          {doctorDegree && (
+            <div className="rfp-tabDeg" style={{ fontSize: `${fitDegreeSize(doctorDegree)}px` }}>
+              {doctorDegree}
+            </div>
+          )}
+        </div>
 
         {/* fixed headline */}
         <div className="rfp-headline">
@@ -345,32 +366,20 @@ const RiskFactorPoster = forwardRef(function RiskFactorPoster(
           <img src={photo} alt="Blood pressure check" />
         </div>
 
-        {/* Bottom-left: logo + doctor name/degree, then clinic name beside */}
+        {/* PROP `clinicName` (bottom-left bar) */}
         <div className={`rfp-barL${barClass}`}>
-          <div className="rfp-barLogo">
-            {logo && <img src={logo} alt="Logo" style={{ objectFit: logoFit }} />}
-          </div>
-          <div className="rfp-barIdentity">
-            <span className="rfp-doc" style={{ fontSize: `${barNameFontSize}px` }}>
-              <span className="rfp-docLine">{nameLine1}</span>
-              {nameWrapped ? <span className="rfp-docLine">{nameLine2}</span> : null}
-            </span>
-            {doctorDegree ? (
-              <span className="rfp-barDeg" style={{ fontSize: `${barDegFontSize}px` }}>
-                {doctorDegree}
-              </span>
-            ) : null}
-          </div>
-          <div className="rfp-barClinic">
-            <span style={{ fontSize: `${clinicFontSize}px` }}>{clinicName}</span>
-          </div>
+          <span style={{ fontSize: `${fitSize(clinicName, 30, 12, 456, 600)}px` }}>{clinicName}</span>
         </div>
 
-        {/* Bottom-right: phone only */}
+        {/* PROP `doctorName` (wrapped) + PROP `phone` — bottom-right */}
         <div className={`rfp-barR${barClass}`}>
+          <span className="rfp-doc" style={{ fontSize: `${barNameFontSize}px` }}>
+            <span className="rfp-docLine">{nameLine1}</span>
+            {nameWrapped ? <span className="rfp-docLine">{nameLine2}</span> : null}
+          </span>
           <span className="rfp-phone">
             <IconPhone />
-            <span style={{ fontSize: `${fitSize(phone, 22, 10, 200, 600)}px` }}>{phone}</span>
+            <span style={{ fontSize: `${fitSize(phone, 22, 10, 188, 600)}px` }}>{phone}</span>
           </span>
         </div>
       </div>

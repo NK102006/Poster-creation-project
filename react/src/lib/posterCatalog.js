@@ -1,4 +1,5 @@
 /** Monthly festival + general-knowledge poster catalog (10 posters). */
+import demoVideoUrl from '../assets/Science_city_launch_video.mp4';
 
 const GK_POSTERS = [
   {
@@ -182,6 +183,14 @@ const GK_POSTERS = [
     scriptBottom: 'Check Early\nLive Easier',
     banner: 'PREVENT  •  DETECT  •  PROTECT',
   },
+  {
+    id: 'video-dummy',
+    kind: 'video',
+    badge: 'Video tip',
+    headline: ['Health', 'Video', 'Demo'],
+    focusTitle: 'Video content',
+    videoUrl: demoVideoUrl,
+  }
 ];
 
 const FESTIVALS_BY_MONTH = {
@@ -321,9 +330,9 @@ const FESTIVALS_BY_MONTH = {
 };
 
 /**
- * Returns exactly 10 posters for the given date.
- * Festival months: 1 festival greeting + 9 GK posters.
- * Non-festival months: 10 GK posters.
+ * Returns all posters for the given date.
+ * Festival months: 1 festival greeting + all GK/Video posters.
+ * Non-festival months: all GK/Video posters.
  */
 export function getMonthlyPosters(date = new Date()) {
   const month = date.getMonth() + 1; // 1–12
@@ -331,13 +340,13 @@ export function getMonthlyPosters(date = new Date()) {
   const gk = GK_POSTERS.map((p) => ({ ...p }));
 
   if (festival) {
-    return [festival, ...gk.slice(0, 9)];
+    return [festival, ...gk];
   }
-  return gk.slice(0, 10);
+  return gk;
 }
 
 export function getGeneralPosters() {
-  return GK_POSTERS.map((p) => ({ ...p })).slice(0, 10);
+  return GK_POSTERS.map((p) => ({ ...p }));
 }
 
 export function getActiveFestival(date = new Date()) {

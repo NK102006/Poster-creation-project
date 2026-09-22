@@ -325,39 +325,7 @@ export default function DoctorManagePage({
             </div>
           </form>
 
-          <section className={styles.panel}>
-            <div className={styles.panelHeader}>
-              <h2 className={styles.panelTitle}>Posters</h2>
-              <span className={styles.panelHint}>
-                {doctor.postersMade || 0} made · {doctor.downloadCount || 0} downloaded
-              </span>
-            </div>
 
-            {(!doctor.posters || doctor.posters.length === 0) && (
-              <p className={styles.status}>No posters yet for this doctor.</p>
-            )}
-
-            <div className={styles.posterGrid}>
-              {(doctor.posters || []).map((poster, index) => (
-                <article key={poster.id} className={styles.posterCard}>
-                  <p className={styles.sendDateAbove}>
-                    Send <strong>{getSendDateForIndex(index, doctor.posters.length)}</strong>
-                  </p>
-                  <img src={poster.image} alt="" className={styles.posterImage} />
-                  <div className={styles.posterMeta}>
-                    <span>{poster.downloads || 0} downloads</span>
-                    <button
-                      type="button"
-                      className={styles.primaryBtn}
-                      onClick={() => handleDownloadPoster(poster)}
-                    >
-                      Download
-                    </button>
-                  </div>
-                </article>
-              ))}
-            </div>
-          </section>
         </>
       )}
 

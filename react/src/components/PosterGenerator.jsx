@@ -1,8 +1,9 @@
 // src/components/PosterGenerator.jsx
 import { useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import JSZip from 'jszip';
 import { POSTER_THEMES } from './Poster';
-import PosterCarousel from './PosterCarousel';
+import PosterCarousel, { PosterPage } from './PosterCarousel';
 import LogoCanvas from './LogoCanvas';
 import { getGeneralPosters, getMonthlyPosters } from '../lib/posterCatalog';
 import {
@@ -15,7 +16,6 @@ import styles from './PosterGenerator.module.css';
 const STEPS = [
   { id: 1, label: 'Doctor Details', short: 'Details' },
   { id: 2, label: 'Design', short: 'Design' },
-  { id: 3, label: 'Preview', short: 'Preview' },
 ];
 
 export default function PosterGenerator({
@@ -43,6 +43,8 @@ export default function PosterGenerator({
   const [croppedLogoData, setCroppedLogoData] = useState(null);
   const [logoCropState, setLogoCropState] = useState(null);
   const [tempLogoCropState, setTempLogoCropState] = useState(null);
+
+  const [previewModalOpen, setPreviewModalOpen] = useState(false);
 
   const generalPosters = useMemo(() => getGeneralPosters(), []);
   const monthlyPosters = useMemo(() => getMonthlyPosters(new Date()), []);
@@ -148,6 +150,7 @@ export default function PosterGenerator({
     onModeChange: setPosterMode,
     theme: selectedTheme,
     doctorFields,
+    onPosterClick: () => setPreviewModalOpen(true),
   };
 
   const renderPosterBlob = async (poster, label) => {
@@ -214,12 +217,12 @@ export default function PosterGenerator({
       setIsGenerating(true);
       setDownloadSuccess(false);
 
-      const pack = getMonthlyPosters(new Date());
       const zip = new JSZip();
       const cleanDocName = formattedDoctorName
         .replace(/[^a-zA-Z0-9_-]/g, '_')
         .replace(/_+/g, '_');
 
+      const pack = getMonthlyPosters(new Date());
       let generalCounter = 0;
       for (let i = 0; i < pack.length; i += 1) {
         const poster = pack[i];
@@ -232,14 +235,6 @@ export default function PosterGenerator({
         zip.file(`${String(i + 1).padStart(2, '0')}_${safeLabel}.jpg`, blob);
       }
 
-      const zipBlob = await zip.generateAsync({ type: 'blob' });
-      const url = URL.createObjectURL(zipBlob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `Posters_${cleanDocName}.zip`;
-      link.click();
-      URL.revokeObjectURL(url);
-
       if (onAutoSave && pack[0]) {
         const firstBlob = await renderPosterBlob(
           pack[0],
@@ -248,8 +243,16 @@ export default function PosterGenerator({
         onAutoSave(formData, logoFile, firstBlob).catch(() => {});
       }
 
+      const zipBlob = await zip.generateAsync({ type: 'blob' });
+      const url = URL.createObjectURL(zipBlob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `Posters_${cleanDocName}.zip`;
+      link.click();
+      URL.revokeObjectURL(url);
+
       setIsGenerating(false);
-      setDownloadMessage(`Zip ready — ${pack.length} posters.`);
+      setDownloadMessage(`Zip ready!`);
       setDownloadSuccess(true);
       setTimeout(() => setDownloadSuccess(false), 6000);
     } catch (err) {
@@ -495,94 +498,54 @@ export default function PosterGenerator({
               <button type="button" className={styles.secondaryBtn} onClick={() => setCurrentStep(1)}>
                 Back
               </button>
-              <button
-                type="button"
-                className={styles.primaryBtn}
-                onClick={() => {
-                  if (checkCanNavigate(3)) setCurrentStep(3);
-                }}
-              >
-                Continue to download
-              </button>
-            </div>
-          </div>
-        )}
-
-        {currentStep === 3 && (
-          <div className={styles.stepContent}>
-            <header className={styles.stepIntro}>
-              <h2 className={styles.stepHeading}>Preview & download</h2>
-              <p className={styles.stepHint}>
-                Slide through posters, check the send date, then download one or all as a zip.
-              </p>
-            </header>
-
-            <div className={styles.previewStage}>
-              <PosterCarousel key={`dl-${selectedThemeId}`} variant="scroll" {...carouselProps} />
-
-              <div className={styles.previewActions}>
+              
+              <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
                 {downloadSuccess && (
-                  <div className={styles.successAlert} role="status">
+                  <span style={{ color: '#4caf50', fontSize: 14, fontWeight: 500 }}>
                     {downloadMessage || 'Download complete.'}
-                  </div>
+                  </span>
                 )}
-
-                <div className={styles.downloadRow}>
-                  <button
-                    type="button"
-                    className={styles.generateBtn}
-                    onClick={handleGenerateAndDownload}
-                    disabled={isGenerating}
-                    id="generate-download-poster-button"
-                  >
-                    {isGenerating ? 'Preparing…' : 'Download this poster'}
-                  </button>
-                  <button
-                    type="button"
-                    className={styles.secondaryDownloadBtn}
-                    onClick={handleDownloadZip}
-                    disabled={isGenerating}
-                    id="download-all-posters-zip-button"
-                  >
-                    {isGenerating ? 'Preparing…' : 'Download all as ZIP'}
-                  </button>
-                </div>
+                <button
+                  type="button"
+                  className={styles.primaryBtn}
+                  onClick={handleDownloadZip}
+                  disabled={isGenerating}
+                >
+                  {isGenerating ? 'Preparing ZIP…' : 'Download all posters as ZIP'}
+                </button>
               </div>
-            </div>
-
-            <div className={styles.navRow}>
-              <button type="button" className={styles.secondaryBtn} onClick={() => setCurrentStep(2)}>
-                Back to Design
-              </button>
-              <div />
             </div>
           </div>
         )}
       </div>
 
-      {showCropModal && originalLogoUrl && (
+      {showCropModal && originalLogoUrl && createPortal(
         <div
           style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(0,0,0,0.5)',
-            zIndex: 9999,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
+            position: 'fixed', inset: 0, 
+            background: 'rgba(255,255,255,0.05)',
+            backdropFilter: 'blur(15px)',
+            WebkitBackdropFilter: 'blur(15px)',
+            zIndex: 999999,
+            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+            padding: '40px 20px',
           }}
+          onClick={() => setShowCropModal(false)}
         >
           <div
             style={{
+              position: 'relative',
               background: '#fff',
               padding: '24px',
-              borderRadius: '12px',
+              borderRadius: '16px',
               display: 'flex',
               flexDirection: 'column',
               gap: '16px',
               alignItems: 'center',
-              boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
+              boxShadow: '0 20px 50px rgba(0,0,0,0.2)',
+              maxHeight: '85vh',
             }}
+            onClick={(e) => e.stopPropagation()}
           >
             <h3
               style={{
@@ -629,7 +592,59 @@ export default function PosterGenerator({
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
+      )}
+
+      {/* Poster Preview Modal */}
+      {previewModalOpen && createPortal(
+        <div
+          style={{
+            position: 'fixed', inset: 0, 
+            background: 'rgba(255,255,255,0.05)',
+            backdropFilter: 'blur(15px)',
+            WebkitBackdropFilter: 'blur(15px)',
+            zIndex: 999999,
+            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+            padding: '40px 20px',
+          }}
+          onClick={() => setPreviewModalOpen(false)}
+        >
+          <div style={{ position: 'relative', height: '100%', maxHeight: '85vh', display: 'flex', flexDirection: 'column', gap: 20, alignItems: 'center' }} onClick={e => e.stopPropagation()}>
+            <button 
+              onClick={() => setPreviewModalOpen(false)}
+              style={{ 
+                position: 'absolute', top: -36, right: -40, background: 'none', border: 'none', 
+                color: '#000', fontSize: 28, cursor: 'pointer', fontWeight: 'bold',
+                textShadow: '0 2px 4px rgba(255,255,255,0.8)' 
+              }}
+            >
+              ✕
+            </button>
+            
+            <div style={{ height: '100%', minHeight: 0, aspectRatio: '9/16', overflow: 'hidden', borderRadius: 12, boxShadow: '0 20px 50px rgba(0,0,0,0.5)', position: 'relative' }}>
+              <PosterPage
+                poster={activePosterContent}
+                label={activePosterContent?.id}
+                pageStyle={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}
+                isCaptureTarget={false}
+                theme={selectedTheme}
+                doctorFields={doctorFields}
+              />
+            </div>
+
+            <button
+              type="button"
+              className={styles.generateBtn}
+              onClick={handleGenerateAndDownload}
+              disabled={isGenerating}
+              style={{ padding: '16px 24px', fontSize: 16 }}
+            >
+              {isGenerating ? 'Preparing…' : 'Download this poster'}
+            </button>
+          </div>
+        </div>,
+        document.body
       )}
     </section>
   );
