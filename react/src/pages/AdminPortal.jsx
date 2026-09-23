@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import DataTable from 'datatables.net-dt';
 import 'datatables.net-dt/css/dataTables.dataTables.css';
+import JSZip from 'jszip';
 import { apiRequest } from '../lib/apiClient';
 import styles from './AdminPortal.module.css';
 
@@ -12,6 +13,33 @@ const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:300
 function getItemId(item) {
   return item?.id || item?._id || '';
 }
+
+const safeFilePart = (str, fallback) => {
+  const safe = String(str || '').replace(/[^a-z0-9]/gi, '_').replace(/_+/g, '_').replace(/^_|_$/g, '');
+  return safe || fallback;
+};
+
+const inferPosterKind = (poster) => poster.kind || 'education';
+const posterExtension = (poster, kind) => {
+  if (kind === 'video') return 'mp4';
+  if (poster.image && poster.image.startsWith('data:image/png')) return 'png';
+  return 'jpg';
+};
+
+const addFileToZip = async (zip, path, urlOrData) => {
+  if (!urlOrData) return;
+  if (urlOrData.startsWith('data:')) {
+    const [, base64 = ''] = urlOrData.split(',', 2);
+    if (base64) zip.file(path, base64, { base64: true });
+  } else if (urlOrData.startsWith('http') || urlOrData.startsWith('/')) {
+    try {
+      const res = await fetch(urlOrData);
+      if (res.ok) zip.file(path, await res.blob());
+    } catch (err) {
+      console.warn('Failed to fetch file for zip:', urlOrData, err);
+    }
+  }
+};
 
 function formatLabel(key) {
   if (key === 'empid') return 'Employee ID';
@@ -36,6 +64,8 @@ export default function AdminPortal() {
   const [editingItem, setEditingItem] = useState(null);
   const [formData, setFormData] = useState({});
   const [saving, setSaving] = useState(false);
+  const [loginFieldErrors, setLoginFieldErrors] = useState({});
+  const [formFieldErrors, setFormFieldErrors] = useState({});
 
   const hostRef = useRef(null);
   const tableRef = useRef(null);
@@ -43,6 +73,15 @@ export default function AdminPortal() {
   const handleLogin = async (e) => {
     e.preventDefault();
     setLoginError('');
+
+    const errors = {};
+    if (!username.trim()) errors.username = 'Username is required';
+    if (!password) errors.password = 'Password is required';
+    if (Object.keys(errors).length > 0) {
+      setLoginFieldErrors(errors);
+      return;
+    }
+    setLoginFieldErrors({});
     try {
       const res = await apiRequest('/admin/login', {
         method: 'POST',
@@ -239,7 +278,7 @@ export default function AdminPortal() {
   const openCreate = () => {
     setEditingItem(null);
     if (activeTab === 'doctors') {
-      setFormData({ name: '', clinicName: '', contactnumber: '', doctorDegree: '' });
+      setFormData({ name: '', clinicName: '', contactnumber: '', doctorDegree: '', logo: null });
     } else {
       setFormData({ empid: '', password: '' });
     }
@@ -248,6 +287,22 @@ export default function AdminPortal() {
 
   const handleSave = async (e) => {
     e.preventDefault();
+
+    const errors = {};
+    for (const f of formFields) {
+      if (!formData[f] || !String(formData[f]).trim()) {
+        errors[f] = `${formatLabel(f)} is required`;
+      }
+    }
+    if (activeTab === 'doctors' && !formData.logo) {
+      errors.logo = 'Logo is required';
+    }
+    if (Object.keys(errors).length > 0) {
+      setFormFieldErrors(errors);
+      return;
+    }
+    setFormFieldErrors({});
+    
     setSaving(true);
     try {
       const id = getItemId(editingItem);
@@ -273,6 +328,7 @@ export default function AdminPortal() {
 
   const handleFieldChange = (key, val) => {
     setFormData((prev) => ({ ...prev, [key]: val }));
+    if (formFieldErrors[key]) setFormFieldErrors((prev) => ({ ...prev, [key]: null }));
   };
 
   const formFields =
@@ -290,12 +346,12 @@ export default function AdminPortal() {
           doctor.doctorDegree || '',
           doctor.clinicName || '',
           doctor.contactnumber || '',
-          (doctor.posters || []).map(p => p.image).join('\n') || doctor.poster || '',
+          (doctor.posters || []).map(p => p.image).join('\r\n') || doctor.poster || '',
         ]),
       ];
       const csv = rows
         .map((row) => row.map((value) => `"${String(value).replaceAll('"', '""')}"`).join(','))
-        .join('\n');
+        .join('\r\n');
       const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }));
       const link = document.createElement('a');
       link.href = url;
@@ -304,6 +360,75 @@ export default function AdminPortal() {
       URL.revokeObjectURL(url);
     } catch (err) {
       alert('Export failed: ' + err.message);
+    }
+  };
+
+  const handleExportAll = async () => {
+    try {
+      const [users, doctors] = await Promise.all([
+        apiRequest('/admin/collections/users'),
+        apiRequest('/admin/collections/doctors')
+      ]);
+
+      const zip = new JSZip();
+
+      for (const user of users) {
+        const userFolderName = safeFilePart(user.empid || user.id, `User_${user.id}`);
+        const userFolder = zip.folder(userFolderName);
+        const userDoctors = doctors.filter(d => d.ownerUser === user.id);
+        
+        for (const doctor of userDoctors) {
+          const docFolderName = safeFilePart(doctor.name, `Doctor_${doctor.id}`);
+          const docFolder = userFolder.folder(docFolderName);
+          
+          if (doctor.logo) {
+            await addFileToZip(docFolder, `logos/${docFolderName}.png`, doctor.logo);
+          }
+          
+          const counts = { education: 0, festival: 0, video: 0 };
+          for (const poster of doctor.posters || []) {
+            const kind = inferPosterKind(poster);
+            counts[kind] += 1;
+            const ext = posterExtension(poster, kind);
+            const label = safeFilePart(poster.label, `poster-${counts[kind]}`);
+            const filename = `${kind}/${label}.${ext}`;
+            await addFileToZip(docFolder, filename, poster.image);
+          }
+        }
+      }
+      
+      const unassigned = doctors.filter(d => !d.ownerUser);
+      if (unassigned.length > 0) {
+        const unassignedFolder = zip.folder('Unassigned_Doctors');
+        for (const doctor of unassigned) {
+          const docFolderName = safeFilePart(doctor.name, `Doctor_${doctor.id}`);
+          const docFolder = unassignedFolder.folder(docFolderName);
+          
+          if (doctor.logo) {
+            await addFileToZip(docFolder, `logos/${docFolderName}.png`, doctor.logo);
+          }
+          
+          const counts = { education: 0, festival: 0, video: 0 };
+          for (const poster of doctor.posters || []) {
+            const kind = inferPosterKind(poster);
+            counts[kind] += 1;
+            const ext = posterExtension(poster, kind);
+            const label = safeFilePart(poster.label, `poster-${counts[kind]}`);
+            const filename = `${kind}/${label}.${ext}`;
+            await addFileToZip(docFolder, filename, poster.image);
+          }
+        }
+      }
+
+      const blob = await zip.generateAsync({ type: 'blob' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'All_Users_And_Doctors.zip';
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      alert('Export All failed: ' + err.message);
     }
   };
 
@@ -325,20 +450,26 @@ export default function AdminPortal() {
             <input
               type="text"
               value={username}
-              onChange={(e) => setUsername(e.target.value)}
+              onChange={(e) => {
+                setUsername(e.target.value);
+                if (loginFieldErrors.username) setLoginFieldErrors((prev) => ({ ...prev, username: null }));
+              }}
               autoComplete="username"
-              required
             />
+            {loginFieldErrors.username && <span className={styles.fieldError}>{loginFieldErrors.username}</span>}
           </label>
           <label className={styles.field}>
             <span>Password</span>
             <input
               type="password"
               value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              onChange={(e) => {
+                setPassword(e.target.value);
+                if (loginFieldErrors.password) setLoginFieldErrors((prev) => ({ ...prev, password: null }));
+              }}
               autoComplete="current-password"
-              required
             />
+            {loginFieldErrors.password && <span className={styles.fieldError}>{loginFieldErrors.password}</span>}
           </label>
           <button type="submit" className={styles.primaryBtn}>
             Login
@@ -389,6 +520,9 @@ export default function AdminPortal() {
           <div className={styles.toolbar}>
             <div />
             <div className={styles.toolbarActions}>
+              <button type="button" className={styles.secondaryBtn} onClick={handleExportAll}>
+                Export All
+              </button>
               <button type="button" className={styles.secondaryBtn} onClick={handleExport}>
                 Export
               </button>
@@ -425,11 +559,46 @@ export default function AdminPortal() {
                     type={f === 'password' ? 'password' : 'text'}
                     value={formData[f] ?? ''}
                     onChange={(e) => handleFieldChange(f, e.target.value)}
-                    required
                     autoComplete={f === 'password' ? 'new-password' : undefined}
                   />
+                  {formFieldErrors[f] && <span className={styles.fieldError}>{formFieldErrors[f]}</span>}
                 </label>
               ))}
+              
+              {activeTab === 'doctors' && (
+                <div className={styles.bsMb3}>
+                  <label htmlFor="logoUpload" className={styles.bsFormLabel}>
+                    Logo *
+                  </label>
+                  <input
+                    id="logoUpload"
+                    className={styles.bsFormControl}
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => {
+                      const file = e.target.files[0];
+                      if (file) {
+                        const reader = new FileReader();
+                        reader.onload = (ev) => handleFieldChange('logo', ev.target.result);
+                        reader.readAsDataURL(file);
+                      } else {
+                        handleFieldChange('logo', null);
+                      }
+                    }}
+                  />
+                  {formData.logo && typeof formData.logo === 'string' && (
+                     <div style={{ marginTop: '8px' }}>
+                       <img 
+                          src={formData.logo} 
+                          alt="Preview" 
+                          style={{ maxHeight: '100px', objectFit: 'contain', borderRadius: '4px', border: '1px solid #ced4da' }} 
+                       />
+                     </div>
+                  )}
+                  {formFieldErrors['logo'] && <span className={styles.fieldError}>{formFieldErrors['logo']}</span>}
+                </div>
+              )}
+              
               <div className={styles.modalActions}>
                 <button
                   type="button"

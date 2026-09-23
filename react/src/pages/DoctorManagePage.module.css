@@ -186,6 +186,20 @@
   font-weight: 500;
 }
 
+.logoBox {
+  padding: 11px 13px;
+  border-radius: 10px;
+  border: 1.5px solid rgba(31, 111, 159, 0.16);
+  background: #ffffff;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 14px;
+  text-transform: none;
+  letter-spacing: normal;
+  font-weight: 500;
+}
+
 .logoThumb,
 .logoFallback {
   width: 64px;

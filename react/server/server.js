@@ -47,9 +47,20 @@ const posterEntrySchema = new mongoose.Schema(
     image: { type: mongoose.Schema.Types.Mixed, required: true },
     downloads: { type: Number, default: 0 },
     createdAt: { type: Date, default: Date.now },
+    kind: { type: String, enum: ['education', 'festival', 'video'], default: 'education' },
+    label: { type: String, default: '' },
   },
   { _id: true }
 );
+
+function normalizePosterKind(value, imageHint = '') {
+  const raw = String(value || '').toLowerCase();
+  if (raw === 'festival' || raw === 'video' || raw === 'education') return raw;
+  if (raw === 'gk') return 'education';
+  const src = String(imageHint || '');
+  if (src.includes('.mp4') || src.includes('video')) return 'video';
+  return 'education';
+}
 
 const doctorSchema = new mongoose.Schema({
   ownerUser: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null, index: true },
@@ -160,6 +171,8 @@ function formatDoctor(doc, { includePosters = false, light = false } = {}) {
       image: bufferToDataUrl(p.image, 'image/jpeg'),
       downloads: Number(p.downloads) || 0,
       createdAt: p.createdAt,
+      kind: normalizePosterKind(p.kind, p.image),
+      label: p.label || '',
     }));
 
     // Legacy single poster fallback for gallery
@@ -170,6 +183,8 @@ function formatDoctor(doc, { includePosters = false, light = false } = {}) {
           image: formatted.poster,
           downloads: downloadCount,
           createdAt: obj.updatedAt || obj.createdAt,
+          kind: normalizePosterKind(null, formatted.poster),
+          label: '',
         },
       ];
     }
@@ -254,6 +269,9 @@ app.get('/api/doctors', async (req, res) => {
   try {
     const q = String(req.query.q || '').trim();
     const includeInactive = String(req.query.includeInactive || '') === 'true';
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const limit = Math.max(1, parseInt(req.query.limit) || 10);
+    const skip = (page - 1) * limit;
     const filter = {};
 
     if (!includeInactive) {
@@ -264,14 +282,18 @@ app.get('/api/doctors', async (req, res) => {
       filter.name = { $regex: q, $options: 'i' };
     }
 
-    const [doctors, total] = await Promise.all([
-      Doctor.find(filter).sort({ createdAt: -1 }),
+    const [doctors, totalFiltered, total] = await Promise.all([
+      Doctor.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit),
+      Doctor.countDocuments(filter),
       Doctor.countDocuments(includeInactive ? {} : { active: { $ne: false } }),
     ]);
 
     return res.status(200).json({
       total,
+      totalFiltered,
       count: doctors.length,
+      page,
+      totalPages: Math.ceil(totalFiltered / limit),
       doctors: doctors.map((d) => formatDoctor(d, { light: true })),
     });
   } catch (error) {
@@ -407,7 +429,7 @@ app.post('/api/doctors/:id/download', async (req, res) => {
 
 // Create/update doctor profile and poster with multer file upload
 app.post('/api/doctors', upload.any(), async (req, res) => {
-  const { name, contactnumber, clinicName, doctorDegree, doctorId, ownerUserId, posterKind } = req.body;
+  const { name, contactnumber, clinicName, doctorDegree, doctorId, ownerUserId } = req.body;
   const countDownload = String(req.body.countDownload || '') === 'true';
   let logoFile = req.files?.find((f) => f.fieldname === 'logo');
   let logoBuffer = logoFile?.buffer || null;
@@ -416,6 +438,8 @@ app.post('/api/doctors', upload.any(), async (req, res) => {
   let posterFile = req.files?.find((f) => f.fieldname === 'poster');
   let posterBuffer = posterFile?.buffer || null;
   let posterName = posterFile?.originalname || '';
+  const posterKind = normalizePosterKind(req.body.posterKind, posterName);
+  const posterLabel = String(req.body.posterLabel || '').trim();
 
   // Also support base64 fallback if sent in body
   if (!logoBuffer && req.body.logo && typeof req.body.logo === 'string' && req.body.logo.startsWith('data:')) {
@@ -439,6 +463,13 @@ app.post('/api/doctors', upload.any(), async (req, res) => {
   try {
     const cleanedContact = Number(String(contactnumber || '').replace(/\D/g, '')) || 9999999999;
     const cleanedDegree = String(doctorDegree).trim();
+
+    if (cleanedContact !== 9999999999) {
+      const existingDoc = await Doctor.findOne({ contactnumber: cleanedContact });
+      if (existingDoc && (!doctorId || String(existingDoc._id) !== String(doctorId))) {
+         return res.status(400).json({ success: false, message: 'This mobile number already exists' });
+      }
+    }
 
     // Update existing doctor when doctorId is provided
     if (doctorId) {
@@ -466,6 +497,8 @@ app.post('/api/doctors', upload.any(), async (req, res) => {
           image: posterPath,
           downloads: countDownload ? 1 : 0,
           createdAt: new Date(),
+          kind: posterKind,
+          label: posterLabel,
         });
         if (countDownload) {
           doctor.downloadCount = (Number(doctor.downloadCount) || 0) + 1;
@@ -511,6 +544,8 @@ app.post('/api/doctors', upload.any(), async (req, res) => {
           image: posterPath,
           downloads: countDownload ? 1 : 0,
           createdAt: new Date(),
+          kind: posterKind,
+          label: posterLabel,
         },
       ];
       docData.downloadCount = countDownload ? 1 : 0;
@@ -726,6 +761,20 @@ app.post('/api/admin/collections/:collection', async (req, res) => {
     
     const createData = { ...req.body };
     if (req.params.collection === 'doctors') {
+      if (createData.contactnumber) {
+         const cleanedContact = Number(String(createData.contactnumber).replace(/\D/g, ''));
+         if (cleanedContact && cleanedContact !== 9999999999) {
+           const existingDoc = await Doctor.findOne({ contactnumber: cleanedContact });
+           if (existingDoc) {
+             return res.status(400).json({ message: 'This mobile number already exists for another doctor.' });
+           }
+         }
+      }
+
+      if (!createData.logo) {
+        return res.status(400).json({ message: 'Doctor logo is required.' });
+      }
+
       if (createData.logo && typeof createData.logo === 'string' && createData.logo.startsWith('data:')) {
         const logoBuffer = Buffer.from(createData.logo.replace(/^data:image\/\w+;base64,/, ''), 'base64');
         createData.logo = await saveFile(logoBuffer, null, 'logos');
@@ -756,6 +805,20 @@ app.put('/api/admin/collections/:collection/:id', async (req, res) => {
     
     const updateData = { ...req.body };
     if (req.params.collection === 'doctors') {
+      if (updateData.contactnumber) {
+         const cleanedContact = Number(String(updateData.contactnumber).replace(/\D/g, ''));
+         if (cleanedContact && cleanedContact !== 9999999999) {
+           const existingDoc = await Doctor.findOne({ contactnumber: cleanedContact });
+           if (existingDoc && String(existingDoc._id) !== String(req.params.id)) {
+             return res.status(400).json({ message: 'This mobile number already exists for another doctor.' });
+           }
+         }
+      }
+
+      if (updateData.hasOwnProperty('logo') && !updateData.logo) {
+        return res.status(400).json({ message: 'Doctor logo is required.' });
+      }
+
       if (updateData.logo && typeof updateData.logo === 'string' && updateData.logo.startsWith('data:')) {
         const logoBuffer = Buffer.from(updateData.logo.replace(/^data:image\/\w+;base64,/, ''), 'base64');
         updateData.logo = await saveFile(logoBuffer, null, 'logos');

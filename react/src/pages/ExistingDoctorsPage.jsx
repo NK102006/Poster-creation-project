@@ -6,9 +6,17 @@ import styles from './ExistingDoctorsPage.module.css';
 export default function ExistingDoctorsPage({ user, onLogout, onBack, onSelectDoctor }) {
   const [doctors, setDoctors] = useState([]);
   const [total, setTotal] = useState(0);
+  const [totalFiltered, setTotalFiltered] = useState(0);
   const [query, setQuery] = useState('');
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+
+  // Reset page when query changes
+  useEffect(() => {
+    setPage(1);
+  }, [query]);
 
   useEffect(() => {
     let active = true;
@@ -18,11 +26,15 @@ export default function ExistingDoctorsPage({ user, onLogout, onBack, onSelectDo
       try {
         const params = new URLSearchParams();
         params.set('includeInactive', 'true');
+        params.set('page', page);
+        params.set('limit', '5');
         if (query.trim()) params.set('q', query.trim());
         const res = await apiRequest(`/doctors?${params.toString()}`);
         if (!active) return;
         setDoctors(res.doctors || []);
         setTotal(res.total ?? res.count ?? 0);
+        setTotalFiltered(res.totalFiltered ?? res.count ?? 0);
+        setTotalPages(res.totalPages || 1);
       } catch (err) {
         if (!active) return;
         setError(err.message || 'Failed to load doctors');
@@ -37,12 +49,12 @@ export default function ExistingDoctorsPage({ user, onLogout, onBack, onSelectDo
       active = false;
       clearTimeout(timer);
     };
-  }, [query]);
+  }, [query, page]);
 
   const shownLabel = useMemo(() => {
-    if (query.trim()) return `${doctors.length} match${doctors.length === 1 ? '' : 'es'}`;
+    if (query.trim()) return `${totalFiltered} match${totalFiltered === 1 ? '' : 'es'}`;
     return `${total} total`;
-  }, [doctors.length, query, total]);
+  }, [query, total, totalFiltered]);
 
   return (
     <StudioShell
@@ -124,6 +136,28 @@ export default function ExistingDoctorsPage({ user, onLogout, onBack, onSelectDo
             </button>
           ))}
         </div>
+
+        {totalPages > 1 && (
+          <div className={styles.pagination}>
+            <button
+              className={styles.pageBtn}
+              disabled={page <= 1}
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+            >
+              Prev
+            </button>
+            <span className={styles.pageInfo}>
+              Page {page} of {totalPages}
+            </span>
+            <button
+              className={styles.pageBtn}
+              disabled={page >= totalPages}
+              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+            >
+              Next
+            </button>
+          </div>
+        )}
       </div>
     </StudioShell>
   );

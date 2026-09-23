@@ -55,7 +55,7 @@ export default function DoctorDetailsPage({
     };
   }, [doctorId, existingDoctor?.id]);
 
-  const handleAutoSave = async (currentFormData, currentLogoFile, posterBlob, posterKind) => {
+  const handleAutoSave = async (currentFormData, currentLogoFile, posterBlob, saveMeta) => {
     const name = currentFormData?.name?.trim() || formData.name?.trim();
     const contactnumber =
       currentFormData?.contactnumber?.trim() || formData.contactnumber?.trim();
@@ -86,9 +86,11 @@ export default function DoctorDetailsPage({
     if (posterBlob) {
       const ext = posterBlob.type && posterBlob.type.includes('video') ? 'mp4' : 'jpg';
       data.append('poster', posterBlob, `poster.${ext}`);
+      if (saveMeta?.kind) data.append('posterKind', saveMeta.kind);
+      if (saveMeta?.label) data.append('posterLabel', saveMeta.label);
     }
-    if (posterKind) {
-      data.append('posterKind', posterKind);
+    if (saveMeta?.kind) {
+      data.append('posterKind', saveMeta.kind);
     }
 
     try {
@@ -107,6 +109,46 @@ export default function DoctorDetailsPage({
     } catch (err) {
       console.warn('Auto-save background sync notice:', err);
       return { success: false, error: err };
+    }
+  };
+
+  const handleSaveDoctorInitial = async () => {
+    if (doctor?.id) return true; // Already saved
+
+    const name = formData.name?.trim();
+    const contactnumber = formData.contactnumber?.trim();
+    const clinicName = formData.clinicName?.trim();
+    const doctorDegree = formData.doctorDegree?.trim();
+
+    const data = new FormData();
+    if (name) data.append('name', name);
+    if (contactnumber) data.append('contactnumber', contactnumber);
+    if (clinicName) data.append('clinicName', clinicName);
+    if (doctorDegree) data.append('doctorDegree', doctorDegree);
+    if (user?.id) data.append('ownerUserId', user.id);
+
+    if (logoFile) {
+      data.append('logo', logoFile);
+    } else if (logoPreview && typeof logoPreview === 'string' && logoPreview.startsWith('data:')) {
+      data.append('logo', logoPreview);
+    }
+
+    try {
+      const result = await apiRequest('/doctors', {
+        method: 'POST',
+        body: data,
+      });
+      if (result?.doctor) {
+        setDoctor(result.doctor);
+        setLogoFile(null);
+        if (result.doctor.logo) {
+          setLogoPreview(result.doctor.logo);
+        }
+      }
+      return { success: true };
+    } catch (err) {
+      console.error('Failed to save doctor initially:', err);
+      return { success: false, error: err.message || 'Failed to save doctor.' };
     }
   };
 
@@ -152,6 +194,7 @@ export default function DoctorDetailsPage({
         logoPreview={logoPreview}
         setLogoPreview={setLogoPreview}
         onAutoSave={handleAutoSave}
+        onSaveDoctorInitial={handleSaveDoctorInitial}
         doctor={doctor}
         initialStep={initialStep}
       />

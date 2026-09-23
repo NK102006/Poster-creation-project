@@ -26,10 +26,12 @@ export default function PosterGenerator({
   logoPreview = null,
   setLogoPreview,
   onAutoSave,
+  onSaveDoctorInitial,
   doctor = null,
   initialStep = 1,
 }) {
   const [currentStep, setCurrentStep] = useState(initialStep);
+  const [isSavingInitial, setIsSavingInitial] = useState(false);
   const [selectedThemeId, setSelectedThemeId] = useState('theme-warm-red');
   const [activePosterIndex, setActivePosterIndex] = useState(0);
   const [posterMode, setPosterMode] = useState('general');
@@ -37,6 +39,7 @@ export default function PosterGenerator({
   const [downloadSuccess, setDownloadSuccess] = useState(false);
   const [downloadMessage, setDownloadMessage] = useState('');
   const [stepError, setStepError] = useState(null);
+  const [fieldErrors, setFieldErrors] = useState({});
 
   const [originalLogoUrl, setOriginalLogoUrl] = useState(null);
   const [showCropModal, setShowCropModal] = useState(false);
@@ -99,15 +102,37 @@ export default function PosterGenerator({
     const hasClinic = Boolean(formData.clinicName?.trim());
     const hasDegree = Boolean(formData.doctorDegree?.trim());
 
-    if (!hasName || !hasDegree || !hasContact || !hasClinic || !hasLogo) {
-      setStepError(
-        'Please fill in all required fields (Name, Degree, Clinic/Hospital, Contact, and Logo) to proceed.'
-      );
+    const errors = {};
+    if (!hasName) errors.name = 'Doctor full name is required.';
+    if (!hasDegree) errors.doctorDegree = 'Doctor\'s degree is required.';
+    if (!hasClinic) errors.clinicName = 'Clinic / Hospital name is required.';
+    if (!hasContact) errors.contactnumber = 'Contact number is required.';
+    if (!hasLogo) errors.logo = 'Doctor photo or clinic logo is required.';
+
+    if (Object.keys(errors).length > 0) {
+      setFieldErrors(errors);
       return;
     }
 
-    setStepError(null);
-    setCurrentStep(2);
+    if (onSaveDoctorInitial) {
+      setIsSavingInitial(true);
+      onSaveDoctorInitial().then((result) => {
+        setIsSavingInitial(false);
+        const isSuccess = typeof result === 'boolean' ? result : result?.success;
+        if (isSuccess || result === true) {
+          setFieldErrors({});
+          setStepError(null);
+          setCurrentStep(2);
+        } else {
+          const errMsg = (typeof result === 'object' && result?.error) ? result.error : 'Failed to save doctor. Please try again.';
+          setStepError(errMsg);
+        }
+      });
+    } else {
+      setFieldErrors({});
+      setStepError(null);
+      setCurrentStep(2);
+    }
   };
 
   const checkCanNavigate = (targetStep) => {
@@ -189,6 +214,13 @@ export default function PosterGenerator({
         .replace(/[^a-zA-Z0-9_-]/g, '_')
         .replace(/_+/g, '_');
       const posterLabel = targetPoster?.id || 'poster';
+      const posterKind =
+        targetPoster?.kind === 'festival'
+          ? 'festival'
+          : targetPoster?.kind === 'video'
+            ? 'video'
+            : 'education';
+      const saveMeta = { kind: posterKind, label };
 
       if (targetPoster?.kind === 'video') {
         const res = await fetch(targetPoster.videoUrl);
@@ -197,7 +229,7 @@ export default function PosterGenerator({
         const fileName = `Video_${cleanDocName}_${posterLabel}.mp4`;
         
         if (onAutoSave) {
-          onAutoSave(formData, logoFile, videoBlob, targetPoster.kind).catch((err) => {
+          onAutoSave(formData, logoFile, videoBlob, saveMeta).catch((err) => {
             console.warn('Auto save notice:', err);
           });
         }
@@ -213,7 +245,7 @@ export default function PosterGenerator({
         const fileName = `Poster_${cleanDocName}_${posterLabel}.jpg`;
 
         if (onAutoSave) {
-          onAutoSave(formData, logoFile, posterBlob, targetPoster.kind).catch((err) => {
+          onAutoSave(formData, logoFile, posterBlob, saveMeta).catch((err) => {
             console.warn('Auto save notice:', err);
           });
         }
@@ -268,14 +300,19 @@ export default function PosterGenerator({
 
       if (onAutoSave && pack[0]) {
         let firstBlob;
+        const firstLabel =
+          pack[0].kind === 'festival' ? pack[0].festivalName : 'Poster-1';
+        const firstKind =
+          pack[0].kind === 'festival'
+            ? 'festival'
+            : pack[0].kind === 'video'
+              ? 'video'
+              : 'education';
         if (pack[0].kind === 'video') {
           const res = await fetch(pack[0].videoUrl);
           firstBlob = await res.blob();
         } else {
-          firstBlob = await renderPosterBlob(
-            pack[0],
-            pack[0].kind === 'festival' ? pack[0].festivalName : 'Poster-1'
-          );
+          firstBlob = await renderPosterBlob(pack[0], firstLabel);
         }
         onAutoSave(formData, logoFile, firstBlob, pack[0].kind).catch(() => {});
       }
@@ -360,10 +397,10 @@ export default function PosterGenerator({
                     value={formData.name}
                     onChange={(e) => {
                       setFormData?.((prev) => ({ ...prev, name: e.target.value }));
-                      if (stepError) setStepError(null);
+                      if (fieldErrors.name) setFieldErrors(prev => ({ ...prev, name: null }));
                     }}
-                    required
                   />
+                  {fieldErrors.name && <span className={styles.fieldError}>{fieldErrors.name}</span>}
                 </div>
 
                 <div className={styles.formGroup}>
@@ -378,10 +415,10 @@ export default function PosterGenerator({
                     value={formData.doctorDegree || ''}
                     onChange={(e) => {
                       setFormData?.((prev) => ({ ...prev, doctorDegree: e.target.value }));
-                      if (stepError) setStepError(null);
+                      if (fieldErrors.doctorDegree) setFieldErrors(prev => ({ ...prev, doctorDegree: null }));
                     }}
-                    required
                   />
+                  {fieldErrors.doctorDegree && <span className={styles.fieldError}>{fieldErrors.doctorDegree}</span>}
                 </div>
 
                 <div className={styles.formGroup}>
@@ -396,10 +433,10 @@ export default function PosterGenerator({
                     value={formData.clinicName || ''}
                     onChange={(e) => {
                       setFormData?.((prev) => ({ ...prev, clinicName: e.target.value }));
-                      if (stepError) setStepError(null);
+                      if (fieldErrors.clinicName) setFieldErrors(prev => ({ ...prev, clinicName: null }));
                     }}
-                    required
                   />
+                  {fieldErrors.clinicName && <span className={styles.fieldError}>{fieldErrors.clinicName}</span>}
                 </div>
 
                 <div className={styles.formGroup}>
@@ -414,10 +451,10 @@ export default function PosterGenerator({
                     value={formData.contactnumber}
                     onChange={(e) => {
                       setFormData?.((prev) => ({ ...prev, contactnumber: e.target.value }));
-                      if (stepError) setStepError(null);
+                      if (fieldErrors.contactnumber) setFieldErrors(prev => ({ ...prev, contactnumber: null }));
                     }}
-                    required
                   />
+                  {fieldErrors.contactnumber && <span className={styles.fieldError}>{fieldErrors.contactnumber}</span>}
                 </div>
               </div>
 
@@ -426,16 +463,17 @@ export default function PosterGenerator({
                   Doctor photo or clinic logo <span className={styles.requiredStar}>*</span>
                 </label>
 
-                <label className={styles.fileDrop} htmlFor="step-doc-logo">
-                  <span className={styles.fileDropTitle}>Click to upload</span>
-                  <input
-                    id="step-doc-logo"
-                    type="file"
-                    accept="image/*"
-                    className={styles.fileInput}
-                    onChange={handleFileChange}
-                  />
-                </label>
+                <input
+                  id="step-doc-logo"
+                  type="file"
+                  accept="image/*"
+                  className="bs-form-control bs-mb-3"
+                  onChange={(e) => {
+                    handleFileChange(e);
+                    if (fieldErrors.logo) setFieldErrors(prev => ({ ...prev, logo: null }));
+                  }}
+                />
+                {fieldErrors.logo && <span className={styles.fieldError}>{fieldErrors.logo}</span>}
 
                 {logoPreview && (
                   <div className={styles.filePreviewWrap}>
@@ -471,8 +509,9 @@ export default function PosterGenerator({
                 className={styles.primaryBtn}
                 onClick={handleContinueToDesign}
                 id="continue-to-design-button"
+                disabled={isSavingInitial}
               >
-                Continue to Design
+                {isSavingInitial ? 'Saving...' : 'Continue to Design'}
               </button>
             </div>
           </div>

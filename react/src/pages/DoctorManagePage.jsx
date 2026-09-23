@@ -226,12 +226,6 @@ export default function DoctorManagePage({
               <span className={styles.statLabel}>Downloads</span>
               <strong className={styles.statValue}>{doctor.downloadCount || 0}</strong>
             </div>
-            <div className={styles.statCard}>
-              <span className={styles.statLabel}>Status</span>
-              <strong className={styles.statValue}>
-                {isInactive ? 'Inactive' : 'Active'}
-              </strong>
-            </div>
           </div>
 
           <form className={styles.panel} onSubmit={handleSave}>
@@ -275,22 +269,25 @@ export default function DoctorManagePage({
 
             <label className={styles.field}>
               <span>Doctor photo / logo</span>
-              <div className={styles.logoRow}>
+              <div className={styles.logoBox}>
                 {logoPreview ? (
-                  <img src={logoPreview} alt="" className={styles.logoThumb} />
+                  <img 
+                    src={logoPreview} 
+                    alt="" 
+                    className={styles.logoThumb} 
+                    onClick={(e) => {
+                      e.preventDefault();
+                      handleAdjustClick();
+                    }} 
+                    style={{ cursor: 'pointer' }} 
+                    title="Click to adjust / reframe"
+                  />
                 ) : (
                   <div className={styles.logoFallback}>No logo</div>
                 )}
-                <input type="file" accept="image/*" onChange={handleLogoChange} />
-                {logoPreview && (
-                  <button
-                    type="button"
-                    className={styles.secondaryBtn}
-                    onClick={handleAdjustClick}
-                  >
-                    Adjust / reframe
-                  </button>
-                )}
+                <div style={{ flex: 1 }}>
+                  <input type="file" accept="image/*" onChange={handleLogoChange} className="bs-form-control" />
+                </div>
               </div>
             </label>
 
