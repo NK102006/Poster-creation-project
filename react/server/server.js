@@ -44,9 +44,20 @@ const posterEntrySchema = new mongoose.Schema(
     image: { type: mongoose.Schema.Types.Mixed, required: true },
     downloads: { type: Number, default: 0 },
     createdAt: { type: Date, default: Date.now },
+    kind: { type: String, enum: ['education', 'festival', 'video'], default: 'education' },
+    label: { type: String, default: '' },
   },
   { _id: true }
 );
+
+function normalizePosterKind(value, imageHint = '') {
+  const raw = String(value || '').toLowerCase();
+  if (raw === 'festival' || raw === 'video' || raw === 'education') return raw;
+  if (raw === 'gk') return 'education';
+  const src = String(imageHint || '');
+  if (src.includes('.mp4') || src.includes('video')) return 'video';
+  return 'education';
+}
 
 const doctorSchema = new mongoose.Schema({
   ownerUser: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null, index: true },
@@ -157,6 +168,8 @@ function formatDoctor(doc, { includePosters = false, light = false } = {}) {
       image: bufferToDataUrl(p.image, 'image/jpeg'),
       downloads: Number(p.downloads) || 0,
       createdAt: p.createdAt,
+      kind: normalizePosterKind(p.kind, p.image),
+      label: p.label || '',
     }));
 
     // Legacy single poster fallback for gallery
@@ -167,6 +180,8 @@ function formatDoctor(doc, { includePosters = false, light = false } = {}) {
           image: formatted.poster,
           downloads: downloadCount,
           createdAt: obj.updatedAt || obj.createdAt,
+          kind: normalizePosterKind(null, formatted.poster),
+          label: '',
         },
       ];
     }
@@ -413,6 +428,8 @@ app.post('/api/doctors', upload.any(), async (req, res) => {
   let posterFile = req.files?.find((f) => f.fieldname === 'poster');
   let posterBuffer = posterFile?.buffer || null;
   let posterName = posterFile?.originalname || '';
+  const posterKind = normalizePosterKind(req.body.posterKind, posterName);
+  const posterLabel = String(req.body.posterLabel || '').trim();
 
   // Also support base64 fallback if sent in body
   if (!logoBuffer && req.body.logo && typeof req.body.logo === 'string' && req.body.logo.startsWith('data:')) {
@@ -458,6 +475,8 @@ app.post('/api/doctors', upload.any(), async (req, res) => {
           image: posterPath,
           downloads: countDownload ? 1 : 0,
           createdAt: new Date(),
+          kind: posterKind,
+          label: posterLabel,
         });
         if (countDownload) {
           doctor.downloadCount = (Number(doctor.downloadCount) || 0) + 1;
@@ -498,6 +517,8 @@ app.post('/api/doctors', upload.any(), async (req, res) => {
           image: posterPath,
           downloads: countDownload ? 1 : 0,
           createdAt: new Date(),
+          kind: posterKind,
+          label: posterLabel,
         },
       ];
       docData.downloadCount = countDownload ? 1 : 0;

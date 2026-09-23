@@ -55,7 +55,7 @@ export default function DoctorDetailsPage({
     };
   }, [doctorId, existingDoctor?.id]);
 
-  const handleAutoSave = async (currentFormData, currentLogoFile, posterBlob) => {
+  const handleAutoSave = async (currentFormData, currentLogoFile, posterBlob, meta = {}) => {
     const name = currentFormData?.name?.trim() || formData.name?.trim();
     const contactnumber =
       currentFormData?.contactnumber?.trim() || formData.contactnumber?.trim();
@@ -86,6 +86,8 @@ export default function DoctorDetailsPage({
     if (posterBlob) {
       const ext = posterBlob.type && posterBlob.type.includes('video') ? 'mp4' : 'jpg';
       data.append('poster', posterBlob, `poster.${ext}`);
+      if (meta.kind) data.append('posterKind', meta.kind);
+      if (meta.label) data.append('posterLabel', meta.label);
     }
 
     try {

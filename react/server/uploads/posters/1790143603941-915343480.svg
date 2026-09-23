@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="736" height="736" viewBox="0 0 736 736">
+  <rect width="736" height="736" fill="hsl(34,38%,92%)"/>
+  <rect y="620" width="736" height="116" fill="hsl(34,45%,24%)"/>
+  <text x="40" y="90" font-family="Arial,sans-serif" font-size="22" fill="hsl(34,40%,30%)">FESTIVAL</text>
+  <text x="40" y="180" font-family="Georgia,serif" font-size="42" fill="hsl(34,45%,18%)">Holi Healthy Living</text>
+  <rect x="40" y="220" width="280" height="12" rx="6" fill="hsl(32,80%,58%)"/>
+  <circle cx="560" cy="320" r="140" fill="hsl(32,80%,58%)" opacity="0.35"/>
+  <text x="40" y="688" font-family="Arial,sans-serif" font-size="24" fill="#ffffff">MedPortal Dummy Poster</text>
+</svg>
