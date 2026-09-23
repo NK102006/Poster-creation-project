@@ -1,6 +1,7 @@
 import styles from './StudioShell.module.css';
 
 export default function StudioShell({
+  user,
   userLabel = 'Employee',
   onLogout,
   children,
@@ -27,7 +28,7 @@ export default function StudioShell({
           {headerActions}
           <div className={styles.userBadge}>
             <span className={styles.statusDot} />
-            <span>{userLabel}</span>
+            <span>{userLabel}{user?.empid ? ` ${user.empid}` : ''}</span>
           </div>
           <button type="button" className={styles.logoutBtn} onClick={onLogout} id="logout-button">
             Sign out

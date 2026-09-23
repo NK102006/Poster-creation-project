@@ -241,7 +241,26 @@ export default function SuperAdminPortal() {
             <div className={styles.detailCard}>
               <div className={styles.detailLogo}>{selectedDoctor.logo ? <img src={selectedDoctor.logo} alt={`${selectedDoctor.name} logo`} /> : <span>—</span>}</div>
               <div className={styles.detailGrid}>
-                {[["Doctor ID", selectedDoctor.id], ["Name", selectedDoctor.name], ["Degree", selectedDoctor.doctorDegree], ["Clinic / Hospital", selectedDoctor.clinicName], ["Contact Number", selectedDoctor.contactnumber], ["Status", selectedDoctor.active ? 'Active' : 'Inactive'], ["Posters made", selectedDoctor.postersMade], ["Downloads", selectedDoctor.downloadCount], ["Created", selectedDoctor.createdAt ? new Date(selectedDoctor.createdAt).toLocaleString() : '—'], ["Last updated", selectedDoctor.updatedAt ? new Date(selectedDoctor.updatedAt).toLocaleString() : '—']].map(([label, value]) => <div key={label} className={styles.detailField}><span>{label}</span><strong>{value || '—'}</strong></div>)}
+                {[
+                  ["Doctor ID", selectedDoctor.id], 
+                  ["Name", selectedDoctor.name], 
+                  ["Degree", selectedDoctor.doctorDegree], 
+                  ["Clinic / Hospital", selectedDoctor.clinicName], 
+                  ["Contact Number", selectedDoctor.contactnumber], 
+                  ["Status", selectedDoctor.active ? 'Active' : 'Inactive'], 
+                  ["Posters made", selectedDoctor.postersMade], 
+                  ["Downloads", selectedDoctor.downloadCount],
+                  ["Logo File", selectedDoctor.logo ? <a href={selectedDoctor.logo} target="_blank" rel="noopener noreferrer" style={{color: '#1f6f9f', textDecoration: 'underline'}}>View Logo</a> : '—'],
+                  ["Poster Files", (selectedDoctor.posters || []).length > 0 ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                      {selectedDoctor.posters.map((p, i) => (
+                        <a key={p.id || i} href={p.image} target="_blank" rel="noopener noreferrer" style={{color: '#1f6f9f', textDecoration: 'underline', fontWeight: 'normal'}}>View File {i+1}</a>
+                      ))}
+                    </div>
+                  ) : '—'],
+                  ["Created", selectedDoctor.createdAt ? new Date(selectedDoctor.createdAt).toLocaleString() : '—'], 
+                  ["Last updated", selectedDoctor.updatedAt ? new Date(selectedDoctor.updatedAt).toLocaleString() : '—']
+                ].map(([label, value]) => <div key={label} className={styles.detailField}><span>{label}</span><strong>{value || '—'}</strong></div>)}
               </div>
             </div>
           </>}

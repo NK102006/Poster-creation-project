@@ -1,9 +1,9 @@
 import StudioShell from '../components/StudioShell';
 import styles from './DoctorHubPage.module.css';
 
-export default function DoctorHubPage({ onLogout, onAddNew, onAccessExisting }) {
+export default function DoctorHubPage({ user, onLogout, onAddNew, onAccessExisting }) {
   return (
-    <StudioShell onLogout={onLogout} onBrandClick={undefined}>
+    <StudioShell user={user} onLogout={onLogout} onBrandClick={undefined}>
       <div className={styles.hero}>
         <h1 className={styles.title}>Welcome</h1>
         <p className={styles.subtitle}>Choose add new doctor or an existing one</p>

@@ -36,6 +36,9 @@ app.use(express.urlencoded({ extended: true, limit: '500mb' }));
 const UPLOADS_DIR = path.resolve('uploads');
 fs.mkdirSync(path.join(UPLOADS_DIR, 'logos'), { recursive: true });
 fs.mkdirSync(path.join(UPLOADS_DIR, 'posters'), { recursive: true });
+fs.mkdirSync(path.join(UPLOADS_DIR, 'festival_posters'), { recursive: true });
+fs.mkdirSync(path.join(UPLOADS_DIR, 'education_posters'), { recursive: true });
+fs.mkdirSync(path.join(UPLOADS_DIR, 'videos'), { recursive: true });
 app.use('/uploads', express.static(UPLOADS_DIR));
 
 // Schemas & Models
@@ -404,7 +407,7 @@ app.post('/api/doctors/:id/download', async (req, res) => {
 
 // Create/update doctor profile and poster with multer file upload
 app.post('/api/doctors', upload.any(), async (req, res) => {
-  const { name, contactnumber, clinicName, doctorDegree, doctorId, ownerUserId } = req.body;
+  const { name, contactnumber, clinicName, doctorDegree, doctorId, ownerUserId, posterKind } = req.body;
   const countDownload = String(req.body.countDownload || '') === 'true';
   let logoFile = req.files?.find((f) => f.fieldname === 'logo');
   let logoBuffer = logoFile?.buffer || null;
@@ -451,7 +454,12 @@ app.post('/api/doctors', upload.any(), async (req, res) => {
       if (logoBuffer) doctor.logo = await saveFile(logoBuffer, logoName, 'logos');
 
       if (posterBuffer) {
-        const posterPath = await saveFile(posterBuffer, posterName, 'posters');
+        let posterSubfolder = 'posters';
+        if (posterKind === 'festival') posterSubfolder = 'festival_posters';
+        else if (posterKind === 'gk') posterSubfolder = 'education_posters';
+        else if (posterKind === 'video') posterSubfolder = 'videos';
+
+        const posterPath = await saveFile(posterBuffer, posterName, posterSubfolder);
         doctor.poster = posterPath;
         doctor.posters = doctor.posters || [];
         doctor.posters.push({
@@ -491,7 +499,12 @@ app.post('/api/doctors', upload.any(), async (req, res) => {
     };
 
     if (posterBuffer) {
-      const posterPath = await saveFile(posterBuffer, posterName, 'posters');
+      let posterSubfolder = 'posters';
+      if (posterKind === 'festival') posterSubfolder = 'festival_posters';
+      else if (posterKind === 'gk') posterSubfolder = 'education_posters';
+      else if (posterKind === 'video') posterSubfolder = 'videos';
+
+      const posterPath = await saveFile(posterBuffer, posterName, posterSubfolder);
       docData.poster = posterPath;
       docData.posters = [
         {
@@ -612,7 +625,7 @@ app.get('/api/admin/collections/:collection', async (req, res) => {
     
     const docs = await Model.find().sort({ createdAt: -1 });
     if (req.params.collection === 'doctors') {
-      return res.status(200).json(docs.map(formatDoctor));
+      return res.status(200).json(docs.map(d => formatDoctor(d, { includePosters: true })));
     }
     return res.status(200).json(docs.map(formatUser));
   } catch (err) {

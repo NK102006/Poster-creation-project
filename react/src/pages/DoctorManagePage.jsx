@@ -13,6 +13,7 @@ const EMPTY_FORM = {
 };
 
 export default function DoctorManagePage({
+  user,
   doctorId,
   onLogout,
   onBack,
@@ -183,6 +184,7 @@ export default function DoctorManagePage({
 
   return (
     <StudioShell
+      user={user}
       onLogout={onLogout}
       onBrandClick={onStartNew || onBack}
       headerActions={

@@ -3,7 +3,7 @@ import { apiRequest } from '../lib/apiClient';
 import StudioShell from '../components/StudioShell';
 import styles from './ExistingDoctorsPage.module.css';
 
-export default function ExistingDoctorsPage({ onLogout, onBack, onSelectDoctor }) {
+export default function ExistingDoctorsPage({ user, onLogout, onBack, onSelectDoctor }) {
   const [doctors, setDoctors] = useState([]);
   const [total, setTotal] = useState(0);
   const [query, setQuery] = useState('');
@@ -46,6 +46,7 @@ export default function ExistingDoctorsPage({ onLogout, onBack, onSelectDoctor }
 
   return (
     <StudioShell
+      user={user}
       onLogout={onLogout}
       onBrandClick={onBack}
       headerActions={

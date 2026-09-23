@@ -55,7 +55,7 @@ export default function DoctorDetailsPage({
     };
   }, [doctorId, existingDoctor?.id]);
 
-  const handleAutoSave = async (currentFormData, currentLogoFile, posterBlob) => {
+  const handleAutoSave = async (currentFormData, currentLogoFile, posterBlob, posterKind) => {
     const name = currentFormData?.name?.trim() || formData.name?.trim();
     const contactnumber =
       currentFormData?.contactnumber?.trim() || formData.contactnumber?.trim();
@@ -87,6 +87,9 @@ export default function DoctorDetailsPage({
       const ext = posterBlob.type && posterBlob.type.includes('video') ? 'mp4' : 'jpg';
       data.append('poster', posterBlob, `poster.${ext}`);
     }
+    if (posterKind) {
+      data.append('posterKind', posterKind);
+    }
 
     try {
       const result = await apiRequest('/doctors', {
@@ -95,6 +98,10 @@ export default function DoctorDetailsPage({
       });
       if (result?.doctor) {
         setDoctor(result.doctor);
+        setLogoFile(null);
+        if (result.doctor.logo) {
+          setLogoPreview(result.doctor.logo);
+        }
       }
       return { success: true };
     } catch (err) {
@@ -105,6 +112,7 @@ export default function DoctorDetailsPage({
 
   return (
     <StudioShell
+      user={user}
       onLogout={onLogout}
       onBrandClick={onBrandClick || onStartNew}
       headerActions={

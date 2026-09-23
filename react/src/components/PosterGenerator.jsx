@@ -52,7 +52,7 @@ export default function PosterGenerator({
   const selectedTheme =
     POSTER_THEMES.find((t) => t.id === selectedThemeId) || POSTER_THEMES[0];
   const isStepComplete = (step) => currentStep > step;
-  const activePosterContent = monthlyPosters[activePosterIndex] || monthlyPosters[0];
+  const [modalPoster, setModalPoster] = useState(null);
 
   const handleFileChange = (e) => {
     const file = e.target.files?.[0];
@@ -150,7 +150,10 @@ export default function PosterGenerator({
     onModeChange: setPosterMode,
     theme: selectedTheme,
     doctorFields,
-    onPosterClick: () => setPreviewModalOpen(true),
+    onPosterClick: (poster) => {
+      setModalPoster(poster);
+      setPreviewModalOpen(true);
+    },
   };
 
   const renderPosterBlob = async (poster, label) => {
@@ -168,31 +171,33 @@ export default function PosterGenerator({
       setIsGenerating(true);
       setDownloadSuccess(false);
 
+      const targetPoster = modalPoster || monthlyPosters[0];
+
       const label =
-        activePosterContent?.kind === 'festival'
-          ? activePosterContent.festivalName || 'Festival'
+        targetPoster?.kind === 'festival'
+          ? targetPoster.festivalName || 'Festival'
           : `Poster-${
-              activePosterContent?.kind === 'festival'
+              targetPoster?.kind === 'festival'
                 ? 1
                 : Math.max(
                     1,
-                    generalPosters.findIndex((p) => p.id === activePosterContent?.id) + 1
+                    generalPosters.findIndex((p) => p.id === targetPoster?.id) + 1
                   )
             }`;
 
       const cleanDocName = formattedDoctorName
         .replace(/[^a-zA-Z0-9_-]/g, '_')
         .replace(/_+/g, '_');
-      const posterLabel = activePosterContent?.id || 'poster';
+      const posterLabel = targetPoster?.id || 'poster';
 
-      if (activePosterContent?.kind === 'video') {
-        const res = await fetch(activePosterContent.videoUrl);
+      if (targetPoster?.kind === 'video') {
+        const res = await fetch(targetPoster.videoUrl);
         const videoBlob = await res.blob();
         const dataUrl = URL.createObjectURL(videoBlob);
         const fileName = `Video_${cleanDocName}_${posterLabel}.mp4`;
         
         if (onAutoSave) {
-          onAutoSave(formData, logoFile, videoBlob).catch((err) => {
+          onAutoSave(formData, logoFile, videoBlob, targetPoster.kind).catch((err) => {
             console.warn('Auto save notice:', err);
           });
         }
@@ -203,12 +208,12 @@ export default function PosterGenerator({
         link.click();
         URL.revokeObjectURL(dataUrl);
       } else {
-        const posterBlob = await renderPosterBlob(activePosterContent, label);
+        const posterBlob = await renderPosterBlob(targetPoster, label);
         const dataUrl = URL.createObjectURL(posterBlob);
         const fileName = `Poster_${cleanDocName}_${posterLabel}.jpg`;
 
         if (onAutoSave) {
-          onAutoSave(formData, logoFile, posterBlob).catch((err) => {
+          onAutoSave(formData, logoFile, posterBlob, targetPoster.kind).catch((err) => {
             console.warn('Auto save notice:', err);
           });
         }
@@ -272,7 +277,7 @@ export default function PosterGenerator({
             pack[0].kind === 'festival' ? pack[0].festivalName : 'Poster-1'
           );
         }
-        onAutoSave(formData, logoFile, firstBlob).catch(() => {});
+        onAutoSave(formData, logoFile, firstBlob, pack[0].kind).catch(() => {});
       }
 
       const zipBlob = await zip.generateAsync({ type: 'blob' });
@@ -656,8 +661,8 @@ export default function PosterGenerator({
             
             <div style={{ height: '100%', minHeight: 0, aspectRatio: '9/16', overflow: 'hidden', borderRadius: 12, boxShadow: '0 20px 50px rgba(0,0,0,0.5)', position: 'relative' }}>
               <PosterPage
-                poster={activePosterContent}
-                label={activePosterContent?.id}
+                poster={modalPoster || monthlyPosters[0]}
+                label={modalPoster?.id || 'Poster'}
                 pageStyle={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}
                 isCaptureTarget={false}
                 theme={selectedTheme}

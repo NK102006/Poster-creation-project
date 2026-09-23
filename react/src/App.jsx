@@ -221,6 +221,7 @@ export default function App() {
   } else if (view === 'hub') {
     screen = (
       <DoctorHubPage
+        user={currentUser}
         onLogout={handleLogout}
         onAddNew={goToNewDoctor}
         onAccessExisting={() => navigate('existing')}
@@ -229,6 +230,7 @@ export default function App() {
   } else if (view === 'existing') {
     screen = (
       <ExistingDoctorsPage
+        user={currentUser}
         onLogout={handleLogout}
         onBack={goToHub}
         onSelectDoctor={(doc) => {
@@ -240,6 +242,7 @@ export default function App() {
   } else if (view === 'manage' && doctorId) {
     screen = (
       <DoctorManagePage
+        user={currentUser}
         doctorId={doctorId}
         onLogout={handleLogout}
         onBack={() => navigate('existing')}
@@ -275,6 +278,7 @@ export default function App() {
   } else {
     screen = (
       <DoctorHubPage
+        user={currentUser}
         onLogout={handleLogout}
         onAddNew={goToNewDoctor}
         onAccessExisting={() => navigate('existing')}

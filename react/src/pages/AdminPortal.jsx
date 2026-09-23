@@ -284,12 +284,13 @@ export default function AdminPortal() {
     try {
       const doctors = await apiRequest('/admin/collections/doctors');
       const rows = [
-        ['Name', 'Degree', 'Clinic / Hospital', 'Contact Number'],
+        ['Name', 'Degree', 'Clinic / Hospital', 'Contact Number', 'Posters'],
         ...doctors.map((doctor) => [
           doctor.name || '',
           doctor.doctorDegree || '',
           doctor.clinicName || '',
           doctor.contactnumber || '',
+          (doctor.posters || []).map(p => p.image).join('\n') || doctor.poster || '',
         ]),
       ];
       const csv = rows
