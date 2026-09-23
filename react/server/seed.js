@@ -1,5 +1,5 @@
 /**
- * Seed 5 dummy users + 20 dummy doctors (with posters) for Super Admin testing.
+ * Wipe all current data and seed dummy admins, users, and doctors.
  * Usage: npm run seed
  */
 import fs from 'fs';
@@ -26,6 +26,7 @@ const posterEntrySchema = new mongoose.Schema(
 
 const doctorSchema = new mongoose.Schema({
   ownerUser: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null, index: true },
+  ownerAdmin: { type: mongoose.Schema.Types.ObjectId, ref: 'Admin', default: null, index: true },
   name: { type: String, required: true },
   clinicName: { type: String, required: true, trim: true },
   doctorDegree: { type: String, trim: true, default: '' },
@@ -41,24 +42,27 @@ const userSchema = new mongoose.Schema({
   empid: { type: mongoose.Schema.Types.Mixed },
   password: { type: String, required: true },
   name: { type: String },
+  ownerAdmin: { type: mongoose.Schema.Types.ObjectId, ref: 'Admin', default: null, index: true },
 }, { strict: false, timestamps: true });
+
+const adminSchema = new mongoose.Schema({
+  username: { type: String, required: true, unique: true, trim: true },
+  password: { type: String, required: true },
+}, { timestamps: true });
 
 const Doctor = mongoose.models.Doctor || mongoose.model('Doctor', doctorSchema);
 const User = mongoose.models.User || mongoose.model('User', userSchema);
+const Admin = mongoose.models.Admin || mongoose.model('Admin', adminSchema);
 
 const FIRST = [
   'Aarav', 'Ananya', 'Rohan', 'Ishita', 'Kabir', 'Meera', 'Vivaan', 'Diya',
-  'Arjun', 'Sara', 'Neel', 'Priya', 'Dev', 'Aisha', 'Yash', 'Kiara',
-  'Rahul', 'Sneha', 'Aman', 'Pooja',
+  'Arjun', 'Sara', 'Neel', 'Priya',
 ];
-const LAST = [
-  'Patel', 'Shah', 'Mehta', 'Desai', 'Joshi', 'Khan', 'Reddy', 'Nair',
-  'Kapoor', 'Malhotra',
-];
-const DEGREES = ['MBBS', 'MBBS, MD', 'MBBS, MS', 'BDS', 'BAMS'];
+const LAST = ['Patel', 'Shah', 'Mehta', 'Desai', 'Joshi', 'Khan'];
+const DEGREES = ['MBBS', 'MBBS, MD', 'MBBS, MS', 'BDS'];
 const CLINICS = [
   'City Care Clinic', 'Hope Health Center', 'Sunrise Hospital', 'Green Leaf Clinic',
-  'Lotus Medical', 'Harmony Hospital', 'Pearl Health', 'Nova Care',
+  'Lotus Medical', 'Harmony Hospital',
 ];
 const POSTER_SETS = [
   [
@@ -73,9 +77,12 @@ const POSTER_SETS = [
   [
     { kind: 'festival', label: 'New Year Health' },
     { kind: 'education', label: 'Blood Pressure Check' },
-    { kind: 'festival', label: 'Holi Healthy Living' },
-    { kind: 'video', label: 'Treatment Overview' },
   ],
+];
+
+const ADMINS = [
+  { username: 'westadmin', password: 'admin123' },
+  { username: 'eastadmin', password: 'admin123' },
 ];
 
 function logoSvg(initials, hue) {
@@ -114,28 +121,38 @@ async function seed() {
   await mongoose.connect(MONGODB_URI);
   console.log(`Connected to ${MONGODB_URI}`);
 
-  await Doctor.deleteMany({ name: /^Dr\. Dummy / });
-  await User.deleteMany({ name: /^Dummy User / });
+  await Doctor.deleteMany({});
+  await User.deleteMany({});
+  await Admin.deleteMany({});
+  console.log('Cleared admins, users, and doctors');
+
+  const createdAdmins = await Admin.insertMany(ADMINS);
+  console.log(`Inserted ${createdAdmins.length} admins (password admin123)`);
 
   const users = [];
-  for (let i = 0; i < 5; i += 1) {
-    users.push({
-      empid: 30100 + i,
-      id: 30100 + i,
-      name: `Dummy User ${i + 1}`,
-      password: 'pass1234',
-    });
-  }
+  createdAdmins.forEach((admin, adminIndex) => {
+    const count = adminIndex === 0 ? 3 : 2;
+    for (let i = 0; i < count; i += 1) {
+      const empid = 40100 + adminIndex * 100 + i + 1;
+      users.push({
+        empid,
+        id: empid,
+        name: `User ${admin.username} ${i + 1}`,
+        password: 'pass1234',
+        ownerAdmin: admin._id,
+      });
+    }
+  });
   const createdUsers = await User.insertMany(users);
-  console.log(`Inserted ${createdUsers.length} dummy users (empid 30100–30104, password pass1234)`);
+  console.log(`Inserted ${createdUsers.length} users (password pass1234)`);
 
   const hasSampleVideo = fs.existsSync(SAMPLE_VIDEO);
   const doctors = [];
 
-  for (let i = 0; i < 20; i += 1) {
-    const first = FIRST[i];
+  for (let i = 0; i < createdUsers.length * 3; i += 1) {
+    const first = FIRST[i % FIRST.length];
     const last = LAST[i % LAST.length];
-    const name = `Dr. Dummy ${first} ${last}`;
+    const name = `Dr. ${first} ${last}`;
     const initials = `${first[0]}${last[0]}`.toUpperCase();
     const hue = (i * 17) % 360;
     const owner = createdUsers[i % createdUsers.length];
@@ -162,6 +179,7 @@ async function seed() {
 
     doctors.push({
       ownerUser: owner._id,
+      ownerAdmin: owner.ownerAdmin,
       name,
       clinicName: CLINICS[i % CLINICS.length],
       doctorDegree: DEGREES[i % DEGREES.length],
@@ -175,8 +193,12 @@ async function seed() {
   }
 
   await Doctor.insertMany(doctors);
-  console.log(`Inserted ${doctors.length} dummy doctors with posters`);
-  console.log(`Totals → doctors: ${await Doctor.countDocuments()}, users: ${await User.countDocuments()}`);
+  console.log(`Inserted ${doctors.length} doctors with posters`);
+  console.log(`Totals → admins: ${await Admin.countDocuments()}, users: ${await User.countDocuments()}, doctors: ${await Doctor.countDocuments()}`);
+  console.log('Logins:');
+  console.log('  Superadmin → /superadmin  superadmin / superadmin123');
+  console.log('  Admins     → /admin       westadmin / admin123, eastadmin / admin123');
+  console.log('  Users      → /            40101–40103 and 40201–40202 / pass1234');
   await mongoose.disconnect();
   console.log('Seed complete.');
 }

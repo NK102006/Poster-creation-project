@@ -107,6 +107,11 @@ export default function PosterGenerator({
     }
 
     setStepError(null);
+    if (onAutoSave) {
+      onAutoSave(formData, logoFile).catch((err) => {
+        console.warn('Save notice:', err);
+      });
+    }
     setCurrentStep(2);
   };
 
@@ -317,13 +322,6 @@ export default function PosterGenerator({
   return (
     <section className={styles.containerWide} id="poster-studio-section">
       <nav className={styles.topStepper} aria-label="Poster setup steps">
-        <div className={styles.progressTrack} aria-hidden="true">
-          <div
-            className={styles.progressFill}
-            style={{ width: `${((currentStep - 1) / (STEPS.length - 1)) * 100}%` }}
-          />
-        </div>
-
         <div className={styles.stepRow} role="tablist">
           {STEPS.map((step) => {
             const active = currentStep === step.id;
@@ -487,7 +485,7 @@ export default function PosterGenerator({
                 onClick={handleContinueToDesign}
                 id="continue-to-design-button"
               >
-                Continue to Design
+                Save & next
               </button>
             </div>
           </div>

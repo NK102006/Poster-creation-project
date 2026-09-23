@@ -4,7 +4,7 @@ import { validateEmployeeId, validatePassword } from './validators';
 import { ApiError } from '../../lib/apiClient';
 
 const GENERIC_AUTH_ERROR =
-  'The employee ID or password you entered is incorrect. Please try again.';
+  'The employee ID / username or password you entered is incorrect. Please try again.';
 
 export function useLoginForm({ onSuccess } = {}) {
   const [values, setValues] = useState({ id: '', password: '' });
