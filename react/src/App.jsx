@@ -219,6 +219,7 @@ export default function App() {
       <DoctorHubPage
         user={currentUser}
         onLogout={handleLogout}
+        onBrandClick={goToHub}
         onAddNew={goToNewDoctor}
         onAccessExisting={() => navigate('existing')}
       />
@@ -228,6 +229,7 @@ export default function App() {
       <ExistingDoctorsPage
         user={currentUser}
         onLogout={handleLogout}
+        onBrandClick={goToHub}
         onBack={goToHub}
         onSelectDoctor={(doc) => {
           setSelectedDoctor(doc);
@@ -241,6 +243,7 @@ export default function App() {
         user={currentUser}
         doctorId={doctorId}
         onLogout={handleLogout}
+        onBrandClick={goToHub}
         onBack={() => navigate('existing')}
         onStartNew={goToNewDoctor}
         onContinue={(doc) => {

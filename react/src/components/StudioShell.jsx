@@ -14,7 +14,6 @@ export default function StudioShell({
     <div className={styles.page}>
       <header className={styles.header}>
         <div className={styles.headerLeft}>
-
           <button type="button" className={styles.brandGroup} onClick={onBrandClick}>
             <div className={styles.logoIcon} aria-hidden="true">
               <svg viewBox="0 0 24 24" className={styles.logoMark} fill="none">

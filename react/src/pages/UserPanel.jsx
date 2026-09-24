@@ -315,7 +315,7 @@ export default function UserPanel() {
   return (
     <div className={styles.shell}>
       <aside className={styles.sidebar}>
-        <div className={styles.sidebarTop}>
+        <div className={styles.sidebarTop} onClick={() => { window.location.href = '/'; }} style={{ cursor: 'pointer' }}>
           <div className={styles.brandMark}>U</div>
           <div>
             <div className={styles.brandName}>MedPortal</div>

@@ -509,13 +509,6 @@ export default function PosterGenerator({
 
         {currentStep === 2 && (
           <div className={styles.stepContent}>
-            <header className={styles.stepIntro}>
-              <h2 className={styles.stepHeading}>Design</h2>
-              <p className={styles.stepHint}>
-                Pick a theme and review all posters. Hover a poster to enlarge it in place.
-              </p>
-            </header>
-
             <div className={styles.atelier}>
               <div className={styles.atelierBlock}>
                 <div className={styles.atelierHeader}>
@@ -560,11 +553,7 @@ export default function PosterGenerator({
               <PosterCarousel key={selectedThemeId} variant="grid" {...carouselProps} />
             </div>
 
-            <div className={styles.navRow}>
-              <button type="button" className={styles.secondaryBtn} onClick={() => setCurrentStep(1)}>
-                Back
-              </button>
-              
+            <div className={styles.navRow} style={{ justifyContent: 'flex-end' }}>
               <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
                 {downloadSuccess && (
                   <span style={{ color: '#4caf50', fontSize: 14, fontWeight: 500 }}>

@@ -176,11 +176,6 @@ export default function DoctorDetailsPage({
             ? `Working on ${doctor?.name || existingDoctor?.name || 'this doctor'}`
             : 'Fill in the profile and generate a poster'}
         </p>
-        {editingExisting && onStartNew && (
-          <button type="button" className={styles.switchLink} onClick={onStartNew}>
-            Start a new doctor instead
-          </button>
-        )}
       </div>
 
       <PosterGenerator

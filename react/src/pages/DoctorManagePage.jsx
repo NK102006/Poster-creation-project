@@ -19,6 +19,7 @@ export default function DoctorManagePage({
   onBack,
   onStartNew,
   onContinue,
+  onBrandClick,
 }) {
   const [doctor, setDoctor] = useState(null);
   const [form, setForm] = useState(EMPTY_FORM);
@@ -220,7 +221,7 @@ export default function DoctorManagePage({
     <StudioShell
       user={user}
       onLogout={onLogout}
-      onBrandClick={onStartNew || onBack}
+      onBrandClick={onBrandClick}
       onBack={onBack}
       backLabel="Doctors"
       headerActions={
