@@ -91,6 +91,7 @@ export default function SuperAdminPortal() {
   const [form, setForm] = useState({ username: '', password: '' });
   const [formErrors, setFormErrors] = useState({});
   const [saving, setSaving] = useState(false);
+  const [boardContext, setBoardContext] = useState({ user: null, doctor: null });
   const hostRef = useRef(null);
   const actionRef = useRef({});
 
@@ -306,11 +307,24 @@ export default function SuperAdminPortal() {
 
       <div className={styles.main}>
         <header className={styles.topbar}>
-          <div id="topbar-left" style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-            {!selectedAdmin && (
-              <h1 className={styles.pageTitle}>Admins</h1>
-            )}
-          </div>
+          {selectedAdmin ? (
+            <button
+              type="button"
+              className={styles.secondaryBtn}
+              onClick={() => {
+                if (boardContext.onNavigateBack) {
+                  boardContext.onNavigateBack();
+                  return;
+                }
+                setBoardContext({ user: null, doctor: null });
+                setSelectedAdmin(null);
+              }}
+            >
+              {boardContext.backLabel || '← Admins'}
+            </button>
+          ) : (
+            <h1 className={styles.pageTitle}>Admins</h1>
+          )}
           <div className={styles.topbarRight}>
             <div id="topbar-actions" style={{ display: 'flex', gap: '10px' }} />
             <span className={styles.adminBadge}>Superadmin</span>
@@ -343,7 +357,12 @@ export default function SuperAdminPortal() {
           {selectedAdmin && (
             <UsersDoctorsBoard
               adminId={selectedAdmin.id}
-              onBack={() => setSelectedAdmin(null)}
+              adminName={selectedAdmin.username}
+              onBack={() => {
+                setBoardContext({ user: null, doctor: null });
+                setSelectedAdmin(null);
+              }}
+              onContextChange={setBoardContext}
             />
           )}
         </section>

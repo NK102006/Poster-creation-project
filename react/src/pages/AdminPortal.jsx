@@ -60,6 +60,7 @@ export default function AdminPortal() {
   const [password, setPassword] = useState('');
   const [loginError, setLoginError] = useState('');
   const [loginFieldErrors, setLoginFieldErrors] = useState({});
+  const [boardContext, setBoardContext] = useState({ backLabel: '', onNavigateBack: null });
 
   const isLoggedIn = canAccessPage(auth, 'admin');
 
@@ -217,7 +218,10 @@ export default function AdminPortal() {
           </div>
         </header>
         <section className={styles.panel}>
-          <UsersDoctorsBoard showAdminColumn={auth.role === 'superadmin'} />
+          <UsersDoctorsBoard
+            showAdminColumn={auth.role === 'superadmin'}
+            onContextChange={setBoardContext}
+          />
         </section>
       </div>
     </div>

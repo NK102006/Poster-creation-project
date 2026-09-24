@@ -202,7 +202,7 @@
 .topbar {
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
+  align-items: center;
   gap: 16px;
   padding: 28px 32px 8px;
 }
@@ -229,7 +229,6 @@
 }
 
 .topbarRight {
-  padding-top: 8px;
   display: flex;
   align-items: center;
   gap: 10px;
@@ -281,10 +280,20 @@
   flex-wrap: wrap;
 }
 
+.sectionTitle {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 36px;
+  font-weight: 600;
+  color: var(--color-primary-rich);
+  line-height: 1.15;
+}
+
 .toolbarActions {
   display: flex;
   align-items: center;
   gap: 10px;
+  flex-shrink: 0;
 }
 
 .toolbarHint {
@@ -1011,7 +1020,8 @@
     margin-top: 0;
   }
 
-  .pageTitle {
+  .pageTitle,
+  .sectionTitle {
     font-size: 28px;
   }
 

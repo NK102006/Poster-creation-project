@@ -241,9 +241,11 @@ function useDataTable({ enabled, data, columns, onRowAction }) {
 
 export default function UsersDoctorsBoard({
   adminId = null,
+  adminName = '',
   showAdminColumn = false,
   onBack = null,
   backLabel = '← Admins',
+  onContextChange = null,
 }) {
   const [users, setUsers] = useState([]);
   const [selectedUser, setSelectedUser] = useState(null);
@@ -262,6 +264,7 @@ export default function UsersDoctorsBoard({
   const [importing, setImporting] = useState(false);
   const [importSummary, setImportSummary] = useState('');
   const userImportRef = useRef(null);
+  const navigateBackRef = useRef(() => {});
   const needsAdminPick = showAdminColumn && !adminId;
 
   const [portalNodes, setPortalNodes] = useState({ left: null, right: null });
@@ -294,6 +297,37 @@ export default function UsersDoctorsBoard({
   useEffect(() => {
     loadUsers();
   }, [usersPath]);
+
+  const headerBackLabel = selectedDoctor
+    ? '← Doctors'
+    : selectedUser
+      ? '← Users'
+      : onBack
+        ? backLabel
+        : '';
+
+  navigateBackRef.current = () => {
+    setShowPosters(false);
+    if (selectedDoctor) {
+      setSelectedDoctor(null);
+      return;
+    }
+    if (selectedUser) {
+      setSelectedUser(null);
+      setDoctors([]);
+      return;
+    }
+    onBack?.();
+  };
+
+  useEffect(() => {
+    onContextChange?.({
+      user: selectedUser,
+      doctor: selectedDoctor,
+      backLabel: headerBackLabel,
+      onNavigateBack: () => navigateBackRef.current(),
+    });
+  }, [selectedUser, selectedDoctor, headerBackLabel, onContextChange]);
 
   useEffect(() => {
     if (!needsAdminPick) return undefined;
@@ -578,34 +612,14 @@ export default function UsersDoctorsBoard({
     ? 'Doctor details'
     : selectedUser
       ? `${selectedUser.empid || 'User'}’s doctors`
-      : 'Users';
+      : adminName
+        ? `${adminName}’s users`
+        : 'Users';
 
   const doctorPosters = selectedDoctor?.posters || [];
 
   const leftContent = (
     <>
-      {onBack && !selectedUser && (
-        <button type="button" className={styles.secondaryBtn} onClick={onBack}>
-          {backLabel}
-        </button>
-      )}
-      {selectedUser && (
-        <button
-          type="button"
-          className={styles.secondaryBtn}
-          onClick={() => {
-            setShowPosters(false);
-            if (selectedDoctor) {
-              setSelectedDoctor(null);
-              return;
-            }
-            setSelectedUser(null);
-            setDoctors([]);
-          }}
-        >
-          {selectedDoctor ? '← Doctors' : '← Users'}
-        </button>
-      )}
       <h1 className={styles.pageTitle} style={{ margin: 0 }}>{page}</h1>
     </>
   );
