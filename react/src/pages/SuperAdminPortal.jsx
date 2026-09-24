@@ -94,6 +94,7 @@ export default function SuperAdminPortal() {
   const [formErrors, setFormErrors] = useState({});
   const [saving, setSaving] = useState(false);
   const [boardContext, setBoardContext] = useState({ user: null, doctor: null });
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const hostRef = useRef(null);
   const actionRef = useRef({});
 
@@ -234,7 +235,7 @@ export default function SuperAdminPortal() {
     setTimeout(() => {
       setShowModal(false);
       setClosingModal(false);
-    }, 200);
+    }, 400);
   };
 
   const saveAdmin = async (event) => {
@@ -299,7 +300,11 @@ export default function SuperAdminPortal() {
 
   return (
     <div className={styles.shell}>
-      <aside className={styles.sidebar}>
+      <div 
+        className={`${styles.sidebarOverlay} ${sidebarOpen ? styles.open : ''} ${styles.mobileOnly}`} 
+        onClick={() => setSidebarOpen(false)}
+      />
+      <aside className={`${styles.sidebar} ${sidebarOpen ? styles.open : ''}`}>
         <div className={styles.sidebarTop} onClick={() => { window.location.href = '/'; }} style={{ cursor: 'pointer' }}>
           <div className={styles.brandMark}>S</div>
           <div>
@@ -323,11 +328,36 @@ export default function SuperAdminPortal() {
             </button>
           )}
         </nav>
+
+        <div className={`${styles.sidebarMobileActions} ${styles.mobileOnly}`}>
+          <div id="topbar-actions-mobile" style={{ display: 'flex', flexDirection: 'column', gap: '10px' }} />
+          {!selectedAdmin && (
+            <button type="button" className={styles.primaryBtn} onClick={openCreate} style={{ width: '100%' }}>
+              + Add admin
+            </button>
+          )}
+          <button type="button" className={styles.sidebarLogout} onClick={handleLogout}>
+            Log out
+          </button>
+        </div>
       </aside>
 
       <div className={styles.main}>
         <header className={styles.topbar}>
-          {selectedAdmin ? (
+          <button 
+            type="button" 
+            className={`${styles.hamburgerBtn} ${styles.mobileOnly}`} 
+            onClick={() => setSidebarOpen(true)}
+            aria-label="Open menu"
+          >
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="3" y1="12" x2="21" y2="12"></line>
+              <line x1="3" y1="6" x2="21" y2="6"></line>
+              <line x1="3" y1="18" x2="21" y2="18"></line>
+            </svg>
+          </button>
+          <div id="topbar-left" style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+            {selectedAdmin ? (
             <button
               type="button"
               className={styles.secondaryBtn}
@@ -345,10 +375,11 @@ export default function SuperAdminPortal() {
           ) : (
             <h1 className={styles.pageTitle}>Admins</h1>
           )}
+          </div>
           <div className={styles.topbarRight}>
-            <div id="topbar-actions" style={{ display: 'flex', gap: '10px' }} />
+            <div id="topbar-actions" className={styles.desktopOnly} style={{ gap: '10px' }} />
             <span className={styles.adminBadge}>Superadmin</span>
-            <button type="button" className={styles.logoutBtn} onClick={handleLogout}>
+            <button type="button" className={`${styles.logoutBtn} ${styles.desktopOnly}`} onClick={handleLogout}>
               Log out
             </button>
           </div>
@@ -358,10 +389,10 @@ export default function SuperAdminPortal() {
 
           {!selectedAdmin && (
             <>
-              <div className={styles.toolbar}>
+              <div className={`${styles.toolbar} ${styles.desktopOnly}`}>
                 <div />
                 <button type="button" className={styles.primaryBtn} onClick={openCreate}>
-                  + Add
+                  + Add admin
                 </button>
               </div>
               {loading && <p className={styles.statusText}>Loading…</p>}

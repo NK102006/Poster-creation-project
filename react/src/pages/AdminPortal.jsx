@@ -62,6 +62,7 @@ export default function AdminPortal() {
   const [loginError, setLoginError] = useState('');
   const [loginFieldErrors, setLoginFieldErrors] = useState({});
   const [boardContext, setBoardContext] = useState({ backLabel: '', onNavigateBack: null });
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const isLoggedIn = canAccessPage(auth, 'admin');
 
@@ -194,7 +195,11 @@ export default function AdminPortal() {
 
   return (
     <div className={styles.shell}>
-      <aside className={styles.sidebar}>
+      <div 
+        className={`${styles.sidebarOverlay} ${sidebarOpen ? styles.open : ''} ${styles.mobileOnly}`} 
+        onClick={() => setSidebarOpen(false)}
+      />
+      <aside className={`${styles.sidebar} ${sidebarOpen ? styles.open : ''}`}>
         <div className={styles.sidebarTop} onClick={() => { window.location.href = '/'; }} style={{ cursor: 'pointer' }}>
           <div className={styles.brandMark}>A</div>
           <div>
@@ -208,10 +213,29 @@ export default function AdminPortal() {
             <span className={styles.navIcon}>U</span>Users
           </button>
         </nav>
+
+        <div className={`${styles.sidebarMobileActions} ${styles.mobileOnly}`}>
+          <div id="topbar-actions-mobile" style={{ display: 'flex', flexDirection: 'column', gap: '10px' }} />
+          <button type="button" className={styles.sidebarLogout} onClick={handleLogout}>
+            Log out
+          </button>
+        </div>
       </aside>
 
       <div className={styles.main}>
         <header className={styles.topbar}>
+          <button 
+            type="button" 
+            className={`${styles.hamburgerBtn} ${styles.mobileOnly}`} 
+            onClick={() => setSidebarOpen(true)}
+            aria-label="Open menu"
+          >
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="3" y1="12" x2="21" y2="12"></line>
+              <line x1="3" y1="6" x2="21" y2="6"></line>
+              <line x1="3" y1="18" x2="21" y2="18"></line>
+            </svg>
+          </button>
           <div id="topbar-left" style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
             {boardContext.backLabel && (
               <button
@@ -224,11 +248,11 @@ export default function AdminPortal() {
             )}
           </div>
           <div className={styles.topbarRight}>
-            <div id="topbar-actions" style={{ display: 'flex', gap: '10px' }} />
+            <div id="topbar-actions" className={styles.desktopOnly} style={{ gap: '10px' }} />
             <span className={styles.adminBadge}>
               {auth.role === 'superadmin' ? 'Superadmin' : auth.username || 'Admin'}
             </span>
-            <button type="button" className={styles.logoutBtn} onClick={handleLogout}>
+            <button type="button" className={`${styles.logoutBtn} ${styles.desktopOnly}`} onClick={handleLogout}>
               Log out
             </button>
           </div>

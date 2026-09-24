@@ -49,6 +49,8 @@ export default function PosterGenerator({
   const [tempLogoCropState, setTempLogoCropState] = useState(null);
 
   const [previewModalOpen, setPreviewModalOpen] = useState(false);
+  const [closingModal, setClosingModal] = useState(false);
+  const [modalOrigin, setModalOrigin] = useState({ x: window.innerWidth / 2, y: window.innerHeight / 2 });
 
   const generalPosters = useMemo(() => getGeneralPosters(), []);
   const monthlyPosters = useMemo(() => getMonthlyPosters(new Date()), []);
@@ -160,6 +162,14 @@ export default function PosterGenerator({
     return true;
   };
 
+  const closePreview = () => {
+    setClosingModal(true);
+    setTimeout(() => {
+      setPreviewModalOpen(false);
+      setClosingModal(false);
+    }, 400);
+  };
+
   const rawDocName = formData.name?.trim() || doctor?.name || 'Doctor Name';
   const formattedDoctorName = rawDocName.startsWith('Dr.') ? rawDocName : `Dr. ${rawDocName}`;
   const doctorFields = {
@@ -177,9 +187,11 @@ export default function PosterGenerator({
     onModeChange: setPosterMode,
     theme: selectedTheme,
     doctorFields,
-    onPosterClick: (poster) => {
+    onPosterClick: (poster, originCoords) => {
       setModalPoster(poster);
+      if (originCoords) setModalOrigin(originCoords);
       setPreviewModalOpen(true);
+      setClosingModal(false);
     },
   };
 
@@ -659,21 +671,19 @@ export default function PosterGenerator({
 
       {/* Poster Preview Modal */}
       {previewModalOpen && createPortal(
-        <div
-          style={{
-            position: 'fixed', inset: 0, 
-            background: 'rgba(255,255,255,0.05)',
-            backdropFilter: 'blur(15px)',
-            WebkitBackdropFilter: 'blur(15px)',
-            zIndex: 999999,
-            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-            padding: '40px 20px',
-          }}
-          onClick={() => setPreviewModalOpen(false)}
-        >
-          <div style={{ position: 'relative', height: '100%', maxHeight: '85vh', display: 'flex', flexDirection: 'column', gap: 20, alignItems: 'center' }} onClick={e => e.stopPropagation()}>
+        <>
+          <div 
+            className={`${styles.previewModalBackdrop} ${closingModal ? styles.closing : ''}`} 
+            onClick={closePreview} 
+          />
+          <div
+            className={`${styles.previewModalWrapper} ${closingModal ? styles.closing : ''}`}
+            style={{ transformOrigin: `${modalOrigin.x}px ${modalOrigin.y}px` }}
+            onClick={closePreview}
+          >
+            <div className={styles.previewModalContent} onClick={e => e.stopPropagation()}>
             <button 
-              onClick={() => setPreviewModalOpen(false)}
+              onClick={closePreview}
               style={{ 
                 position: 'absolute', top: -36, right: -40, background: 'none', border: 'none', 
                 color: '#000', fontSize: 28, cursor: 'pointer', fontWeight: 'bold',
@@ -704,7 +714,8 @@ export default function PosterGenerator({
               {isGenerating ? 'Preparing…' : 'Download this poster'}
             </button>
           </div>
-        </div>,
+          </div>
+        </>,
         document.body
       )}
     </section>

@@ -292,7 +292,13 @@ function ScrollView({
                   key={poster.id}
                   type="button"
                   className={`${styles.scrollSlide} ${sideClass}`}
-                  onClick={() => lockedGoTo(index)}
+                  onClick={(e) => {
+                    lockedGoTo(index);
+                    if (onPosterClick) {
+                      const rect = e.currentTarget.getBoundingClientRect();
+                      onPosterClick(poster, { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 });
+                    }
+                  }}
                   aria-label={label}
                   aria-current={distance === 0 ? 'true' : undefined}
                 >
@@ -469,9 +475,12 @@ export default function PosterCarousel({
                 key={poster.id}
                 type="button"
                 className={`${styles.gridCard} ${isActive ? styles.gridCardActive : ''}`}
-                onClick={() => {
+                onClick={(e) => {
                   goTo(index);
-                  if (onPosterClick) onPosterClick(poster);
+                  if (onPosterClick) {
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    onPosterClick(poster, { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 });
+                  }
                 }}
                 aria-label={label}
                 aria-current={isActive ? 'true' : undefined}

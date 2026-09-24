@@ -26,6 +26,7 @@ export default function UserPanel() {
   const [loginFieldErrors, setLoginFieldErrors] = useState({});
   const [showModal, setShowModal] = useState(false);
   const [closingModal, setClosingModal] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
   const [formData, setFormData] = useState({});
   const [formFieldErrors, setFormFieldErrors] = useState({});
@@ -238,7 +239,7 @@ export default function UserPanel() {
     setTimeout(() => {
       setShowModal(false);
       setClosingModal(false);
-    }, 100);
+    }, 400);
   };
 
   const handleSave = async (event) => {
@@ -336,7 +337,11 @@ export default function UserPanel() {
 
   return (
     <div className={styles.shell}>
-      <aside className={styles.sidebar}>
+      <div 
+        className={`${styles.sidebarOverlay} ${sidebarOpen ? styles.open : ''} ${styles.mobileOnly}`} 
+        onClick={() => setSidebarOpen(false)}
+      />
+      <aside className={`${styles.sidebar} ${sidebarOpen ? styles.open : ''}`}>
         <div className={styles.sidebarTop} onClick={() => { window.location.href = '/'; }} style={{ cursor: 'pointer' }}>
           <div className={styles.brandMark}>U</div>
           <div>
@@ -351,11 +356,37 @@ export default function UserPanel() {
             Doctors
           </button>
         </nav>
+
+        <div className={`${styles.sidebarMobileActions} ${styles.mobileOnly}`}>
+          <button type="button" className={styles.secondaryBtn} onClick={handleExport}>
+            Export
+          </button>
+          <button type="button" className={styles.primaryBtn} onClick={openCreate}>
+            + Add doctor
+          </button>
+          <button type="button" className={styles.sidebarLogout} onClick={handleLogout}>
+            Log out
+          </button>
+        </div>
       </aside>
 
       <div className={styles.main}>
         <header className={styles.topbar}>
-          <h1 className={styles.pageTitle}>Doctors list</h1>
+          <button 
+            type="button" 
+            className={`${styles.hamburgerBtn} ${styles.mobileOnly}`} 
+            onClick={() => setSidebarOpen(true)}
+            aria-label="Open menu"
+          >
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="3" y1="12" x2="21" y2="12"></line>
+              <line x1="3" y1="6" x2="21" y2="6"></line>
+              <line x1="3" y1="18" x2="21" y2="18"></line>
+            </svg>
+          </button>
+          <div id="topbar-left" style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+            <h1 className={styles.pageTitle}>Doctors list</h1>
+          </div>
           <div className={styles.topbarRight}>
             <span className={styles.adminBadge}>
               {auth.role === 'superadmin'
@@ -364,14 +395,14 @@ export default function UserPanel() {
                   ? auth.username || 'Admin'
                   : auth.empid || 'User'}
             </span>
-            <button type="button" className={styles.logoutBtn} onClick={handleLogout}>
+            <button type="button" className={`${styles.logoutBtn} ${styles.desktopOnly}`} onClick={handleLogout}>
               Log out
             </button>
           </div>
         </header>
 
         <section className={styles.panel}>
-          <div className={styles.toolbar}>
+          <div className={`${styles.toolbar} ${styles.desktopOnly}`}>
             <div />
             <div className={styles.toolbarActions}>
               <button type="button" className={styles.secondaryBtn} onClick={handleExport}>

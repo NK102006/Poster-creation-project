@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import DataTable from 'datatables.net-dt';
 import 'datatables.net-dt/css/dataTables.dataTables.css';
 import JSZip from 'jszip';
@@ -662,12 +663,15 @@ export default function UsersDoctorsBoard({
     </>
   );
 
+  const mobileActionsPortal = document.getElementById('topbar-actions-mobile');
+
   return (
     <>
       <div className={styles.toolbar}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>{leftContent}</div>
-        <div className={styles.toolbarActions}>{rightContent}</div>
+        <div className={`${styles.toolbarActions} ${styles.desktopOnly}`}>{rightContent}</div>
       </div>
+      {mobileActionsPortal && createPortal(rightContent, mobileActionsPortal)}
       {error && <p className={styles.error}>{error}</p>}
       {importSummary && !selectedDoctor && (
         <p className={styles.statusText}>{importSummary}</p>

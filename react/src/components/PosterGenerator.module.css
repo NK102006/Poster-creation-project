@@ -1131,3 +1131,67 @@
     display: none;
   }
 }
+
+/* —— Poster Preview Modal Animations —— */
+@keyframes posterModalFadeIn {
+  from { opacity: 0; backdrop-filter: blur(0px); -webkit-backdrop-filter: blur(0px); }
+  to { opacity: 1; backdrop-filter: blur(15px); -webkit-backdrop-filter: blur(15px); }
+}
+
+@keyframes posterModalFadeOut {
+  from { opacity: 1; backdrop-filter: blur(15px); -webkit-backdrop-filter: blur(15px); }
+  to { opacity: 0; backdrop-filter: blur(0px); -webkit-backdrop-filter: blur(0px); }
+}
+
+@keyframes posterModalScaleIn {
+  from { opacity: 0; transform: scale(0.9) translateY(20px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+@keyframes posterModalScaleOut {
+  from { opacity: 1; transform: scale(1) translateY(0); }
+  to { opacity: 0; transform: scale(0.9) translateY(20px); }
+}
+
+.previewModalBackdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(255,255,255,0.05);
+  backdrop-filter: blur(15px);
+  -webkit-backdrop-filter: blur(15px);
+  z-index: 999998;
+  animation: posterModalFadeIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.previewModalBackdrop.closing {
+  animation: posterModalFadeOut 0.4s ease-in forwards;
+  pointer-events: none;
+}
+
+.previewModalWrapper {
+  position: fixed;
+  inset: 0;
+  z-index: 999999;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  animation: posterModalScaleIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+  will-change: transform;
+}
+
+.previewModalWrapper.closing {
+  animation: posterModalScaleOut 0.4s ease-in forwards;
+  pointer-events: none;
+}
+
+.previewModalContent {
+  position: relative;
+  height: 100%;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  align-items: center;
+}
