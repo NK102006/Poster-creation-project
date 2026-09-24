@@ -60,6 +60,7 @@ export default function AdminPortal() {
   const [password, setPassword] = useState('');
   const [loginError, setLoginError] = useState('');
   const [loginFieldErrors, setLoginFieldErrors] = useState({});
+  const [boardContext, setBoardContext] = useState({ backLabel: '', onNavigateBack: null });
 
   const isLoggedIn = canAccessPage(auth, 'admin');
 
@@ -205,7 +206,17 @@ export default function AdminPortal() {
 
       <div className={styles.main}>
         <header className={styles.topbar}>
-          <h1 className={styles.pageTitle}>Users</h1>
+          {boardContext.backLabel ? (
+            <button
+              type="button"
+              className={styles.secondaryBtn}
+              onClick={() => boardContext.onNavigateBack?.()}
+            >
+              {boardContext.backLabel}
+            </button>
+          ) : (
+            <h1 className={styles.pageTitle}>Users</h1>
+          )}
           <div className={styles.topbarRight}>
             <span className={styles.adminBadge}>
               {auth.role === 'superadmin' ? 'Superadmin' : auth.username || 'Admin'}
@@ -216,7 +227,10 @@ export default function AdminPortal() {
           </div>
         </header>
         <section className={styles.panel}>
-          <UsersDoctorsBoard showAdminColumn={auth.role === 'superadmin'} />
+          <UsersDoctorsBoard
+            showAdminColumn={auth.role === 'superadmin'}
+            onContextChange={setBoardContext}
+          />
         </section>
       </div>
     </div>
