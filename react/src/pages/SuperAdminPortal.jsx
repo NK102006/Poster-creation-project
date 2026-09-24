@@ -78,7 +78,7 @@ const adminColumns = [
 ];
 
 export default function SuperAdminPortal() {
-  const [auth, setAuth] = useState(() => readAuth());
+  const [auth, setAuth] = useState(() => readAuth('superadmin'));
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [loginError, setLoginError] = useState('');
@@ -200,7 +200,7 @@ export default function SuperAdminPortal() {
         body: { username, password },
       });
       if (result.success) {
-        setAuth(writeAuth(result.auth));
+        setAuth(writeAuth(result.auth, 'superadmin'));
       }
     } catch (err) {
       setLoginError(err.message || 'Login failed');
@@ -208,7 +208,7 @@ export default function SuperAdminPortal() {
   };
 
   const handleLogout = () => {
-    clearAuth();
+    clearAuth('superadmin');
     setAuth(null);
     setSelectedAdmin(null);
     apiRequest('/logout', { method: 'POST' }).catch(() => {});

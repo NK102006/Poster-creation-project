@@ -56,7 +56,7 @@ function formatLabel(key) {
 }
 
 export default function AdminPortal() {
-  const [auth, setAuth] = useState(() => readAuth());
+  const [auth, setAuth] = useState(() => readAuth('admin'));
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [loginError, setLoginError] = useState('');
@@ -84,7 +84,7 @@ export default function AdminPortal() {
         body: { username, password },
       });
       if (result.success) {
-        setAuth(writeAuth(result.auth));
+        setAuth(writeAuth(result.auth, 'admin'));
       }
     } catch (err) {
       setLoginError(err.message || 'Login failed');
@@ -92,7 +92,7 @@ export default function AdminPortal() {
   };
 
   const handleLogout = () => {
-    clearAuth();
+    clearAuth('admin');
     setAuth(null);
     apiRequest('/logout', { method: 'POST' }).catch(() => {});
   };

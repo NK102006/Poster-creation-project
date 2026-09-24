@@ -123,7 +123,10 @@ function resolveAuthenticatedView() {
 }
 
 export default function App() {
-  const [currentUser, setCurrentUser] = useState(() => readAuth());
+  const [currentUser, setCurrentUser] = useState(() => {
+    const stored = readAuth('portal');
+    return stored?.role === 'user' ? stored : null;
+  });
 
   const initialAuthView = currentUser ? resolveAuthenticatedView() : null;
 
@@ -136,8 +139,8 @@ export default function App() {
   const [startAtDesign, setStartAtDesign] = useState(false);
 
   const restoreAppState = (historyState) => {
-    const stored = readAuth();
-    if (!stored) {
+    const stored = readAuth('portal');
+    if (!stored || stored.role !== 'user') {
       setCurrentUser(null);
       setView(isUnknownPath() ? 'notfound' : staffViewFromPath() || 'login');
       setDoctorId(null);
@@ -208,7 +211,7 @@ export default function App() {
 
   const handleLoginSuccess = (payload) => {
     const user = payload?.user || payload?.auth || payload;
-    setCurrentUser(writeAuth(user));
+    setCurrentUser(writeAuth(user, 'portal'));
     goToHub();
   };
 
@@ -217,7 +220,7 @@ export default function App() {
     setSelectedDoctor(null);
     setDoctorId(null);
     clearSavedViewState();
-    clearAuth();
+    clearAuth('portal');
     navigate('login');
   };
 

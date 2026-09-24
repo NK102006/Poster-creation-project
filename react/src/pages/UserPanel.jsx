@@ -19,7 +19,7 @@ function formatLabel(key) {
 }
 
 export default function UserPanel() {
-  const [auth, setAuth] = useState(() => readAuth());
+  const [auth, setAuth] = useState(() => readAuth('userpanel'));
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [loginError, setLoginError] = useState('');
@@ -55,7 +55,7 @@ export default function UserPanel() {
         body: { username, password },
       });
       if (result.success) {
-        setAuth(writeAuth(result.auth));
+        setAuth(writeAuth(result.auth, 'userpanel'));
       }
     } catch (err) {
       setLoginError(err.message || 'Login failed');
@@ -63,7 +63,7 @@ export default function UserPanel() {
   };
 
   const handleLogout = () => {
-    clearAuth();
+    clearAuth('userpanel');
     setAuth(null);
     apiRequest('/logout', { method: 'POST' }).catch(() => {});
   };

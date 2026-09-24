@@ -1,40 +1,81 @@
-const AUTH_KEY = 'auth_session';
+const LEGACY_KEY = 'auth_session';
 
-export function readAuth() {
+const AUTH_KEYS = {
+  portal: 'portal_auth_session',
+  admin: 'admin_session',
+  superadmin: 'super_admin_session',
+  userpanel: 'userpanel_auth_session',
+};
+
+function parseStored(raw) {
+  if (!raw) return null;
   try {
-    const stored = localStorage.getItem(AUTH_KEY);
-    if (!stored) return null;
-    const parsed = JSON.parse(stored);
-    if (!parsed?.role) return null;
-    return parsed;
+    const parsed = JSON.parse(raw);
+    return parsed?.role ? parsed : null;
   } catch {
     return null;
   }
 }
 
-export function writeAuth(auth) {
+export function authScopeFromPath() {
+  const path = window.location.pathname;
+  if (path === '/admin') return 'admin';
+  if (path === '/superadmin' || path === '/super-admin') return 'superadmin';
+  if (path === '/userpanel') return 'userpanel';
+  return 'portal';
+}
+
+function scopeFromRole(role) {
+  if (role === 'superadmin') return 'superadmin';
+  if (role === 'admin') return 'admin';
+  return 'portal';
+}
+
+function migrateLegacy(scope) {
+  const legacy = parseStored(localStorage.getItem(LEGACY_KEY));
+  if (!legacy) return null;
+
+  const inferred = scopeFromRole(legacy.role);
+  if (scope === 'userpanel') {
+    localStorage.setItem(AUTH_KEYS.userpanel, JSON.stringify(legacy));
+    localStorage.removeItem(LEGACY_KEY);
+    return legacy;
+  }
+  if (inferred !== scope) return null;
+
+  localStorage.setItem(AUTH_KEYS[scope], JSON.stringify(legacy));
+  localStorage.removeItem(LEGACY_KEY);
+  return legacy;
+}
+
+export function readAuth(scope = authScopeFromPath()) {
+  const stored = parseStored(localStorage.getItem(AUTH_KEYS[scope]));
+  if (stored) return stored;
+  return migrateLegacy(scope);
+}
+
+export function writeAuth(auth, scope = authScopeFromPath()) {
   if (!auth?.role) {
-    clearAuth();
+    clearAuth(scope);
     return null;
   }
-  localStorage.setItem(AUTH_KEY, JSON.stringify(auth));
-  localStorage.removeItem('admin_session');
-  localStorage.removeItem('super_admin_session');
+  localStorage.setItem(AUTH_KEYS[scope], JSON.stringify(auth));
+  localStorage.removeItem(LEGACY_KEY);
   return auth;
 }
 
-export function clearAuth() {
-  localStorage.removeItem(AUTH_KEY);
-  localStorage.removeItem('admin_session');
-  localStorage.removeItem('super_admin_session');
+export function clearAuth(scope = authScopeFromPath()) {
+  localStorage.removeItem(AUTH_KEYS[scope]);
+  if (scope === 'portal') localStorage.removeItem(LEGACY_KEY);
 }
 
 export function canAccessPage(auth, page) {
   const role = auth?.role;
   if (!role) return false;
   if (page === 'superadmin') return role === 'superadmin';
-  if (page === 'admin') return role === 'superadmin' || role === 'admin';
-  if (page === 'userpanel' || page === 'portal') return role === 'superadmin' || role === 'admin' || role === 'user';
+  if (page === 'admin') return role === 'admin' || role === 'superadmin';
+  if (page === 'userpanel') return role === 'superadmin' || role === 'admin' || role === 'user';
+  if (page === 'portal') return role === 'user';
   return false;
 }
 
