@@ -366,9 +366,6 @@ export default function PosterGenerator({
       <div className={styles.content}>
         {currentStep === 1 && (
           <div className={styles.stepContent}>
-            <header className={styles.stepIntro}>
-              <h2 className={styles.stepHeading}>Doctor details</h2>
-            </header>
 
             {stepError && (
               <div className={styles.stepAlert} role="alert">

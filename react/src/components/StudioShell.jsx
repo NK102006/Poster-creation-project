@@ -14,11 +14,7 @@ export default function StudioShell({
     <div className={styles.page}>
       <header className={styles.header}>
         <div className={styles.headerLeft}>
-          {onBack ? (
-            <button type="button" className={styles.headerBack} onClick={onBack}>
-              ← {backLabel}
-            </button>
-          ) : null}
+
           <button type="button" className={styles.brandGroup} onClick={onBrandClick}>
             <div className={styles.logoIcon} aria-hidden="true">
               <svg viewBox="0 0 24 24" className={styles.logoMark} fill="none">
@@ -44,6 +40,13 @@ export default function StudioShell({
           </button>
         </div>
       </header>
+      {onBack && (
+        <div className={styles.subheader}>
+          <button type="button" className={styles.headerBack} onClick={onBack}>
+            ← {backLabel}
+          </button>
+        </div>
+      )}
       <main className={styles.main}>{children}</main>
     </div>
   );

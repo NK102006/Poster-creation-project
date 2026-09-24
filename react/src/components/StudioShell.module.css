@@ -16,8 +16,18 @@
   top: 0;
   z-index: 20;
 }
-
-.headerLeft {
+  
+  .subheader {
+    width: 100%;
+    padding: 16px 32px 0;
+    display: flex;
+    justify-content: flex-start;
+    margin-bottom: -40px;
+    position: relative;
+    z-index: 10;
+  }
+  
+  .headerLeft {
   display: flex;
   align-items: center;
   gap: 14px;
