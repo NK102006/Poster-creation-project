@@ -92,7 +92,7 @@ export default function ExistingDoctorsPage({ user, onLogout, onBack, onSelectDo
           id="doctor-search"
           className={styles.searchInput}
           type="search"
-          placeholder="Search by name"
+          placeholder="Search by name, phone, clinic, or degree"
           value={query}
           onChange={(e) => {
             setQuery(e.target.value);

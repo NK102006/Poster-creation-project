@@ -3,7 +3,7 @@ import DataTable from 'datatables.net-dt';
 import 'datatables.net-dt/css/dataTables.dataTables.css';
 import { apiRequest } from '../lib/apiClient';
 import { canAccessPage, clearAuth, readAuth, writeAuth } from '../lib/authSession';
-import { sanitizePasswordInput, validateNewPassword } from '../features/auth/validators';
+import { sanitizePasswordInput, sanitizeUsernameInput, validateNewPassword, validatePassword } from '../features/auth/validators';
 import StaffLogin from './StaffLogin';
 import UsersDoctorsBoard from './UsersDoctorsBoard';
 import styles from './AdminPortal.module.css';
@@ -186,7 +186,8 @@ export default function SuperAdminPortal() {
 
     const errors = {};
     if (!username.trim()) errors.username = 'Username is required';
-    if (!password) errors.password = 'Password is required';
+    const loginPasswordError = validatePassword(password);
+    if (loginPasswordError) errors.password = loginPasswordError;
     if (Object.keys(errors).length > 0) {
       setLoginFieldErrors(errors);
       return;
@@ -275,6 +276,7 @@ export default function SuperAdminPortal() {
         }}
         onSubmit={handleLogin}
         fieldErrors={loginFieldErrors}
+        disableAutofill
       />
     );
   }
@@ -374,13 +376,15 @@ export default function SuperAdminPortal() {
         <div className={styles.modalOverlay} onClick={() => setShowModal(false)}>
           <div className={styles.modal} role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()}>
             <h2 className={styles.modalTitle}>{editingAdmin ? 'Edit admin' : 'Add admin'}</h2>
-            <form onSubmit={saveAdmin} className={styles.form} noValidate>
+            <form onSubmit={saveAdmin} className={styles.form} noValidate autoComplete="off">
               <label className={styles.field}>
                 <span>Username</span>
                 <input
                   value={form.username}
+                  name="admin-username"
+                  autoComplete="off"
                   onChange={(event) => {
-                    setForm((prev) => ({ ...prev, username: event.target.value }));
+                    setForm((prev) => ({ ...prev, username: sanitizeUsernameInput(event.target.value) }));
                     if (formErrors.username) setFormErrors((prev) => ({ ...prev, username: null }));
                   }}
                 />
@@ -395,7 +399,8 @@ export default function SuperAdminPortal() {
                     setForm((prev) => ({ ...prev, password: sanitizePasswordInput(event.target.value) }));
                     if (formErrors.password) setFormErrors((prev) => ({ ...prev, password: null }));
                   }}
-                  autoComplete="new-password"
+                  autoComplete="off"
+                  name="admin-password"
                 />
                 {formErrors.password && <span className={styles.fieldError}>{formErrors.password}</span>}
               </label>

@@ -3,6 +3,7 @@ import { apiRequest } from '../lib/apiClient';
 import StudioShell from '../components/StudioShell';
 import LogoCanvas from '../components/LogoCanvas';
 import { getSendDateForIndex } from '../lib/posterSchedule';
+import { sanitizePhoneInput, validatePhoneNumber } from '../features/auth/validators';
 import styles from './DoctorManagePage.module.css';
 
 const EMPTY_FORM = {
@@ -75,7 +76,8 @@ export default function DoctorManagePage({
     if (!form.name.trim()) errs.name = 'Doctor name is required';
     if (!form.doctorDegree.trim()) errs.doctorDegree = "Doctor's degree is required";
     if (!form.clinicName.trim()) errs.clinicName = 'Clinic / Hospital name is required';
-    if (!form.contactnumber.trim()) errs.contactnumber = 'Contact number is required';
+    const phoneError = validatePhoneNumber(form.contactnumber);
+    if (phoneError) errs.contactnumber = phoneError;
     
     if (Object.keys(errs).length > 0) {
       setFormFieldErrors(errs);
@@ -326,9 +328,12 @@ export default function DoctorManagePage({
               <label className={styles.field}>
                 <span>WhatsApp contact</span>
                 <input
+                  type="tel"
+                  inputMode="numeric"
+                  maxLength={10}
                   value={form.contactnumber}
                   onChange={(e) => {
-                    setForm((p) => ({ ...p, contactnumber: e.target.value }));
+                    setForm((p) => ({ ...p, contactnumber: sanitizePhoneInput(e.target.value) }));
                     if (formFieldErrors.contactnumber) setFormFieldErrors((p) => ({ ...p, contactnumber: null }));
                   }}
                 />

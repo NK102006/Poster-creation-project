@@ -95,6 +95,18 @@ const adminSchema = new mongoose.Schema({
   password: { type: String, required: true },
 }, { timestamps: true });
 
+function assertContactNumber(value, { required = true } = {}) {
+  const digits = String(value ?? '').replace(/\D/g, '');
+  if (!digits) {
+    if (!required) return null;
+    throw Object.assign(new Error('Contact number must be exactly 10 digits'), { status: 400 });
+  }
+  if (digits.length !== 10) {
+    throw Object.assign(new Error('Contact number must be exactly 10 digits'), { status: 400 });
+  }
+  return Number(digits);
+}
+
 function isHashedPassword(value) {
   return /^\$2[aby]\$\d{2}\$[./A-Za-z0-9]{53}$/.test(String(value || ''));
 }
@@ -515,7 +527,24 @@ app.get('/api/doctors', async (req, res) => {
     }
 
     if (q) {
-      filter.name = { $regex: q, $options: 'i' };
+      const escaped = escapeRegex(q);
+      const or = [
+        { name: { $regex: escaped, $options: 'i' } },
+        { clinicName: { $regex: escaped, $options: 'i' } },
+        { doctorDegree: { $regex: escaped, $options: 'i' } },
+      ];
+      const digits = q.replace(/\D/g, '');
+      if (digits) {
+        or.push({
+          $expr: {
+            $regexMatch: {
+              input: { $toString: { $ifNull: ['$contactnumber', ''] } },
+              regex: escapeRegex(digits),
+            },
+          },
+        });
+      }
+      filter.$or = or;
     }
 
     const [doctors, totalFiltered, total] = await Promise.all([
@@ -584,9 +613,8 @@ app.put('/api/doctors/:id', upload.any(), async (req, res) => {
       }
       doctor.doctorDegree = cleaned;
     }
-    if (contactnumber != null) {
-      doctor.contactnumber =
-        Number(String(contactnumber).replace(/\D/g, '')) || doctor.contactnumber;
+    if (contactnumber != null && String(contactnumber).trim() !== '') {
+      doctor.contactnumber = assertContactNumber(contactnumber);
     }
     if (active != null) doctor.active = String(active) !== 'false' && active !== false;
     
@@ -602,7 +630,7 @@ app.put('/api/doctors/:id', upload.any(), async (req, res) => {
     });
   } catch (error) {
     console.error('Error updating doctor:', error);
-    return res.status(500).json({ message: 'Failed to update doctor' });
+    return res.status(error.status || 500).json({ message: error.message || 'Failed to update doctor' });
   }
 });
 
@@ -701,7 +729,9 @@ app.post('/api/doctors', requireAuth('superadmin', 'admin', 'user'), upload.any(
   }
 
   try {
-    const cleanedContact = Number(String(contactnumber || '').replace(/\D/g, '')) || 9999999999;
+    const cleanedContact = contactnumber
+      ? assertContactNumber(contactnumber)
+      : 9999999999;
     const cleanedDegree = String(doctorDegree).trim();
 
     if (cleanedContact !== 9999999999) {
@@ -820,7 +850,7 @@ app.post('/api/doctors', requireAuth('superadmin', 'admin', 'user'), upload.any(
     });
   } catch (error) {
     console.error('Error saving doctor and poster:', error);
-    return res.status(500).json({ message: 'Failed to save doctor and poster', error: error.message });
+    return res.status(error.status || 500).json({ message: error.message || 'Failed to save doctor and poster' });
   }
 });
 
@@ -1750,13 +1780,22 @@ app.get('/api/admin/datatables/:collection', requireAuth('superadmin', 'admin', 
     const filter = { ...scope };
     if (searchValue) {
       if (collection === 'doctors') {
+        const escapedSearch = escapeRegex(searchValue);
         const or = [
-          { name: { $regex: searchValue, $options: 'i' } },
-          { clinicName: { $regex: searchValue, $options: 'i' } },
+          { name: { $regex: escapedSearch, $options: 'i' } },
+          { clinicName: { $regex: escapedSearch, $options: 'i' } },
+          { doctorDegree: { $regex: escapedSearch, $options: 'i' } },
         ];
-        const asNumber = Number(searchValue.replace(/\D/g, ''));
-        if (!Number.isNaN(asNumber) && searchValue.replace(/\D/g, '').length > 0) {
-          or.push({ contactnumber: asNumber });
+        const digits = searchValue.replace(/\D/g, '');
+        if (digits) {
+          or.push({
+            $expr: {
+              $regexMatch: {
+                input: { $toString: { $ifNull: ['$contactnumber', ''] } },
+                regex: escapeRegex(digits),
+              },
+            },
+          });
         }
         if (/^[a-f\d]{24}$/i.test(searchValue)) {
           or.push({ _id: searchValue });
@@ -1819,12 +1858,11 @@ app.post('/api/admin/collections/:collection', requireAuth('superadmin', 'admin'
     const createData = { ...req.body };
     if (req.params.collection === 'doctors') {
       if (createData.contactnumber) {
-         const cleanedContact = Number(String(createData.contactnumber).replace(/\D/g, ''));
-         if (cleanedContact && cleanedContact !== 9999999999) {
-           const existingDoc = await Doctor.findOne({ contactnumber: cleanedContact });
-           if (existingDoc) {
-             return res.status(400).json({ message: 'This mobile number already exists for another doctor.' });
-           }
+         const cleanedContact = assertContactNumber(createData.contactnumber);
+         createData.contactnumber = cleanedContact;
+         const existingDoc = await Doctor.findOne({ contactnumber: cleanedContact });
+         if (existingDoc) {
+           return res.status(400).json({ message: 'This mobile number already exists for another doctor.' });
          }
       }
 
@@ -1863,7 +1901,7 @@ app.post('/api/admin/collections/:collection', requireAuth('superadmin', 'admin'
     await doc.save();
     res.status(201).json({ success: true, data: req.params.collection === 'doctors' ? formatDoctor(doc) : doc });
   } catch (err) {
-    res.status(500).json({ message: 'Error creating document', error: err.message });
+    res.status(err.status || 500).json({ message: err.message || 'Error creating document' });
   }
 });
 
@@ -1883,12 +1921,11 @@ app.put('/api/admin/collections/:collection/:id', requireAuth('superadmin', 'adm
     const updateData = { ...req.body };
     if (req.params.collection === 'doctors') {
       if (updateData.contactnumber) {
-         const cleanedContact = Number(String(updateData.contactnumber).replace(/\D/g, ''));
-         if (cleanedContact && cleanedContact !== 9999999999) {
-           const existingDoc = await Doctor.findOne({ contactnumber: cleanedContact });
-           if (existingDoc && String(existingDoc._id) !== String(req.params.id)) {
-             return res.status(400).json({ message: 'This mobile number already exists for another doctor.' });
-           }
+         const cleanedContact = assertContactNumber(updateData.contactnumber);
+         updateData.contactnumber = cleanedContact;
+         const existingDoc = await Doctor.findOne({ contactnumber: cleanedContact });
+         if (existingDoc && String(existingDoc._id) !== String(req.params.id)) {
+           return res.status(400).json({ message: 'This mobile number already exists for another doctor.' });
          }
       }
 
@@ -1920,7 +1957,7 @@ app.put('/api/admin/collections/:collection/:id', requireAuth('superadmin', 'adm
     
     res.status(200).json({ success: true, data: req.params.collection === 'doctors' ? formatDoctor(doc) : doc });
   } catch (err) {
-    res.status(500).json({ message: 'Error updating document', error: err.message });
+    res.status(err.status || 500).json({ message: err.message || 'Error updating document' });
   }
 });
 

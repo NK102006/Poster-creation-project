@@ -4,6 +4,7 @@ import 'datatables.net-dt/css/dataTables.dataTables.css';
 import { apiRequest } from '../lib/apiClient';
 import { canAccessPage, clearAuth, readAuth, writeAuth } from '../lib/authSession';
 import StaffLogin from './StaffLogin';
+import { sanitizePhoneInput, validatePassword, validatePhoneNumber } from '../features/auth/validators';
 import styles from './AdminPortal.module.css';
 
 function getItemId(item) {
@@ -39,7 +40,8 @@ export default function UserPanel() {
 
     const errors = {};
     if (!username.trim()) errors.username = 'Username or Employee ID is required';
-    if (!password) errors.password = 'Password is required';
+    const loginPasswordError = validatePassword(password);
+    if (loginPasswordError) errors.password = loginPasswordError;
 
     if (Object.keys(errors).length > 0) {
       setLoginFieldErrors(errors);
@@ -230,6 +232,11 @@ export default function UserPanel() {
     const errors = {};
     const requiredFields = ['name', 'doctorDegree', 'clinicName', 'contactnumber'];
     for (const f of requiredFields) {
+      if (f === 'contactnumber') {
+        const phoneError = validatePhoneNumber(formData.contactnumber);
+        if (phoneError) errors.contactnumber = phoneError;
+        continue;
+      }
       if (!formData[f] || !String(formData[f]).trim()) {
         errors[f] = `${formatLabel(f)} is required`;
       }
@@ -376,9 +383,14 @@ export default function UserPanel() {
                   <span>{formatLabel(field)}</span>
                   <input
                     type="text"
+                    inputMode={field === 'contactnumber' ? 'numeric' : undefined}
+                    maxLength={field === 'contactnumber' ? 10 : undefined}
                     value={formData[field] ?? ''}
                     onChange={(event) => {
-                      setFormData((prev) => ({ ...prev, [field]: event.target.value }));
+                      const next = field === 'contactnumber'
+                        ? sanitizePhoneInput(event.target.value)
+                        : event.target.value;
+                      setFormData((prev) => ({ ...prev, [field]: next }));
                       if (formFieldErrors[field]) setFormFieldErrors((prev) => ({ ...prev, [field]: null }));
                     }}
                   />

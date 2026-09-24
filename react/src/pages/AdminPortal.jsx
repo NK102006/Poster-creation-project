@@ -5,6 +5,7 @@ import JSZip from 'jszip';
 import { apiRequest } from '../lib/apiClient';
 import { canAccessPage, clearAuth, readAuth, writeAuth } from '../lib/authSession';
 import StaffLogin from './StaffLogin';
+import { validatePassword } from '../features/auth/validators';
 import UsersDoctorsBoard from './UsersDoctorsBoard';
 import styles from './AdminPortal.module.css';
 
@@ -70,7 +71,8 @@ export default function AdminPortal() {
 
     const errors = {};
     if (!username.trim()) errors.username = 'Username is required';
-    if (!password) errors.password = 'Password is required';
+    const loginPasswordError = validatePassword(password);
+    if (loginPasswordError) errors.password = loginPasswordError;
     if (Object.keys(errors).length > 0) {
       setLoginFieldErrors(errors);
       return;
