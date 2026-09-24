@@ -25,6 +25,7 @@ export default function UserPanel() {
   const [loginError, setLoginError] = useState('');
   const [loginFieldErrors, setLoginFieldErrors] = useState({});
   const [showModal, setShowModal] = useState(false);
+  const [closingModal, setClosingModal] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
   const [formData, setFormData] = useState({});
   const [formFieldErrors, setFormFieldErrors] = useState({});
@@ -83,6 +84,7 @@ export default function UserPanel() {
       setEditingItem(item);
       setFormData({ ...item });
       setShowModal(true);
+      setClosingModal(false);
     };
 
     const removeRow = async (id) => {
@@ -228,6 +230,15 @@ export default function UserPanel() {
     setFormData({ name: '', clinicName: '', contactnumber: '', doctorDegree: '' });
     setFormFieldErrors({});
     setShowModal(true);
+    setClosingModal(false);
+  };
+
+  const closeModal = () => {
+    setClosingModal(true);
+    setTimeout(() => {
+      setShowModal(false);
+      setClosingModal(false);
+    }, 100);
   };
 
   const handleSave = async (event) => {
@@ -265,7 +276,7 @@ export default function UserPanel() {
           body: formData,
         });
       }
-      setShowModal(false);
+      closeModal();
       reloadTable();
     } catch (err) {
       alert('Save failed: ' + err.message);
@@ -378,7 +389,7 @@ export default function UserPanel() {
       </div>
 
       {showModal && (
-        <div className={styles.modalOverlay} onClick={() => setShowModal(false)}>
+        <div className={`${styles.modalOverlay} ${closingModal ? styles.closing : ''}`} onClick={closeModal}>
           <div className={styles.modal} role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()}>
             <h2 className={styles.modalTitle}>{editingItem ? 'Edit doctor' : 'Add doctor'}</h2>
             <form onSubmit={handleSave} className={styles.form}>
@@ -402,7 +413,7 @@ export default function UserPanel() {
                 </label>
               ))}
               <div className={styles.modalActions}>
-                <button type="button" className={styles.secondaryBtn} onClick={() => setShowModal(false)}>
+                <button type="button" className={styles.secondaryBtn} onClick={closeModal}>
                   Cancel
                 </button>
                 <button type="submit" className={styles.primaryBtn} disabled={saving}>

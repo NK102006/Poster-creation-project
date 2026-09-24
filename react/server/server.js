@@ -72,7 +72,6 @@ function normalizePosterKind(value, imageHint = '') {
 
 const doctorSchema = new mongoose.Schema({
   ownerUser: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null, index: true },
-  ownerAdmin: { type: mongoose.Schema.Types.ObjectId, ref: 'Admin', default: null, index: true },
   name: { type: String, required: true },
   clinicName: { type: String, required: true, trim: true },
   doctorDegree: { type: String, trim: true, default: '' },
@@ -251,14 +250,13 @@ async function doctorQueryForAuth(auth, { adminId } = {}) {
   if (auth.role === 'superadmin') {
     if (adminId) {
       const ids = await userIdsForAdmin(adminId);
-      return { $or: [{ ownerUser: { $in: ids } }, { ownerAdmin: adminId }] };
+      return { ownerUser: { $in: ids } };
     }
     return {};
   }
   if (auth.role === 'admin') {
-    const scopedAdminId = auth.id;
-    const ids = await userIdsForAdmin(scopedAdminId);
-    return { $or: [{ ownerUser: { $in: ids } }, { ownerAdmin: scopedAdminId }] };
+    const ids = await userIdsForAdmin(auth.id);
+    return { ownerUser: { $in: ids } };
   }
   if (auth.role === 'user') {
     return { ownerUser: auth.id };
@@ -288,7 +286,6 @@ async function canAccessDoctor(auth, doctor) {
   if (!doctor) return false;
   if (auth.role === 'superadmin') return true;
   if (auth.role === 'admin') {
-    if (String(doctor.ownerAdmin || '') === String(auth.id)) return true;
     if (!doctor.ownerUser) return false;
     const owner = await User.findById(doctor.ownerUser).select('ownerAdmin');
     return String(owner?.ownerAdmin || '') === String(auth.id);
@@ -363,7 +360,6 @@ function formatDoctor(doc, { includePosters = false, light = false } = {}) {
     postersMade,
     downloadCount,
     ownerUser: obj.ownerUser ? String(obj.ownerUser) : null,
-    ownerAdmin: obj.ownerAdmin ? String(obj.ownerAdmin) : null,
     createdAt: obj.createdAt,
     updatedAt: obj.updatedAt,
   };
@@ -520,7 +516,12 @@ app.get('/api/doctors', async (req, res) => {
     const page = Math.max(1, parseInt(req.query.page) || 1);
     const limit = Math.max(1, parseInt(req.query.limit) || 10);
     const skip = (page - 1) * limit;
-    const filter = {};
+    
+    const scopeQuery = await doctorQueryForAuth(auth);
+    if (scopeQuery._id === null) {
+      return res.status(200).json({ total: 0, totalFiltered: 0, count: 0, page: 1, totalPages: 0, doctors: [] });
+    }
+    const filter = { ...scopeQuery };
 
     if (!includeInactive) {
       filter.active = { $ne: false };
@@ -550,7 +551,7 @@ app.get('/api/doctors', async (req, res) => {
     const [doctors, totalFiltered, total] = await Promise.all([
       Doctor.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit),
       Doctor.countDocuments(filter),
-      Doctor.countDocuments(includeInactive ? {} : { active: { $ne: false } }),
+      Doctor.countDocuments({ ...scopeQuery, ...(includeInactive ? {} : { active: { $ne: false } }) }),
     ]);
 
     return res.status(200).json({
@@ -790,27 +791,19 @@ app.post('/api/doctors', requireAuth('superadmin', 'admin', 'user'), upload.any(
     const logoPath = await saveFile(logoBuffer, logoName, 'logos');
 
     let ownerUser = mongoose.isValidObjectId(ownerUserId) ? ownerUserId : null;
-    let ownerAdmin = null;
     if (req.auth?.role === 'user') {
       ownerUser = req.auth.id;
-      const creator = await User.findById(req.auth.id).select('ownerAdmin');
-      ownerAdmin = creator?.ownerAdmin || null;
     } else if (req.auth?.role === 'admin') {
-      ownerAdmin = req.auth.id;
       if (ownerUser) {
         const assigned = await User.findById(ownerUser).select('ownerAdmin');
         if (!assigned || String(assigned.ownerAdmin || '') !== String(req.auth.id)) {
           ownerUser = null;
         }
       }
-    } else if (ownerUser) {
-      const assigned = await User.findById(ownerUser).select('ownerAdmin');
-      ownerAdmin = assigned?.ownerAdmin || null;
     }
 
     const docData = {
       ownerUser,
-      ownerAdmin,
       name: name?.trim() || 'Doctor',
       clinicName: String(clinicName).trim(),
       doctorDegree: cleanedDegree,
@@ -885,6 +878,10 @@ async function createUserUnderAdmin(adminId, { empid, password }) {
     error.status = 400;
     throw error;
   }
+  const existing = await findUserByLoginId(cleanEmpid);
+  if (existing) {
+    throw Object.assign(new Error('Employee ID already exists'), { status: 409 });
+  }
   const cleanPassword = assertNewPassword(password);
   const user = await User.create({
     empid: cleanEmpid,
@@ -902,6 +899,12 @@ async function updateUserRecord(user, { empid, password, ownerAdmin }) {
       const error = new Error('Employee ID is required');
       error.status = 400;
       throw error;
+    }
+    if (cleanEmpid !== String(user.empid || '')) {
+      const existing = await findUserByLoginId(cleanEmpid);
+      if (existing && String(existing._id) !== String(user._id)) {
+        throw Object.assign(new Error('Employee ID already exists'), { status: 409 });
+      }
     }
     user.empid = cleanEmpid;
     user.id = cleanEmpid;
@@ -926,7 +929,7 @@ const USER_CSV_HEADERS = ['id', 'empid', 'password', 'ownerAdmin', 'createdAt', 
 const DOCTOR_CSV_HEADERS = [
   'id', 'name', 'clinicName', 'doctorDegree', 'contactnumber',
   'logo', 'poster', 'posters', 'downloadCount', 'active',
-  'createdAt', 'updatedAt', 'ownerUser', 'ownerAdmin',
+  'createdAt', 'updatedAt', 'ownerUser',
 ];
 
 function parseCsvText(text) {
@@ -1053,7 +1056,7 @@ function applyTimestamps(doc, row) {
   if (updatedAt) doc.updatedAt = updatedAt;
 }
 
-function applyDoctorImportFields(doctor, row, { ownerUser, ownerAdmin }) {
+function applyDoctorImportFields(doctor, row, { ownerUser }) {
   doctor.name = String(row.name || '').trim();
   doctor.clinicName = String(row.clinicName || '').trim();
   doctor.doctorDegree = String(row.doctorDegree || '').trim();
@@ -1066,7 +1069,6 @@ function applyDoctorImportFields(doctor, row, { ownerUser, ownerAdmin }) {
     : Number(row.downloadCount) || 0;
   doctor.active = parseCsvActive(row.active);
   doctor.ownerUser = ownerUser;
-  doctor.ownerAdmin = ownerAdmin;
   applyTimestamps(doctor, row);
 }
 
@@ -1279,7 +1281,7 @@ app.delete('/api/superadmin/admins/:id', requireAuth('superadmin'), async (req, 
     if (!admin) return res.status(404).json({ message: 'Admin not found' });
     const users = await User.find({ ownerAdmin: admin._id }).select('_id');
     const userIds = users.map((user) => user._id);
-    await Doctor.deleteMany({ $or: [{ ownerAdmin: admin._id }, { ownerUser: { $in: userIds } }] });
+    await Doctor.deleteMany({ ownerUser: { $in: userIds } });
     await User.deleteMany({ ownerAdmin: admin._id });
     await Admin.findByIdAndDelete(admin._id);
     return res.json({ success: true, message: 'Admin deleted' });
@@ -1573,7 +1575,6 @@ app.post('/api/admin/users/:userId/doctors/import', requireAuth('superadmin', 'a
     assertCsvHeaders(headers, DOCTOR_CSV_HEADERS);
 
     const ownerUser = user._id;
-    const ownerAdmin = user.ownerAdmin || (req.auth.role === 'admin' ? req.auth.id : null);
     let created = 0;
     let updated = 0;
     const errors = [];
@@ -1602,7 +1603,7 @@ app.post('/api/admin/users/:userId/doctors/import', requireAuth('superadmin', 'a
         }
 
         if (doctor) {
-          applyDoctorImportFields(doctor, row, { ownerUser, ownerAdmin });
+          applyDoctorImportFields(doctor, row, { ownerUser });
           await doctor.save();
           updated += 1;
         } else {
@@ -1619,7 +1620,6 @@ app.post('/api/admin/users/:userId/doctors/import', requireAuth('superadmin', 'a
             downloadCount: String(row.downloadCount ?? '').trim() === '' ? 0 : Number(row.downloadCount) || 0,
             active: parseCsvActive(row.active),
             ownerUser,
-            ownerAdmin,
             ...(createdAt ? { createdAt } : {}),
             ...(updatedAt ? { updatedAt } : {}),
           });
@@ -1885,13 +1885,8 @@ app.post('/api/admin/collections/:collection', requireAuth('superadmin', 'admin'
       }
     }
 
-    if (req.params.collection === 'doctors' && req.auth.role === 'admin') {
-      createData.ownerAdmin = req.auth.id;
-    }
     if (req.params.collection === 'doctors' && req.auth.role === 'user') {
       createData.ownerUser = req.auth.id;
-      const creator = await User.findById(req.auth.id).select('ownerAdmin');
-      createData.ownerAdmin = creator?.ownerAdmin || null;
     }
     if (req.params.collection === 'users' && req.auth.role === 'admin') {
       createData.ownerAdmin = req.auth.id;

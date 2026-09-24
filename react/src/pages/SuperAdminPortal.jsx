@@ -88,6 +88,7 @@ export default function SuperAdminPortal() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [showModal, setShowModal] = useState(false);
+  const [closingModal, setClosingModal] = useState(false);
   const [editingAdmin, setEditingAdmin] = useState(null);
   const [form, setForm] = useState({ username: '', password: '' });
   const [formErrors, setFormErrors] = useState({});
@@ -124,6 +125,7 @@ export default function SuperAdminPortal() {
       setEditingAdmin(admin);
       setForm({ username: admin.username || '', password: '' });
       setShowModal(true);
+      setClosingModal(false);
     },
     remove: async (admin) => {
       if (!window.confirm(`Delete admin ${admin.username} and every user and doctor under them?`)) return;
@@ -222,7 +224,17 @@ export default function SuperAdminPortal() {
     setEditingAdmin(null);
     setForm({ username: '', password: '' });
     setFormErrors({});
+    setError('');
     setShowModal(true);
+    setClosingModal(false);
+  };
+
+  const closeModal = () => {
+    setClosingModal(true);
+    setTimeout(() => {
+      setShowModal(false);
+      setClosingModal(false);
+    }, 200);
   };
 
   const saveAdmin = async (event) => {
@@ -253,11 +265,11 @@ export default function SuperAdminPortal() {
           body: form,
         });
       }
-      setShowModal(false);
+      closeModal();
       setSaving(false);
       loadAdmins();
     } catch (err) {
-      setError(err.message || 'Could not save admin');
+      setFormErrors({ root: err.message || 'Could not save admin' });
       setSaving(false);
     }
   };
@@ -377,9 +389,10 @@ export default function SuperAdminPortal() {
       </div>
 
       {showModal && (
-        <div className={styles.modalOverlay} onClick={() => setShowModal(false)}>
+        <div className={`${styles.modalOverlay} ${closingModal ? styles.closing : ''}`} onClick={closeModal}>
           <div className={styles.modal} role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()}>
             <h2 className={styles.modalTitle}>{editingAdmin ? 'Edit admin' : 'Add admin'}</h2>
+            {formErrors.root && <p className={styles.error} style={{ marginBottom: '16px' }}>{formErrors.root}</p>}
             <form onSubmit={saveAdmin} className={styles.form} noValidate autoComplete="off">
               <label className={styles.field}>
                 <span>Username</span>
@@ -409,7 +422,7 @@ export default function SuperAdminPortal() {
                 {formErrors.password && <span className={styles.fieldError}>{formErrors.password}</span>}
               </label>
               <div className={styles.modalActions}>
-                <button type="button" className={styles.secondaryBtn} onClick={() => setShowModal(false)}>
+                <button type="button" className={styles.secondaryBtn} onClick={closeModal}>
                   Cancel
                 </button>
                 <button type="submit" className={styles.primaryBtn} disabled={saving}>
