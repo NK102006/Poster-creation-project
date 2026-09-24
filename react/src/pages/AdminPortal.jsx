@@ -206,7 +206,17 @@ export default function AdminPortal() {
 
       <div className={styles.main}>
         <header className={styles.topbar}>
-          <div id="topbar-left"></div>
+          <div id="topbar-left" style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+            {boardContext.backLabel && (
+              <button
+                type="button"
+                className={styles.secondaryBtn}
+                onClick={() => boardContext.onNavigateBack?.()}
+              >
+                {boardContext.backLabel}
+              </button>
+            )}
+          </div>
           <div className={styles.topbarRight}>
             <div id="topbar-actions" style={{ display: 'flex', gap: '10px' }} />
             <span className={styles.adminBadge}>

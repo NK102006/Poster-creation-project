@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from 'react';
-import { createPortal } from 'react-dom';
 import DataTable from 'datatables.net-dt';
 import 'datatables.net-dt/css/dataTables.dataTables.css';
 import JSZip from 'jszip';
@@ -266,15 +265,6 @@ export default function UsersDoctorsBoard({
   const userImportRef = useRef(null);
   const navigateBackRef = useRef(() => {});
   const needsAdminPick = showAdminColumn && !adminId;
-
-  const [portalNodes, setPortalNodes] = useState({ left: null, right: null });
-
-  useEffect(() => {
-    setPortalNodes({
-      left: document.getElementById('topbar-left'),
-      right: document.getElementById('topbar-actions'),
-    });
-  }, []);
 
   const usersPath = adminId ? `/superadmin/admins/${adminId}/users` : '/admin/users';
 
@@ -672,14 +662,10 @@ export default function UsersDoctorsBoard({
 
   return (
     <>
-      {portalNodes.left && selectedUser && createPortal(leftContent, portalNodes.left)}
-      {portalNodes.right && selectedUser && createPortal(rightContent, portalNodes.right)}
-      {(!portalNodes.left || !selectedUser) && (
-        <div className={styles.toolbar}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>{leftContent}</div>
-          <div className={styles.toolbarActions}>{rightContent}</div>
-        </div>
-      )}
+      <div className={styles.toolbar}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>{leftContent}</div>
+        <div className={styles.toolbarActions}>{rightContent}</div>
+      </div>
       {error && <p className={styles.error}>{error}</p>}
       {importSummary && !selectedDoctor && (
         <p className={styles.statusText}>{importSummary}</p>
