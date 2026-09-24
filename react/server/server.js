@@ -1229,6 +1229,66 @@ app.post('/api/superadmin/admins/:adminId/users', requireAuth('superadmin'), asy
   }
 });
 
+async function importEmployeesForAdmin(adminId, fileBuffer) {
+  if (!fileBuffer) {
+    throw Object.assign(new Error('CSV file is required'), { status: 400 });
+  }
+
+  const { headers, records } = parseCsvText(fileBuffer.toString('utf8'));
+  assertCsvHeaders(headers, USER_CSV_HEADERS);
+
+  let created = 0;
+  let updated = 0;
+  const errors = [];
+
+  for (let index = 0; index < records.length; index += 1) {
+    const row = records[index];
+    const rowNumber = index + 2;
+    try {
+      const id = String(row.id || '').trim();
+      const empid = String(row.empid || '').trim();
+      const password = String(row.password || '');
+      if (!empid) {
+        throw Object.assign(new Error('Employee ID is required'), { status: 400 });
+      }
+
+      let user = null;
+      if (id && mongoose.isValidObjectId(id)) {
+        user = await User.findById(id);
+      }
+      if (!user) {
+        user = await findUserByLoginId(empid);
+      }
+
+      if (user) {
+        await updateUserRecord(user, { empid, password, ownerAdmin: adminId });
+        applyTimestamps(user, row);
+        await user.save();
+        updated += 1;
+      } else {
+        if (!password.trim()) {
+          throw Object.assign(new Error('Password is required for a new employee'), { status: 400 });
+        }
+        const createdAt = parseCsvDate(row.createdAt);
+        const updatedAt = parseCsvDate(row.updatedAt);
+        await User.create({
+          empid,
+          id: empid,
+          password,
+          ownerAdmin: adminId,
+          ...(createdAt ? { createdAt } : {}),
+          ...(updatedAt ? { updatedAt } : {}),
+        });
+        created += 1;
+      }
+    } catch (error) {
+      errors.push({ row: rowNumber, message: error.message || 'Failed to import employee' });
+    }
+  }
+
+  return { created, updated, errors };
+}
+
 app.post('/api/superadmin/admins/:adminId/users/import', requireAuth('superadmin'), upload.single('file'), async (req, res) => {
   try {
     if (!mongoose.isValidObjectId(req.params.adminId)) {
@@ -1236,63 +1296,8 @@ app.post('/api/superadmin/admins/:adminId/users/import', requireAuth('superadmin
     }
     const admin = await Admin.findById(req.params.adminId);
     if (!admin) return res.status(404).json({ message: 'Admin not found' });
-    if (!req.file?.buffer) {
-      return res.status(400).json({ message: 'CSV file is required' });
-    }
-
-    const { headers, records } = parseCsvText(req.file.buffer.toString('utf8'));
-    assertCsvHeaders(headers, USER_CSV_HEADERS);
-
-    let created = 0;
-    let updated = 0;
-    const errors = [];
-
-    for (let index = 0; index < records.length; index += 1) {
-      const row = records[index];
-      const rowNumber = index + 2;
-      try {
-        const id = String(row.id || '').trim();
-        const empid = String(row.empid || '').trim();
-        const password = String(row.password || '');
-        if (!empid) {
-          throw Object.assign(new Error('Employee ID is required'), { status: 400 });
-        }
-
-        let user = null;
-        if (id && mongoose.isValidObjectId(id)) {
-          user = await User.findById(id);
-        }
-        if (!user) {
-          user = await findUserByLoginId(empid);
-        }
-
-        if (user) {
-          await updateUserRecord(user, { empid, password, ownerAdmin: admin._id });
-          applyTimestamps(user, row);
-          await user.save();
-          updated += 1;
-        } else {
-          if (!password.trim()) {
-            throw Object.assign(new Error('Password is required for a new employee'), { status: 400 });
-          }
-          const createdAt = parseCsvDate(row.createdAt);
-          const updatedAt = parseCsvDate(row.updatedAt);
-          await User.create({
-            empid,
-            id: empid,
-            password,
-            ownerAdmin: admin._id,
-            ...(createdAt ? { createdAt } : {}),
-            ...(updatedAt ? { updatedAt } : {}),
-          });
-          created += 1;
-        }
-      } catch (error) {
-        errors.push({ row: rowNumber, message: error.message || 'Failed to import employee' });
-      }
-    }
-
-    return res.json({ success: true, created, updated, errors });
+    const result = await importEmployeesForAdmin(admin._id, req.file?.buffer);
+    return res.json({ success: true, ...result });
   } catch (error) {
     return res.status(error.status || 500).json({ message: error.message || 'Failed to import employees' });
   }
@@ -1370,6 +1375,23 @@ app.get('/api/admin/users', requireAuth('superadmin', 'admin'), async (req, res)
   } catch (error) {
     console.error('Error fetching admin users:', error);
     return res.status(500).json({ message: 'Failed to retrieve users' });
+  }
+});
+
+app.post('/api/admin/users/import', requireAuth('superadmin', 'admin'), upload.single('file'), async (req, res) => {
+  try {
+    const requestedAdmin = req.body?.ownerAdmin || req.query.adminId;
+    const adminId = req.auth.role === 'admin' ? req.auth.id : requestedAdmin;
+    if (!mongoose.isValidObjectId(adminId)) {
+      return res.status(400).json({ message: 'An admin must be selected to import employees' });
+    }
+    if (req.auth.role === 'admin' && String(adminId) !== String(req.auth.id)) {
+      return res.status(403).json({ message: 'Admins can only import employees under themselves' });
+    }
+    const result = await importEmployeesForAdmin(adminId, req.file?.buffer);
+    return res.json({ success: true, ...result });
+  } catch (error) {
+    return res.status(error.status || 500).json({ message: error.message || 'Failed to import employees' });
   }
 });
 

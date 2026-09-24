@@ -261,7 +261,6 @@ export default function UsersDoctorsBoard({
   const [importing, setImporting] = useState(false);
   const [importSummary, setImportSummary] = useState('');
   const userImportRef = useRef(null);
-  const doctorImportRef = useRef(null);
   const needsAdminPick = showAdminColumn && !adminId;
 
   const usersPath = adminId ? `/superadmin/admins/${adminId}/users` : '/admin/users';
@@ -433,14 +432,17 @@ export default function UsersDoctorsBoard({
   const importUsers = async (event) => {
     const file = event.target.files?.[0];
     event.target.value = '';
-    if (!file || !adminId) return;
+    if (!file) return;
     setImporting(true);
     setError('');
     setImportSummary('');
     try {
       const data = new FormData();
       data.append('file', file);
-      const result = await apiRequest(`/superadmin/admins/${adminId}/users/import`, {
+      const path = adminId
+        ? `/superadmin/admins/${adminId}/users/import`
+        : '/admin/users/import';
+      const result = await apiRequest(path, {
         method: 'POST',
         body: data,
       });
@@ -448,29 +450,6 @@ export default function UsersDoctorsBoard({
       await loadUsers();
     } catch (err) {
       setError(err.message || 'Could not import employees');
-    } finally {
-      setImporting(false);
-    }
-  };
-
-  const importDoctors = async (event) => {
-    const file = event.target.files?.[0];
-    event.target.value = '';
-    if (!file || !selectedUser) return;
-    setImporting(true);
-    setError('');
-    setImportSummary('');
-    try {
-      const data = new FormData();
-      data.append('file', file);
-      const result = await apiRequest(`/admin/users/${String(selectedUser.id)}/doctors/import`, {
-        method: 'POST',
-        body: data,
-      });
-      setImportSummary(formatImportSummary(result));
-      await selectUser(selectedUser);
-    } catch (err) {
-      setError(err.message || 'Could not import doctors');
     } finally {
       setImporting(false);
     }
@@ -623,25 +602,21 @@ export default function UsersDoctorsBoard({
         <div className={styles.toolbarActions}>
           {!selectedUser && (
             <>
-              {adminId && (
-                <>
-                  <input
-                    ref={userImportRef}
-                    type="file"
-                    accept=".csv,text/csv"
-                    hidden
-                    onChange={importUsers}
-                  />
-                  <button
-                    type="button"
-                    className={styles.secondaryBtn}
-                    onClick={() => userImportRef.current?.click()}
-                    disabled={importing}
-                  >
-                    {importing ? 'Importing…' : 'Import'}
-                  </button>
-                </>
-              )}
+              <input
+                ref={userImportRef}
+                type="file"
+                accept=".csv,text/csv"
+                hidden
+                onChange={importUsers}
+              />
+              <button
+                type="button"
+                className={styles.secondaryBtn}
+                onClick={() => userImportRef.current?.click()}
+                disabled={importing}
+              >
+                {importing ? 'Importing…' : 'Import employee'}
+              </button>
               <button type="button" className={styles.secondaryBtn} onClick={exportUsers}>
                 Export users
               </button>
@@ -656,25 +631,6 @@ export default function UsersDoctorsBoard({
                 <button type="button" className={styles.primaryBtn} onClick={() => setShowPosters(true)}>
                   Show posters
                 </button>
-              )}
-              {!selectedDoctor && (
-                <>
-                  <input
-                    ref={doctorImportRef}
-                    type="file"
-                    accept=".csv,text/csv"
-                    hidden
-                    onChange={importDoctors}
-                  />
-                  <button
-                    type="button"
-                    className={styles.secondaryBtn}
-                    onClick={() => doctorImportRef.current?.click()}
-                    disabled={importing}
-                  >
-                    {importing ? 'Importing…' : 'Import doctors'}
-                  </button>
-                </>
               )}
               <button type="button" className={styles.secondaryBtn} onClick={exportDoctors}>
                 Export doctors
