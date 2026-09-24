@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import mongoose from 'mongoose';
+import bcrypt from 'bcryptjs';
 import multer from 'multer';
 import dotenv from 'dotenv';
 import session from 'express-session';
@@ -93,6 +94,48 @@ const adminSchema = new mongoose.Schema({
   username: { type: String, required: true, unique: true, trim: true },
   password: { type: String, required: true },
 }, { timestamps: true });
+
+function isHashedPassword(value) {
+  return /^\$2[aby]\$\d{2}\$[./A-Za-z0-9]{53}$/.test(String(value || ''));
+}
+
+async function hashPassword(value) {
+  const password = String(value || '');
+  if (!password || isHashedPassword(password)) return password;
+  return bcrypt.hash(password, 10);
+}
+
+async function verifyPassword(plain, stored) {
+  const candidate = String(plain || '');
+  const current = stored != null ? String(stored) : '';
+  if (!candidate || !current) return false;
+  if (isHashedPassword(current)) return bcrypt.compare(candidate, current);
+  return candidate === current;
+}
+
+function attachPasswordHashing(schema) {
+  schema.pre('save', async function hashStoredPassword() {
+    if (!this.isModified('password')) return;
+    this.password = await hashPassword(this.password);
+  });
+}
+
+async function ensureHashedPasswords(Model, fallback = 'pass1234') {
+  const docs = await Model.find();
+  let count = 0;
+  for (const doc of docs) {
+    const current = doc.password != null ? String(doc.password) : '';
+    if (isHashedPassword(current)) continue;
+    doc.password = current || fallback;
+    doc.markModified('password');
+    await doc.save();
+    count += 1;
+  }
+  return count;
+}
+
+attachPasswordHashing(userSchema);
+attachPasswordHashing(adminSchema);
 
 export const Doctor = mongoose.model('Doctor', doctorSchema);
 export const User = mongoose.model('User', userSchema);
@@ -387,7 +430,7 @@ app.post('/api/login', async (req, res) => {
     }
 
     const admin = await findAdminByUsername(loginId);
-    if (admin && String(admin.password) === pass) {
+    if (admin && await verifyPassword(pass, admin.password)) {
       const auth = setAuthSession(req, buildAuthPayload('admin', admin));
       return res.status(200).json({ success: true, message: 'Login successful', user: auth, auth });
     }
@@ -397,8 +440,7 @@ app.post('/api/login', async (req, res) => {
       return res.status(401).json({ success: false, message: 'Invalid employee ID or password' });
     }
 
-    const storedPassword = user.password != null ? String(user.password) : '';
-    if (!storedPassword || storedPassword !== pass) {
+    if (!(await verifyPassword(pass, user.password))) {
       return res.status(401).json({ success: false, message: 'Invalid employee ID or password' });
     }
 
@@ -1011,7 +1053,7 @@ app.post('/api/admin/login', async (req, res) => {
   }
   try {
     const admin = await findAdminByUsername(loginId);
-    if (!admin || String(admin.password) !== pass) {
+    if (!admin || !(await verifyPassword(pass, admin.password))) {
       return res.status(401).json({ success: false, message: 'Invalid admin credentials' });
     }
     const auth = setAuthSession(req, buildAuthPayload('admin', admin));
@@ -1035,12 +1077,12 @@ app.post('/api/userpanel/login', async (req, res) => {
   }
   try {
     const admin = await findAdminByUsername(loginId);
-    if (admin && String(admin.password) === pass) {
+    if (admin && await verifyPassword(pass, admin.password)) {
       const auth = setAuthSession(req, buildAuthPayload('admin', admin));
       return res.status(200).json({ success: true, message: 'Login successful', auth });
     }
     const user = await findUserByLoginId(loginId);
-    if (user && String(user.password || '') === pass) {
+    if (user && await verifyPassword(pass, user.password)) {
       const auth = setAuthSession(req, buildAuthPayload('user', user));
       return res.status(200).json({ success: true, message: 'Login successful', auth });
     }
@@ -2014,14 +2056,11 @@ const startServer = async () => {
     await mongoose.connect(MONGODB_URI);
     console.log(`Connected to MongoDB at ${MONGODB_URI}`);
 
-    // Backfill passwords for older user records so login keeps working
-    const passwordBackfill = await User.updateMany(
-      { $or: [{ password: { $exists: false } }, { password: null }, { password: '' }] },
-      { $set: { password: 'pass1234' } }
-    );
-    if (passwordBackfill.modifiedCount) {
-      console.log(`Backfilled password for ${passwordBackfill.modifiedCount} user(s)`);
-    }
+    // Keep missing passwords usable, then store every leftover plaintext password as a hash
+    const hashedUsers = await ensureHashedPasswords(User);
+    const hashedAdmins = await ensureHashedPasswords(Admin);
+    if (hashedUsers) console.log(`Hashed password for ${hashedUsers} user(s)`);
+    if (hashedAdmins) console.log(`Hashed password for ${hashedAdmins} admin(s)`);
 
     // Backfill clinic name for older doctor records
     const clinicBackfill = await Doctor.updateMany(
