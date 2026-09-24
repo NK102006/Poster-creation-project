@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import DataTable from 'datatables.net-dt';
 import 'datatables.net-dt/css/dataTables.dataTables.css';
 import JSZip from 'jszip';
@@ -262,6 +263,15 @@ export default function UsersDoctorsBoard({
   const [importSummary, setImportSummary] = useState('');
   const userImportRef = useRef(null);
   const needsAdminPick = showAdminColumn && !adminId;
+
+  const [portalNodes, setPortalNodes] = useState({ left: null, right: null });
+
+  useEffect(() => {
+    setPortalNodes({
+      left: document.getElementById('topbar-left'),
+      right: document.getElementById('topbar-actions'),
+    });
+  }, []);
 
   const usersPath = adminId ? `/superadmin/admins/${adminId}/users` : '/admin/users';
 
@@ -572,35 +582,39 @@ export default function UsersDoctorsBoard({
 
   const doctorPosters = selectedDoctor?.posters || [];
 
-  return (
+  const leftContent = (
     <>
-      <div className={styles.toolbar}>
-        <div>
-          {onBack && !selectedUser && (
-            <button type="button" className={styles.secondaryBtn} onClick={onBack}>
-              {backLabel}
-            </button>
-          )}
-          {selectedUser && (
-            <button
-              type="button"
-              className={styles.secondaryBtn}
-              onClick={() => {
-                setShowPosters(false);
-                if (selectedDoctor) {
-                  setSelectedDoctor(null);
-                  return;
-                }
-                setSelectedUser(null);
-                setDoctors([]);
-              }}
-            >
-              {selectedDoctor ? '← Doctors' : '← Users'}
-            </button>
-          )}
-        </div>
-        <div className={styles.toolbarActions}>
-          {!selectedUser && (
+      {onBack && !selectedUser && (
+        <button type="button" className={styles.secondaryBtn} onClick={onBack}>
+          {backLabel}
+        </button>
+      )}
+      {selectedUser && (
+        <button
+          type="button"
+          className={styles.secondaryBtn}
+          onClick={() => {
+            setShowPosters(false);
+            if (selectedDoctor) {
+              setSelectedDoctor(null);
+              return;
+            }
+            setSelectedUser(null);
+            setDoctors([]);
+          }}
+        >
+          {selectedDoctor ? '← Doctors' : '← Users'}
+        </button>
+      )}
+      <h1 className={styles.pageTitle} style={{ margin: 0 }}>{page}</h1>
+    </>
+  );
+
+  const rightContent = (
+    <>
+      {!selectedUser && (
+        <>
+          {adminId && (
             <>
               <input
                 ref={userImportRef}
@@ -617,30 +631,41 @@ export default function UsersDoctorsBoard({
               >
                 {importing ? 'Importing…' : 'Import employee'}
               </button>
-              <button type="button" className={styles.secondaryBtn} onClick={exportUsers}>
-                Export users
-              </button>
-              <button type="button" className={styles.primaryBtn} onClick={openCreateUser}>
-                + Add user
-              </button>
             </>
           )}
-          {selectedUser && (
-            <>
-              {selectedDoctor && (
-                <button type="button" className={styles.primaryBtn} onClick={() => setShowPosters(true)}>
-                  Show posters
-                </button>
-              )}
-              <button type="button" className={styles.secondaryBtn} onClick={exportDoctors}>
-                Export doctors
-              </button>
-            </>
+          <button type="button" className={styles.secondaryBtn} onClick={exportUsers}>
+            Export users
+          </button>
+          <button type="button" className={styles.primaryBtn} onClick={openCreateUser}>
+            + Add user
+          </button>
+        </>
+      )}
+      {selectedUser && (
+        <>
+          {selectedDoctor && (
+            <button type="button" className={styles.primaryBtn} onClick={() => setShowPosters(true)}>
+              Show posters
+            </button>
           )}
-        </div>
-      </div>
+          <button type="button" className={styles.secondaryBtn} onClick={exportDoctors}>
+            Export doctors
+          </button>
+        </>
+      )}
+    </>
+  );
 
-      <h1 className={styles.pageTitle} style={{ marginTop: 0, marginBottom: 16 }}>{page}</h1>
+  return (
+    <>
+      {portalNodes.left && selectedUser && createPortal(leftContent, portalNodes.left)}
+      {portalNodes.right && selectedUser && createPortal(rightContent, portalNodes.right)}
+      {(!portalNodes.left || !selectedUser) && (
+        <div className={styles.toolbar}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>{leftContent}</div>
+          <div className={styles.toolbarActions}>{rightContent}</div>
+        </div>
+      )}
       {error && <p className={styles.error}>{error}</p>}
       {importSummary && !selectedDoctor && (
         <p className={styles.statusText}>{importSummary}</p>

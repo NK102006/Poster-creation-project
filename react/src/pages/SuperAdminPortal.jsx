@@ -306,10 +306,13 @@ export default function SuperAdminPortal() {
 
       <div className={styles.main}>
         <header className={styles.topbar}>
-          <h1 className={styles.pageTitle}>
-            {selectedAdmin ? `${selectedAdmin.username}’s users` : 'Admins'}
-          </h1>
+          <div id="topbar-left" style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+            {!selectedAdmin && (
+              <h1 className={styles.pageTitle}>Admins</h1>
+            )}
+          </div>
           <div className={styles.topbarRight}>
+            <div id="topbar-actions" style={{ display: 'flex', gap: '10px' }} />
             <span className={styles.adminBadge}>Superadmin</span>
             <button type="button" className={styles.logoutBtn} onClick={handleLogout}>
               Log out

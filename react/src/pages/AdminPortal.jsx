@@ -205,8 +205,9 @@ export default function AdminPortal() {
 
       <div className={styles.main}>
         <header className={styles.topbar}>
-          <h1 className={styles.pageTitle}>Users</h1>
+          <div id="topbar-left"></div>
           <div className={styles.topbarRight}>
+            <div id="topbar-actions" style={{ display: 'flex', gap: '10px' }} />
             <span className={styles.adminBadge}>
               {auth.role === 'superadmin' ? 'Superadmin' : auth.username || 'Admin'}
             </span>
