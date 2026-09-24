@@ -8,7 +8,7 @@ export function validateEmployeeId(value) {
 export function validatePassword(value) {
   const v = String(value ?? '');
   if (!v.trim()) return 'Enter your password.';
-  if (v.length < 4) return 'Password must be at least 4 characters.';
+  if (v.length < 6) return 'Password must be at least 6 characters.';
   return null;
 }
 

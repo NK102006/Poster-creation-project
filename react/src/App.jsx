@@ -8,6 +8,7 @@ import DoctorManagePage from './pages/DoctorManagePage.jsx';
 import AdminPortal from './pages/AdminPortal.jsx';
 import SuperAdminPortal from './pages/SuperAdminPortal.jsx';
 import UserPanel from './pages/UserPanel.jsx';
+import NotFoundPage from './pages/NotFoundPage.jsx';
 import { clearAuth, readAuth, writeAuth } from './lib/authSession.js';
 
 const VIEW_STATE_KEY = 'app_view_state';
@@ -29,13 +30,13 @@ function writeSavedViewState(view, doctorId) {
       VIEW_STATE_KEY,
       JSON.stringify({ view, doctorId: doctorId || null })
     );
-  } catch (err) {}
+  } catch (err) { }
 }
 
 function clearSavedViewState() {
   try {
     sessionStorage.removeItem(VIEW_STATE_KEY);
-  } catch (err) {}
+  } catch (err) { }
 }
 
 function isAdminPath() {
@@ -48,6 +49,11 @@ function isSuperAdminPath() {
 
 function isUserPanelPath() {
   return window.location.pathname === '/userpanel';
+}
+
+function isUnknownPath() {
+  const p = window.location.pathname;
+  return p !== '/' && p !== '/login' && !isAdminPath() && !isSuperAdminPath() && !isUserPanelPath();
 }
 
 function staffViewFromPath() {
@@ -68,9 +74,15 @@ function setAppView(view, { doctorId, replace = false } = {}) {
   } else if (view === 'userpanel') {
     nextUrl.pathname = '/userpanel';
     nextUrl.search = '';
+  } else if (view === 'notfound') {
+    // leave the url alone
   } else {
-    if (isAdminPath() || isSuperAdminPath() || isUserPanelPath()) nextUrl.pathname = '/';
-    nextUrl.searchParams.set('view', view);
+    nextUrl.pathname = '/';
+    if (view === 'login') {
+      nextUrl.searchParams.delete('view');
+    } else {
+      nextUrl.searchParams.set('view', view);
+    }
     if (doctorId) nextUrl.searchParams.set('doctorId', doctorId);
     else nextUrl.searchParams.delete('doctorId');
   }
@@ -85,6 +97,10 @@ function resolveAuthenticatedView() {
   const staffView = staffViewFromPath();
   if (staffView) {
     return { view: staffView, doctorId: null };
+  }
+
+  if (isUnknownPath()) {
+    return { view: 'notfound', doctorId: null };
   }
 
   const saved = readSavedViewState();
@@ -112,6 +128,7 @@ export default function App() {
   const initialAuthView = currentUser ? resolveAuthenticatedView() : null;
 
   const [view, setView] = useState(() => {
+    if (isUnknownPath()) return 'notfound';
     return staffViewFromPath() || initialAuthView?.view || 'login';
   });
   const [doctorId, setDoctorId] = useState(() => initialAuthView?.doctorId || null);
@@ -122,7 +139,7 @@ export default function App() {
     const stored = readAuth();
     if (!stored) {
       setCurrentUser(null);
-      setView(staffViewFromPath() || 'login');
+      setView(isUnknownPath() ? 'notfound' : staffViewFromPath() || 'login');
       setDoctorId(null);
       return;
     }
@@ -206,7 +223,9 @@ export default function App() {
 
   let screen = null;
 
-  if (view === 'admin') {
+  if (view === 'notfound') {
+    screen = <NotFoundPage onHome={() => { window.location.href = '/'; }} />;
+  } else if (view === 'admin') {
     screen = <AdminPortal />;
   } else if (view === 'superadmin') {
     screen = <SuperAdminPortal />;
