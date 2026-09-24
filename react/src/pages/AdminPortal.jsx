@@ -230,6 +230,7 @@ export default function AdminPortal() {
         <section className={styles.panel}>
           <UsersDoctorsBoard
             showAdminColumn={auth.role === 'superadmin'}
+            adminName={auth.username || 'Admin'}
             onContextChange={setBoardContext}
           />
         </section>

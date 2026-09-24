@@ -534,7 +534,7 @@ export default function UsersDoctorsBoard({
   const exportUsers = () => {
     const rows = [
       ['ID', 'Employee ID', 'Admin', 'Doctors made'],
-      ...users.map((user) => [user.id, user.empid, user.adminUsername || '', user.doctorCount ?? 0]),
+      ...users.map((user) => [user.id, user.empid, user.adminUsername || adminName || '', user.doctorCount ?? 0]),
     ];
     downloadFile(
       new Blob([rows.map((row) => row.map(csvCell).join(',')).join('\n')], {
