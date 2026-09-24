@@ -3,7 +3,7 @@ import DataTable from 'datatables.net-dt';
 import 'datatables.net-dt/css/dataTables.dataTables.css';
 import JSZip from 'jszip';
 import { apiRequest } from '../lib/apiClient';
-import { sanitizePasswordInput, validateNewPassword } from '../features/auth/validators';
+import { sanitizePasswordInput, sanitizeUsernameInput, validateNewPassword } from '../features/auth/validators';
 import styles from './AdminPortal.module.css';
 
 const csvCell = (value) => `"${String(value ?? '').replaceAll('"', '""')}"`;
@@ -752,7 +752,7 @@ export default function UsersDoctorsBoard({
                 <input
                   value={userForm.empid}
                   onChange={(event) => {
-                    setUserForm((prev) => ({ ...prev, empid: event.target.value }));
+                    setUserForm((prev) => ({ ...prev, empid: sanitizeUsernameInput(event.target.value) }));
                     if (userFormErrors.empid) setUserFormErrors((prev) => ({ ...prev, empid: null }));
                   }}
                 />

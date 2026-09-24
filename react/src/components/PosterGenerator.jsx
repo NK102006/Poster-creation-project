@@ -12,6 +12,7 @@ import {
   renderRiskFactorPosterBlob,
 } from '../lib/posterExport';
 import styles from './PosterGenerator.module.css';
+import { sanitizePhoneInput, validatePhoneNumber } from '../features/auth/validators';
 
 const STEPS = [
   { id: 1, label: 'Doctor Details', short: 'Details' },
@@ -106,7 +107,8 @@ export default function PosterGenerator({
     if (!hasName) errors.name = 'Doctor full name is required.';
     if (!hasDegree) errors.doctorDegree = 'Doctor\'s degree is required.';
     if (!hasClinic) errors.clinicName = 'Clinic / Hospital name is required.';
-    if (!hasContact) errors.contactnumber = 'Contact number is required.';
+    const phoneError = validatePhoneNumber(formData.contactnumber);
+    if (phoneError) errors.contactnumber = phoneError;
     if (!hasLogo) errors.logo = 'Doctor photo or clinic logo is required.';
 
     if (Object.keys(errors).length > 0) {
@@ -138,7 +140,7 @@ export default function PosterGenerator({
   const checkCanNavigate = (targetStep) => {
     const hasLogo = Boolean(logoFile || logoPreview);
     const hasName = Boolean(formData.name?.trim());
-    const hasContact = Boolean(formData.contactnumber?.trim());
+    const hasContact = !validatePhoneNumber(formData.contactnumber);
     const hasClinic = Boolean(formData.clinicName?.trim());
     const hasDegree = Boolean(formData.doctorDegree?.trim());
 
@@ -260,6 +262,8 @@ export default function PosterGenerator({
       setIsGenerating(false);
       setDownloadMessage('Poster downloaded.');
       setDownloadSuccess(true);
+      setPreviewModalOpen(false);
+      setModalPoster(null);
       setTimeout(() => setDownloadSuccess(false), 6000);
     } catch (err) {
       console.error('Failed to render poster:', err);
@@ -436,11 +440,13 @@ export default function PosterGenerator({
                   <input
                     id="step-doc-contact"
                     type="tel"
-                    placeholder="e.g. 919876543210"
+                    inputMode="numeric"
+                    maxLength={10}
+                    placeholder="10-digit mobile number"
                     className={styles.inputField}
                     value={formData.contactnumber}
                     onChange={(e) => {
-                      setFormData?.((prev) => ({ ...prev, contactnumber: e.target.value }));
+                      setFormData?.((prev) => ({ ...prev, contactnumber: sanitizePhoneInput(e.target.value) }));
                       if (fieldErrors.contactnumber) setFieldErrors(prev => ({ ...prev, contactnumber: null }));
                     }}
                   />

@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react';
 import { login } from './authService';
-import { validateEmployeeId, validatePassword } from './validators';
+import { sanitizePasswordInput, sanitizeUsernameInput, validateEmployeeId, validatePassword } from './validators';
 import { ApiError } from '../../lib/apiClient';
 
 const GENERIC_AUTH_ERROR =
@@ -13,7 +13,13 @@ export function useLoginForm({ onSuccess } = {}) {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const setField = useCallback((field, value) => {
-    setValues((prev) => ({ ...prev, [field]: value }));
+    const next =
+      field === 'password'
+        ? sanitizePasswordInput(value)
+        : field === 'id'
+          ? sanitizeUsernameInput(value)
+          : value;
+    setValues((prev) => ({ ...prev, [field]: next }));
     setFieldErrors((prev) => ({ ...prev, [field]: null }));
     setFormError(null);
   }, []);
