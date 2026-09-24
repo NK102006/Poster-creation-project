@@ -65,6 +65,10 @@ export default function UserPanel() {
   const handleLogout = () => {
     clearAuth('userpanel');
     setAuth(null);
+    setUsername('');
+    setPassword('');
+    setLoginError('');
+    setLoginFieldErrors({});
     apiRequest('/logout', { method: 'POST' }).catch(() => {});
   };
 

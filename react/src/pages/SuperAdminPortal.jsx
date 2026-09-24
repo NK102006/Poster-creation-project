@@ -211,6 +211,10 @@ export default function SuperAdminPortal() {
     clearAuth('superadmin');
     setAuth(null);
     setSelectedAdmin(null);
+    setUsername('');
+    setPassword('');
+    setLoginError('');
+    setLoginFieldErrors({});
     apiRequest('/logout', { method: 'POST' }).catch(() => {});
   };
 

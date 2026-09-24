@@ -94,6 +94,10 @@ export default function AdminPortal() {
   const handleLogout = () => {
     clearAuth('admin');
     setAuth(null);
+    setUsername('');
+    setPassword('');
+    setLoginError('');
+    setLoginFieldErrors({});
     apiRequest('/logout', { method: 'POST' }).catch(() => {});
   };
 

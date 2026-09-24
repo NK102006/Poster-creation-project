@@ -137,6 +137,7 @@ export default function App() {
   const [doctorId, setDoctorId] = useState(() => initialAuthView?.doctorId || null);
   const [selectedDoctor, setSelectedDoctor] = useState(null);
   const [startAtDesign, setStartAtDesign] = useState(false);
+  const [loginKey, setLoginKey] = useState(0);
 
   const restoreAppState = (historyState) => {
     const stored = readAuth('portal');
@@ -221,6 +222,7 @@ export default function App() {
     setDoctorId(null);
     clearSavedViewState();
     clearAuth('portal');
+    setLoginKey((k) => k + 1);
     navigate('login');
   };
 
@@ -235,7 +237,7 @@ export default function App() {
   } else if (view === 'userpanel') {
     screen = <UserPanel />;
   } else if (!currentUser) {
-    screen = <LoginPage onLoginSuccess={handleLoginSuccess} />;
+    screen = <LoginPage key={loginKey} onLoginSuccess={handleLoginSuccess} />;
   } else if (view === 'hub') {
     screen = (
       <DoctorHubPage
