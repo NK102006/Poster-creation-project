@@ -3,6 +3,7 @@ import DataTable from 'datatables.net-dt';
 import 'datatables.net-dt/css/dataTables.dataTables.css';
 import { apiRequest } from '../lib/apiClient';
 import { canAccessPage, clearAuth, readAuth, writeAuth } from '../lib/authSession';
+import { sanitizePasswordInput, validateNewPassword } from '../features/auth/validators';
 import StaffLogin from './StaffLogin';
 import UsersDoctorsBoard from './UsersDoctorsBoard';
 import styles from './AdminPortal.module.css';
@@ -224,7 +225,8 @@ export default function SuperAdminPortal() {
 
     const errors = {};
     if (!form.username.trim()) errors.username = 'Username is required';
-    if (!editingAdmin && !form.password) errors.password = 'Password is required';
+    const passwordError = validateNewPassword(form.password, { required: !editingAdmin });
+    if (passwordError) errors.password = passwordError;
 
     if (Object.keys(errors).length > 0) {
       setFormErrors(errors);
@@ -372,7 +374,7 @@ export default function SuperAdminPortal() {
         <div className={styles.modalOverlay} onClick={() => setShowModal(false)}>
           <div className={styles.modal} role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()}>
             <h2 className={styles.modalTitle}>{editingAdmin ? 'Edit admin' : 'Add admin'}</h2>
-            <form onSubmit={saveAdmin} className={styles.form}>
+            <form onSubmit={saveAdmin} className={styles.form} noValidate>
               <label className={styles.field}>
                 <span>Username</span>
                 <input
@@ -390,7 +392,7 @@ export default function SuperAdminPortal() {
                   type="password"
                   value={form.password}
                   onChange={(event) => {
-                    setForm((prev) => ({ ...prev, password: event.target.value }));
+                    setForm((prev) => ({ ...prev, password: sanitizePasswordInput(event.target.value) }));
                     if (formErrors.password) setFormErrors((prev) => ({ ...prev, password: null }));
                   }}
                   autoComplete="new-password"

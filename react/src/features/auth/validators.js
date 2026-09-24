@@ -11,3 +11,15 @@ export function validatePassword(value) {
   if (v.length < 4) return 'Password must be at least 4 characters.';
   return null;
 }
+
+export function sanitizePasswordInput(value) {
+  return String(value ?? '').replace(/\s/g, '');
+}
+
+export function validateNewPassword(value, { required = true } = {}) {
+  const v = String(value ?? '');
+  if (!v) return required ? 'Password is required' : null;
+  if (/\s/.test(v)) return 'Password cannot contain spaces';
+  if (v.length < 6) return 'Password must be at least 6 characters';
+  return null;
+}

@@ -113,6 +113,22 @@ async function verifyPassword(plain, stored) {
   return candidate === current;
 }
 
+function assertNewPassword(password, { required = true } = {}) {
+  const value = String(password ?? '');
+  if (!value && !required) return '';
+  if (isHashedPassword(value)) return value;
+  if (!value) {
+    throw Object.assign(new Error('Password is required'), { status: 400 });
+  }
+  if (/\s/.test(value)) {
+    throw Object.assign(new Error('Password cannot contain spaces'), { status: 400 });
+  }
+  if (value.length < 6) {
+    throw Object.assign(new Error('Password must be at least 6 characters'), { status: 400 });
+  }
+  return value;
+}
+
 function attachPasswordHashing(schema) {
   schema.pre('save', async function hashStoredPassword() {
     if (!this.isModified('password')) return;
@@ -834,12 +850,12 @@ async function listUsersForAuth(auth, { adminId } = {}) {
 
 async function createUserUnderAdmin(adminId, { empid, password }) {
   const cleanEmpid = String(empid || '').trim();
-  const cleanPassword = String(password || '');
-  if (!cleanEmpid || !cleanPassword) {
+  if (!cleanEmpid) {
     const error = new Error('Employee ID and password are required');
     error.status = 400;
     throw error;
   }
+  const cleanPassword = assertNewPassword(password);
   const user = await User.create({
     empid: cleanEmpid,
     id: cleanEmpid,
@@ -861,7 +877,7 @@ async function updateUserRecord(user, { empid, password, ownerAdmin }) {
     user.id = cleanEmpid;
   }
   if (password != null && String(password).trim()) {
-    user.password = String(password);
+    user.password = assertNewPassword(password);
   }
   if (ownerAdmin !== undefined) {
     user.ownerAdmin = mongoose.isValidObjectId(ownerAdmin) ? ownerAdmin : null;
@@ -1117,16 +1133,17 @@ app.post('/api/superadmin/admins', requireAuth('superadmin'), async (req, res) =
   try {
     const username = String(req.body?.username || '').trim();
     const password = String(req.body?.password || '');
-    if (!username || !password) {
+    if (!username) {
       return res.status(400).json({ message: 'Username and password are required' });
     }
+    const cleanPassword = assertNewPassword(password);
     const existing = await findAdminByUsername(username);
     if (existing) return res.status(409).json({ message: 'Admin username already exists' });
-    const admin = await Admin.create({ username, password });
+    const admin = await Admin.create({ username, password: cleanPassword });
     return res.status(201).json({ success: true, admin: formatAdmin(admin, { userCount: 0 }) });
   } catch (error) {
     console.error('Error creating admin:', error);
-    return res.status(500).json({ message: 'Failed to create admin' });
+    return res.status(error.status || 500).json({ message: error.message || 'Failed to create admin' });
   }
 });
 
@@ -1167,7 +1184,7 @@ app.post('/api/superadmin/admins/import', requireAuth('superadmin'), upload.sing
             throw Object.assign(new Error('Admin username already exists'), { status: 409 });
           }
           admin.username = username;
-          if (password.trim()) admin.password = password;
+          if (password.trim()) admin.password = assertNewPassword(password);
           applyTimestamps(admin, row);
           await admin.save();
           updated += 1;
@@ -1179,7 +1196,7 @@ app.post('/api/superadmin/admins/import', requireAuth('superadmin'), upload.sing
           const updatedAt = parseCsvDate(row.updatedAt);
           await Admin.create({
             username,
-            password,
+            password: assertNewPassword(password),
             ...(createdAt ? { createdAt } : {}),
             ...(updatedAt ? { updatedAt } : {}),
           });
@@ -1213,13 +1230,13 @@ app.put('/api/superadmin/admins/:id', requireAuth('superadmin'), async (req, res
       admin.username = username;
     }
     if (req.body?.password != null && String(req.body.password).trim()) {
-      admin.password = String(req.body.password);
+      admin.password = assertNewPassword(req.body.password);
     }
     await admin.save();
     return res.json({ success: true, admin: formatAdmin(admin) });
   } catch (error) {
     console.error('Error updating admin:', error);
-    return res.status(500).json({ message: 'Failed to update admin' });
+    return res.status(error.status || 500).json({ message: error.message || 'Failed to update admin' });
   }
 });
 
@@ -1316,7 +1333,7 @@ async function importEmployeesForAdmin(adminId, fileBuffer) {
         await User.create({
           empid,
           id: empid,
-          password,
+          password: assertNewPassword(password),
           ownerAdmin: adminId,
           ...(createdAt ? { createdAt } : {}),
           ...(updatedAt ? { updatedAt } : {}),

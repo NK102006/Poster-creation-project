@@ -3,6 +3,7 @@ import DataTable from 'datatables.net-dt';
 import 'datatables.net-dt/css/dataTables.dataTables.css';
 import JSZip from 'jszip';
 import { apiRequest } from '../lib/apiClient';
+import { sanitizePasswordInput, validateNewPassword } from '../features/auth/validators';
 import styles from './AdminPortal.module.css';
 
 const csvCell = (value) => `"${String(value ?? '').replaceAll('"', '""')}"`;
@@ -416,7 +417,8 @@ export default function UsersDoctorsBoard({
     const errs = {};
     if (needsAdminPick && !editingUser && !userForm.ownerAdmin) errs.ownerAdmin = 'Select an admin';
     if (!userForm.empid.trim()) errs.empid = 'Employee ID is required';
-    if (!editingUser && !userForm.password) errs.password = 'Password is required';
+    const passwordError = validateNewPassword(userForm.password, { required: !editingUser });
+    if (passwordError) errs.password = passwordError;
 
     if (Object.keys(errs).length > 0) {
       setUserFormErrors(errs);
@@ -723,7 +725,7 @@ export default function UsersDoctorsBoard({
         <div className={styles.modalOverlay} onClick={closeUserModal}>
           <div className={styles.modal} role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()}>
             <h2 className={styles.modalTitle}>{editingUser ? 'Edit user' : 'Add user'}</h2>
-            <form onSubmit={saveUser} className={styles.form}>
+            <form onSubmit={saveUser} className={styles.form} noValidate>
               {modalError && <p className={styles.error}>{modalError}</p>}
               {needsAdminPick && !editingUser && (
                 <label className={styles.field}>
@@ -762,7 +764,7 @@ export default function UsersDoctorsBoard({
                   type="password"
                   value={userForm.password}
                   onChange={(event) => {
-                    setUserForm((prev) => ({ ...prev, password: event.target.value }));
+                    setUserForm((prev) => ({ ...prev, password: sanitizePasswordInput(event.target.value) }));
                     if (userFormErrors.password) setUserFormErrors((prev) => ({ ...prev, password: null }));
                   }}
                   autoComplete="new-password"
