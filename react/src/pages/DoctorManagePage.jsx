@@ -28,6 +28,7 @@ export default function DoctorManagePage({
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState(null);
   const [error, setError] = useState(null);
+  const [formFieldErrors, setFormFieldErrors] = useState({});
 
   const [originalLogoUrl, setOriginalLogoUrl] = useState(null);
   const [showCropModal, setShowCropModal] = useState(false);
@@ -68,6 +69,19 @@ export default function DoctorManagePage({
 
   const handleSave = async (e) => {
     e.preventDefault();
+
+    const errs = {};
+    if (!form.name.trim()) errs.name = 'Doctor name is required';
+    if (!form.doctorDegree.trim()) errs.doctorDegree = "Doctor's degree is required";
+    if (!form.clinicName.trim()) errs.clinicName = 'Clinic / Hospital name is required';
+    if (!form.contactnumber.trim()) errs.contactnumber = 'Contact number is required';
+    
+    if (Object.keys(errs).length > 0) {
+      setFormFieldErrors(errs);
+      return;
+    }
+    setFormFieldErrors({});
+
     setSaving(true);
     setMessage(null);
     setError(null);
@@ -170,7 +184,7 @@ export default function DoctorManagePage({
     setShowCropModal(false);
   };
 
-  const handleContinue = () => {
+  const handleContinue = async () => {
     if (isInactive) {
       setError('Reactivate this doctor before continuing.');
       return;
@@ -179,7 +193,27 @@ export default function DoctorManagePage({
       setError("Doctor's degree is required before continuing.");
       return;
     }
-    onContinue?.(doctor);
+    setSaving(true);
+    setError(null);
+    try {
+      const data = new FormData();
+      data.append('name', form.name.trim());
+      data.append('clinicName', form.clinicName.trim());
+      data.append('contactnumber', form.contactnumber.trim());
+      data.append('doctorDegree', form.doctorDegree.trim());
+      if (logoFile) data.append('logo', logoFile);
+      else if (logoPreview?.startsWith('data:')) data.append('logo', logoPreview);
+
+      const res = await apiRequest(`/doctors/${doctorId}`, {
+        method: 'PUT',
+        body: data,
+      });
+      onContinue?.(res.doctor || doctor);
+    } catch (err) {
+      setError(err.message || 'Save failed');
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -187,6 +221,8 @@ export default function DoctorManagePage({
       user={user}
       onLogout={onLogout}
       onBrandClick={onStartNew || onBack}
+      onBack={onBack}
+      backLabel="Doctors"
       headerActions={
         onStartNew ? (
           <button type="button" className={styles.headerAction} onClick={onStartNew}>
@@ -195,75 +231,107 @@ export default function DoctorManagePage({
         ) : null
       }
     >
-      <div className={styles.hero}>
-        <button type="button" className={styles.backLink} onClick={onBack}>
-          ← Back to list
-        </button>
-        <h1 className={styles.title}>{doctor?.name || 'Doctor'}</h1>
-        <p className={styles.subtitle}>
-          {isInactive ? 'Deactivated' : 'Active'} profile
-        </p>
-      </div>
-
       {loading && <p className={styles.status}>Loading…</p>}
       {error && <p className={styles.error}>{error}</p>}
       {message && <p className={styles.success}>{message}</p>}
 
       {!loading && doctor && (
-        <>
+        <div className={styles.profilePage}>
+          <section className={styles.profileHero}>
+            <div className={styles.profilePhoto}>
+              {logoPreview ? (
+                <img src={logoPreview} alt="" />
+              ) : (
+                <span>{(doctor.name || 'D').slice(0, 1)}</span>
+              )}
+            </div>
+            <div className={styles.profileCopy}>
+              <div className={styles.profileTop}>
+                <p className={styles.profileEyebrow}>Doctor profile</p>
+                <span className={isInactive ? styles.statusPillInactive : styles.statusPill}>
+                  {isInactive ? 'Inactive' : 'Active'}
+                </span>
+              </div>
+              <h1 className={styles.profileName}>{doctor.name || 'Doctor'}</h1>
+              <p className={styles.profileMeta}>
+                {[form.doctorDegree, form.clinicName].filter(Boolean).join(' · ') || 'Add clinic and degree'}
+              </p>
+              <div className={styles.metricRow}>
+                <div className={styles.metric}>
+                  <strong>{doctor.postersMade || 0}</strong>
+                  <span>Posters</span>
+                </div>
+                <div className={styles.metric}>
+                  <strong>{doctor.downloadCount || 0}</strong>
+                  <span>Downloads</span>
+                </div>
+                <div className={styles.metric}>
+                  <strong>{form.contactnumber || '—'}</strong>
+                  <span>WhatsApp</span>
+                </div>
+              </div>
+            </div>
+          </section>
+
           {isInactive && (
             <p className={styles.inactiveBanner}>
               This doctor is deactivated. Activate the profile to create new posters.
             </p>
           )}
 
-          <div className={styles.statsRow}>
-            <div className={styles.statCard}>
-              <span className={styles.statLabel}>Posters made</span>
-              <strong className={styles.statValue}>{doctor.postersMade || 0}</strong>
-            </div>
-            <div className={styles.statCard}>
-              <span className={styles.statLabel}>Downloads</span>
-              <strong className={styles.statValue}>{doctor.downloadCount || 0}</strong>
-            </div>
-          </div>
-
           <form className={styles.panel} onSubmit={handleSave}>
-            <h2 className={styles.panelTitle}>Edit details</h2>
+            <div className={styles.panelHeader}>
+              <div>
+                <h2 className={styles.panelTitle}>Profile details</h2>
+                <p className={styles.panelHint}>Update the information used on posters.</p>
+              </div>
+            </div>
 
             <div className={styles.formGrid}>
               <label className={styles.field}>
                 <span>Doctor full name</span>
                 <input
                   value={form.name}
-                  onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))}
-                  required
+                  onChange={(e) => {
+                    setForm((p) => ({ ...p, name: e.target.value }));
+                    if (formFieldErrors.name) setFormFieldErrors((p) => ({ ...p, name: null }));
+                  }}
                 />
+                {formFieldErrors.name && <span className={styles.fieldError}>{formFieldErrors.name}</span>}
               </label>
               <label className={styles.field}>
                 <span>Doctor&apos;s degree</span>
                 <input
                   value={form.doctorDegree}
-                  onChange={(e) => setForm((p) => ({ ...p, doctorDegree: e.target.value }))}
+                  onChange={(e) => {
+                    setForm((p) => ({ ...p, doctorDegree: e.target.value }));
+                    if (formFieldErrors.doctorDegree) setFormFieldErrors((p) => ({ ...p, doctorDegree: null }));
+                  }}
                   placeholder="e.g. MBBS, MD (Medicine)"
-                  required
                 />
+                {formFieldErrors.doctorDegree && <span className={styles.fieldError}>{formFieldErrors.doctorDegree}</span>}
               </label>
               <label className={styles.field}>
                 <span>Clinic / Hospital name</span>
                 <input
                   value={form.clinicName}
-                  onChange={(e) => setForm((p) => ({ ...p, clinicName: e.target.value }))}
-                  required
+                  onChange={(e) => {
+                    setForm((p) => ({ ...p, clinicName: e.target.value }));
+                    if (formFieldErrors.clinicName) setFormFieldErrors((p) => ({ ...p, clinicName: null }));
+                  }}
                 />
+                {formFieldErrors.clinicName && <span className={styles.fieldError}>{formFieldErrors.clinicName}</span>}
               </label>
               <label className={styles.field}>
                 <span>WhatsApp contact</span>
                 <input
                   value={form.contactnumber}
-                  onChange={(e) => setForm((p) => ({ ...p, contactnumber: e.target.value }))}
-                  required
+                  onChange={(e) => {
+                    setForm((p) => ({ ...p, contactnumber: e.target.value }));
+                    if (formFieldErrors.contactnumber) setFormFieldErrors((p) => ({ ...p, contactnumber: null }));
+                  }}
                 />
+                {formFieldErrors.contactnumber && <span className={styles.fieldError}>{formFieldErrors.contactnumber}</span>}
               </label>
             </div>
 
@@ -291,14 +359,8 @@ export default function DoctorManagePage({
               </div>
             </label>
 
-            <div className={styles.actions}>
-              <button type="button" className={styles.backAction} onClick={onBack}>
-                ← Back
-              </button>
-              <div className={styles.actionsCenter}>
-                <button type="submit" className={styles.primaryBtn} disabled={saving}>
-                  {saving ? 'Saving…' : 'Save changes'}
-                </button>
+            <div className={styles.footerActions}>
+              <div className={styles.footerLeft}>
                 <button type="button" className={styles.secondaryBtn} onClick={handleToggleActive}>
                   {isInactive ? 'Activate' : 'Deactivate'}
                 </button>
@@ -306,26 +368,29 @@ export default function DoctorManagePage({
                   Remove
                 </button>
               </div>
-              <button
-                type="button"
-                className={styles.continueBtn}
-                onClick={handleContinue}
-                disabled={isInactive || !form.doctorDegree?.trim()}
-                title={
-                  isInactive
-                    ? 'Activate this doctor to continue'
-                    : !form.doctorDegree?.trim()
-                      ? "Add doctor's degree to continue"
-                      : 'Continue to design'
-                }
-              >
-                Continue
-              </button>
+              <div className={styles.footerRight}>
+                <button type="submit" className={styles.secondaryBtn} disabled={saving}>
+                  {saving ? 'Saving…' : 'Save changes'}
+                </button>
+                <button
+                  type="button"
+                  className={styles.continueBtn}
+                  onClick={handleContinue}
+                  disabled={isInactive || !form.doctorDegree?.trim()}
+                  title={
+                    isInactive
+                      ? 'Activate this doctor to continue'
+                      : !form.doctorDegree?.trim()
+                        ? "Add doctor's degree to continue"
+                        : 'Save & next'
+                  }
+                >
+                  Save & next
+                </button>
+              </div>
             </div>
           </form>
-
-
-        </>
+        </div>
       )}
 
       {showCropModal && originalLogoUrl && (

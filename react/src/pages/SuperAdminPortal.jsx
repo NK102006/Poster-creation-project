@@ -1,22 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import DataTable from 'datatables.net-dt';
 import 'datatables.net-dt/css/dataTables.dataTables.css';
-import JSZip from 'jszip';
 import { apiRequest } from '../lib/apiClient';
+import { canAccessPage, clearAuth, readAuth, writeAuth } from '../lib/authSession';
+import StaffLogin from './StaffLogin';
+import UsersDoctorsBoard from './UsersDoctorsBoard';
 import styles from './AdminPortal.module.css';
-
-const csvCell = (value) => `"${String(value ?? '').replaceAll('"', '""')}"`;
-
-const POSTER_FOLDERS = ['education', 'festival', 'video'];
-
-function downloadFile(blob, filename) {
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = filename;
-  link.click();
-  URL.revokeObjectURL(url);
-}
 
 function escapeHtml(value) {
   return String(value ?? '')
@@ -26,64 +15,6 @@ function escapeHtml(value) {
     .replaceAll('"', '&quot;');
 }
 
-function inferPosterKind(poster) {
-  const raw = String(poster?.kind || '').toLowerCase();
-  if (raw === 'festival' || raw === 'video' || raw === 'education') return raw;
-  if (raw === 'gk') return 'education';
-  const src = String(poster?.image || '');
-  if (src.includes('.mp4') || src.includes('video') || src.startsWith('data:video')) {
-    return 'video';
-  }
-  return 'education';
-}
-
-function posterExtension(poster, kind) {
-  const src = String(poster?.image || '');
-  if (kind === 'video' || src.includes('.mp4') || src.startsWith('data:video')) return 'mp4';
-  if (src.includes('.png')) return 'png';
-  return 'jpg';
-}
-
-function posterGalleryStyle(count) {
-  if (count <= 1) {
-    return { gridTemplateColumns: 'minmax(320px, 480px)', justifyContent: 'center' };
-  }
-  if (count <= 2) {
-    return { gridTemplateColumns: 'repeat(2, minmax(280px, 1fr))' };
-  }
-  if (count <= 4) {
-    return { gridTemplateColumns: 'repeat(2, minmax(260px, 1fr))' };
-  }
-  if (count <= 6) {
-    return { gridTemplateColumns: 'repeat(3, minmax(240px, 1fr))' };
-  }
-  return { gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))' };
-}
-
-function safeFilePart(value, fallback) {
-  const cleaned = String(value || '')
-    .replace(/[^a-z0-9]+/gi, '-')
-    .replace(/-+/g, '-')
-    .replace(/^-|-$/g, '')
-    .toLowerCase();
-  return cleaned || fallback;
-}
-
-async function addFileToZip(zip, path, urlOrData) {
-  if (!urlOrData) return;
-  if (urlOrData.startsWith('data:')) {
-    const [, base64 = ''] = urlOrData.split(',', 2);
-    if (base64) zip.file(path, base64, { base64: true });
-  } else if (urlOrData.startsWith('http')) {
-    try {
-      const res = await fetch(urlOrData);
-      if (res.ok) zip.file(path, await res.blob());
-    } catch (err) {
-      console.warn('Failed to fetch file for zip:', urlOrData, err);
-    }
-  }
-}
-
 const dataTableOptions = {
   pageLength: 10,
   lengthMenu: [5, 10, 25, 50],
@@ -91,6 +22,7 @@ const dataTableOptions = {
   pagingType: 'simple_numbers',
   autoWidth: false,
   scrollX: true,
+  order: [[0, 'desc']],
   layout: {
     topStart: 'pageLength',
     topEnd: 'search',
@@ -108,87 +40,102 @@ const dataTableOptions = {
   },
 };
 
-const userColumns = [
+const adminColumns = [
   {
-    title: 'ID',
-    data: 'id',
-    className: styles.colId,
-    render: (data) => `<code class="${styles.idCell}" title="${escapeHtml(data)}">${escapeHtml(data)}</code>`,
+    title: 'Created',
+    data: 'createdAt',
+    visible: false,
+    render: (data) => (data ? new Date(data).toISOString() : ''),
   },
   {
-    title: 'Employee ID',
-    data: 'empid',
+    title: 'Admin',
+    data: 'username',
     className: styles.nameCell,
     render: (data) => escapeHtml(data || '—'),
   },
   {
-    title: 'Doctors made',
-    data: 'doctorCount',
+    title: 'Users',
+    data: 'userCount',
     render: (data) => String(data ?? 0),
   },
   {
-    title: '',
+    title: 'Edit',
     data: null,
     orderable: false,
     searchable: false,
     className: styles.colActions,
-    render: () => `<button type="button" class="${styles.editBtn}" data-action="view-doctors">View doctors</button>`,
-  },
-];
-
-const doctorColumns = [
-  {
-    title: 'Logo',
-    data: 'logo',
-    orderable: false,
-    searchable: false,
-    render: (logo) =>
-      logo ? `<img src="${escapeHtml(logo)}" alt="" class="${styles.logoThumb}" />` : '—',
+    render: () => `<button type="button" class="${styles.editBtn}" data-action="edit">Edit</button>`,
   },
   {
-    title: 'Name',
-    data: 'name',
-    className: styles.nameCell,
-    render: (data) => escapeHtml(data || '—'),
-  },
-  {
-    title: 'Degree',
-    data: 'doctorDegree',
-    render: (data) => escapeHtml(data || '—'),
-  },
-  {
-    title: 'Clinic / Hospital',
-    data: 'clinicName',
-    render: (data) => escapeHtml(data || '—'),
-  },
-  {
-    title: 'Contact Number',
-    data: 'contactnumber',
-    render: (data) => escapeHtml(data || '—'),
-  },
-  {
-    title: 'Posters made',
-    data: 'postersMade',
-    render: (data) => String(data ?? 0),
-  },
-  {
-    title: '',
+    title: 'Delete',
     data: null,
     orderable: false,
     searchable: false,
     className: styles.colActions,
-    render: () => `<button type="button" class="${styles.editBtn}" data-action="view-details">View details</button>`,
+    render: () => `<button type="button" class="${styles.deleteBtn}" data-action="delete">Delete</button>`,
   },
 ];
 
-function useDataTable({ enabled, data, columns, onRowAction }) {
+export default function SuperAdminPortal() {
+  const [auth, setAuth] = useState(() => readAuth());
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [loginError, setLoginError] = useState('');
+  const [loginFieldErrors, setLoginFieldErrors] = useState({});
+  const [admins, setAdmins] = useState([]);
+  const [selectedAdmin, setSelectedAdmin] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [showModal, setShowModal] = useState(false);
+  const [editingAdmin, setEditingAdmin] = useState(null);
+  const [form, setForm] = useState({ username: '', password: '' });
+  const [formErrors, setFormErrors] = useState({});
+  const [saving, setSaving] = useState(false);
   const hostRef = useRef(null);
-  const tableRef = useRef(null);
-  const actionRef = useRef(onRowAction);
-  actionRef.current = onRowAction;
+  const actionRef = useRef({});
+
+  const isLoggedIn = canAccessPage(auth, 'superadmin');
+
+  const loadAdmins = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const result = await apiRequest('/superadmin/admins');
+      const list = [...(result.admins || [])].sort(
+        (a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0)
+      );
+      setAdmins(list);
+    } catch (err) {
+      setError(err.message || 'Could not load admins');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    if (!enabled || !hostRef.current) return undefined;
+    if (isLoggedIn && !selectedAdmin) loadAdmins();
+  }, [isLoggedIn, selectedAdmin]);
+
+  actionRef.current = {
+    open: (admin) => setSelectedAdmin(admin),
+    edit: (admin) => {
+      setEditingAdmin(admin);
+      setForm({ username: admin.username || '', password: '' });
+      setShowModal(true);
+    },
+    remove: async (admin) => {
+      if (!window.confirm(`Delete admin ${admin.username} and every user and doctor under them?`)) return;
+      try {
+        await apiRequest(`/superadmin/admins/${admin.id}`, { method: 'DELETE' });
+        loadAdmins();
+      } catch (err) {
+        setError(err.message || 'Could not delete admin');
+      }
+    },
+  };
+
+  useEffect(() => {
+    if (!isLoggedIn || selectedAdmin || !hostRef.current) return undefined;
 
     const host = hostRef.current;
     host.innerHTML = '';
@@ -199,93 +146,37 @@ function useDataTable({ enabled, data, columns, onRowAction }) {
 
     const table = new DataTable(tableEl, {
       ...dataTableOptions,
-      data,
-      columns,
+      data: admins,
+      columns: adminColumns,
     });
 
     function onClick(event) {
       const button = event.target.closest('button[data-action]');
-      const row = event.target.closest('tr');
-      if (!button || !row) return;
+      const row = event.target.closest('tbody tr');
+      if (!row) return;
+      const admin = table.row(row).data();
+      if (!admin) return;
       event.preventDefault();
       event.stopPropagation();
-      actionRef.current?.(button.getAttribute('data-action'), table.row(row).data());
+      const action = button?.getAttribute('data-action');
+      if (action === 'edit') {
+        actionRef.current.edit(admin);
+        return;
+      }
+      if (action === 'delete') {
+        actionRef.current.remove(admin);
+        return;
+      }
+      actionRef.current.open(admin);
     }
 
     host.addEventListener('click', onClick);
-    tableRef.current = table;
-
     return () => {
       host.removeEventListener('click', onClick);
       table.destroy();
-      tableRef.current = null;
       host.innerHTML = '';
     };
-  }, [enabled, data, columns]);
-
-  return hostRef;
-}
-
-export default function SuperAdminPortal() {
-  const [isLoggedIn, setIsLoggedIn] = useState(
-    () => localStorage.getItem('super_admin_session') === 'true'
-  );
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
-  const [loginError, setLoginError] = useState('');
-  const [loginFieldErrors, setLoginFieldErrors] = useState({});
-  const [users, setUsers] = useState([]);
-  const [selectedUser, setSelectedUser] = useState(null);
-  const [doctors, setDoctors] = useState([]);
-  const [selectedDoctor, setSelectedDoctor] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [showPosters, setShowPosters] = useState(false);
-  const [selectedPosterToDownload, setSelectedPosterToDownload] = useState(null);
-
-  const handleForceDownload = async (url, filename) => {
-    try {
-      const response = await fetch(url);
-      const blob = await response.blob();
-      const blobUrl = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = blobUrl;
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      window.URL.revokeObjectURL(blobUrl);
-    } catch (err) {
-      console.error('Download failed', err);
-      window.open(url, '_blank');
-    }
-  };
-
-  const loadUsers = async () => {
-    setLoading(true);
-    setError('');
-    try {
-      const result = await apiRequest('/super-admin/users');
-      setUsers(result.users || []);
-    } catch (err) {
-      setError(err.message || 'Could not load users');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    if (isLoggedIn) loadUsers();
-  }, [isLoggedIn]);
-
-  useEffect(() => {
-    if (!showPosters) return undefined;
-    const onKeyDown = (event) => {
-      if (event.key === 'Escape') setShowPosters(false);
-    };
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
-  }, [showPosters]);
+  }, [isLoggedIn, selectedAdmin, admins]);
 
   const handleLogin = async (event) => {
     event.preventDefault();
@@ -301,13 +192,12 @@ export default function SuperAdminPortal() {
     setLoginFieldErrors({});
 
     try {
-      const result = await apiRequest('/super-admin/login', {
+      const result = await apiRequest('/superadmin/login', {
         method: 'POST',
         body: { username, password },
       });
       if (result.success) {
-        localStorage.setItem('super_admin_session', 'true');
-        setIsLoggedIn(true);
+        setAuth(writeAuth(result.auth));
       }
     } catch (err) {
       setLoginError(err.message || 'Login failed');
@@ -315,204 +205,76 @@ export default function SuperAdminPortal() {
   };
 
   const handleLogout = () => {
-    localStorage.removeItem('super_admin_session');
-    setIsLoggedIn(false);
-    setSelectedUser(null);
-    setSelectedDoctor(null);
-    setShowPosters(false);
+    clearAuth();
+    setAuth(null);
+    setSelectedAdmin(null);
+    apiRequest('/logout', { method: 'POST' }).catch(() => {});
   };
 
-  const selectUser = async (user) => {
-    setSelectedUser(user);
-    setSelectedDoctor(null);
-    setShowPosters(false);
-    setLoading(true);
-    setError('');
-    try {
-      const result = await apiRequest(`/super-admin/users/${user.id}/doctors`);
-      setDoctors(result.doctors || []);
-    } catch (err) {
-      setError(err.message || 'Could not load doctors');
-      setDoctors([]);
-    } finally {
-      setLoading(false);
+  const openCreate = () => {
+    setEditingAdmin(null);
+    setForm({ username: '', password: '' });
+    setFormErrors({});
+    setShowModal(true);
+  };
+
+  const saveAdmin = async (event) => {
+    event.preventDefault();
+
+    const errors = {};
+    if (!form.username.trim()) errors.username = 'Username is required';
+    if (!editingAdmin && !form.password) errors.password = 'Password is required';
+
+    if (Object.keys(errors).length > 0) {
+      setFormErrors(errors);
+      return;
     }
-  };
+    setFormErrors({});
 
-  const selectDoctor = async (doctor) => {
-    setLoading(true);
+    setSaving(true);
     setError('');
     try {
-      const result = await apiRequest(
-        `/super-admin/users/${selectedUser.id}/doctors/${doctor.id}`
-      );
-      setSelectedDoctor(result.doctor);
-      setShowPosters(false);
-    } catch (err) {
-      setError(err.message || 'Could not load doctor details');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const usersHostRef = useDataTable({
-    enabled: isLoggedIn && !selectedUser,
-    data: users,
-    columns: userColumns,
-    onRowAction: (_action, user) => {
-      if (user) selectUser(user);
-    },
-  });
-
-  const doctorsHostRef = useDataTable({
-    enabled: isLoggedIn && Boolean(selectedUser) && !selectedDoctor,
-    data: doctors,
-    columns: doctorColumns,
-    onRowAction: (_action, doctor) => {
-      if (doctor) selectDoctor(doctor);
-    },
-  });
-
-  const exportUsers = () => {
-    const rows = [
-      ['ID', 'Employee ID', 'Doctors made'],
-      ...users.map((user) => [user.id, user.empid, user.doctorCount ?? 0]),
-    ];
-    downloadFile(
-      new Blob([rows.map((row) => row.map(csvCell).join(',')).join('\r\n')], {
-        type: 'text/csv;charset=utf-8;',
-      }),
-      'users.csv'
-    );
-  };
-
-  const exportDoctors = async () => {
-    if (!selectedUser) return;
-    setLoading(true);
-    setError('');
-    try {
-      const details = await Promise.all(
-        doctors.map(async (doctor) => {
-          const result = await apiRequest(
-            `/super-admin/users/${selectedUser.id}/doctors/${doctor.id}`
-          );
-          return result.doctor;
-        })
-      );
-      const zip = new JSZip();
-      POSTER_FOLDERS.forEach((folder) => zip.folder(folder));
-      zip.folder('logos');
-
-      const rows = [[
-        'ID',
-        'Name',
-        'Degree',
-        'Clinic / Hospital',
-        'Contact Number',
-        'Active',
-        'Posters Made',
-        'Downloads',
-        'Logo File',
-        'Education Files',
-        'Festival Files',
-        'Video Files',
-      ]];
-
-      for (const doctor of details) {
-        const safeName = `${doctor.id}-${safeFilePart(doctor.name, 'doctor')}`;
-        const filesByKind = { education: [], festival: [], video: [] };
-        const counts = { education: 0, festival: 0, video: 0 };
-
-        for (const poster of doctor.posters || []) {
-          const kind = inferPosterKind(poster);
-          counts[kind] += 1;
-          const ext = posterExtension(poster, kind);
-          const label = safeFilePart(poster.label, `poster-${counts[kind]}`);
-          const filename = `${kind}/${safeName}-${label}.${ext}`;
-          await addFileToZip(zip, filename, poster.image);
-          filesByKind[kind].push(filename);
-        }
-
-        const logoFile = doctor.logo ? `logos/${safeName}.png` : '';
-        if (logoFile) await addFileToZip(zip, logoFile, doctor.logo);
-
-        rows.push([
-          doctor.id,
-          doctor.name,
-          doctor.doctorDegree,
-          doctor.clinicName,
-          doctor.contactnumber,
-          doctor.active ? 'Active' : 'Inactive',
-          doctor.postersMade,
-          doctor.downloadCount,
-          logoFile,
-          filesByKind.education.join('; '),
-          filesByKind.festival.join('; '),
-          filesByKind.video.join('; '),
-        ]);
+      if (editingAdmin) {
+        await apiRequest(`/superadmin/admins/${editingAdmin.id}`, {
+          method: 'PUT',
+          body: form,
+        });
+      } else {
+        await apiRequest('/superadmin/admins', {
+          method: 'POST',
+          body: form,
+        });
       }
-
-      zip.file('doctors.csv', rows.map((row) => row.map(csvCell).join(',')).join('\r\n'));
-      downloadFile(
-        await zip.generateAsync({ type: 'blob' }),
-        `${selectedUser.empid || 'user'}-doctors.zip`
-      );
+      setShowModal(false);
+      setSaving(false);
+      loadAdmins();
     } catch (err) {
-      setError(err.message || 'Could not export doctors');
-    } finally {
-      setLoading(false);
+      setError(err.message || 'Could not save admin');
+      setSaving(false);
     }
   };
 
   if (!isLoggedIn) {
     return (
-      <div className={styles.loginPage}>
-        <form onSubmit={handleLogin} className={styles.loginCard}>
-          <div className={styles.loginBrand}>
-            <div className={styles.brandMark}>S</div>
-            <div>
-              <div className={styles.brandName}>MedPortal</div>
-              <div className={styles.brandSub}>Super admin</div>
-            </div>
-          </div>
-          <h1 className={styles.loginTitle}>Sign in</h1>
-          {loginError && <p className={styles.error}>{loginError}</p>}
-          <label className={styles.field}>
-            <span>Username</span>
-            <input 
-              value={username} 
-              onChange={(e) => {
-                setUsername(e.target.value);
-                if (loginFieldErrors.username) setLoginFieldErrors((prev) => ({ ...prev, username: null }));
-              }} 
-            />
-            {loginFieldErrors.username && <span className={styles.fieldError}>{loginFieldErrors.username}</span>}
-          </label>
-          <label className={styles.field}>
-            <span>Password</span>
-            <input 
-              type="password" 
-              value={password} 
-              onChange={(e) => {
-                setPassword(e.target.value);
-                if (loginFieldErrors.password) setLoginFieldErrors((prev) => ({ ...prev, password: null }));
-              }} 
-            />
-            {loginFieldErrors.password && <span className={styles.fieldError}>{loginFieldErrors.password}</span>}
-          </label>
-          <button type="submit" className={styles.primaryBtn}>Login</button>
-        </form>
-      </div>
+      <StaffLogin
+        mark="S"
+        subtitle="Superadmin"
+        error={loginError}
+        username={username}
+        password={password}
+        onUsername={(val) => {
+          setUsername(val);
+          if (loginFieldErrors.username) setLoginFieldErrors((prev) => ({ ...prev, username: null }));
+        }}
+        onPassword={(val) => {
+          setPassword(val);
+          if (loginFieldErrors.password) setLoginFieldErrors((prev) => ({ ...prev, password: null }));
+        }}
+        onSubmit={handleLogin}
+        fieldErrors={loginFieldErrors}
+      />
     );
   }
-
-  const page = selectedDoctor
-    ? 'Doctor details'
-    : selectedUser
-      ? `${selectedUser.empid || 'User'}’s doctors`
-      : 'Users';
-
-  const doctorPosters = selectedDoctor?.posters || [];
 
   return (
     <div className={styles.shell}>
@@ -521,29 +283,22 @@ export default function SuperAdminPortal() {
           <div className={styles.brandMark}>S</div>
           <div>
             <div className={styles.brandName}>MedPortal</div>
-            <div className={styles.brandSub}>Super admin</div>
+            <div className={styles.brandSub}>Superadmin</div>
           </div>
         </div>
         <nav className={styles.nav}>
           <p className={styles.navLabel}>Oversight</p>
           <button
             type="button"
-            className={`${styles.navItem} ${!selectedUser ? styles.navActive : ''}`}
-            onClick={() => {
-              setSelectedUser(null);
-              setSelectedDoctor(null);
-              loadUsers();
-            }}
+            className={`${styles.navItem} ${!selectedAdmin ? styles.navActive : ''}`}
+            onClick={() => setSelectedAdmin(null)}
           >
-            <span className={styles.navIcon}>U</span>Users
+            <span className={styles.navIcon}>A</span>Admins
           </button>
-          {selectedUser && (
-            <button
-              type="button"
-              className={`${styles.navItem} ${!selectedDoctor ? styles.navActive : ''}`}
-              onClick={() => setSelectedDoctor(null)}
-            >
-              <span className={styles.navIcon}>D</span>Doctors
+          {selectedAdmin && (
+            <button type="button" className={`${styles.navItem} ${styles.navActive}`}>
+              <span className={styles.navIcon}>U</span>
+              {selectedAdmin.username}
             </button>
           )}
         </nav>
@@ -551,175 +306,84 @@ export default function SuperAdminPortal() {
 
       <div className={styles.main}>
         <header className={styles.topbar}>
-          <h1 className={styles.pageTitle}>{page}</h1>
+          <h1 className={styles.pageTitle}>
+            {selectedAdmin ? `${selectedAdmin.username}’s users` : 'Admins'}
+          </h1>
           <div className={styles.topbarRight}>
-            <span className={styles.adminBadge}>Super Administrator</span>
-            <button type="button" className={styles.logoutBtn} onClick={handleLogout}>Log out</button>
+            <span className={styles.adminBadge}>Superadmin</span>
+            <button type="button" className={styles.logoutBtn} onClick={handleLogout}>
+              Log out
+            </button>
           </div>
         </header>
         <section className={styles.panel}>
           {error && <p className={styles.error}>{error}</p>}
-          {loading && <p className={styles.statusText}>Loading…</p>}
 
-          {!selectedUser && (
+          {!selectedAdmin && (
             <>
               <div className={styles.toolbar}>
                 <div />
-                <button type="button" className={styles.secondaryBtn} onClick={exportUsers}>
-                  Export users
+                <button type="button" className={styles.primaryBtn} onClick={openCreate}>
+                  + Add
                 </button>
               </div>
+              {loading && <p className={styles.statusText}>Loading…</p>}
               <div className={styles.tableCard}>
-                <div ref={usersHostRef} className={styles.dtHost} />
-                {!loading && users.length === 0 && <p className={styles.emptyState}>No users found.</p>}
-              </div>
-            </>
-          )}
-
-          {selectedUser && !selectedDoctor && (
-            <>
-              <div className={styles.toolbar}>
-                <button
-                  type="button"
-                  className={styles.secondaryBtn}
-                  onClick={() => {
-                    setSelectedUser(null);
-                    setDoctors([]);
-                  }}
-                >
-                  ← Users
-                </button>
-                <button type="button" className={styles.secondaryBtn} onClick={exportDoctors}>
-                  Export doctors
-                </button>
-              </div>
-              <div className={styles.tableCard}>
-                <div ref={doctorsHostRef} className={styles.dtHost} />
-                {!loading && doctors.length === 0 && (
-                  <p className={styles.emptyState}>This user has not created any doctors yet.</p>
+                <div ref={hostRef} className={styles.dtHost} />
+                {!loading && admins.length === 0 && (
+                  <p className={styles.emptyState}>No admins found.</p>
                 )}
               </div>
             </>
           )}
 
-          {selectedDoctor && (
-            <>
-              <div className={styles.toolbar}>
-                <button
-                  type="button"
-                  className={styles.secondaryBtn}
-                  onClick={() => {
-                    setShowPosters(false);
-                    setSelectedPosterToDownload(null);
-                    setSelectedDoctor(null);
-                  }}
-                >
-                  ← Doctors
-                </button>
-                <div className={styles.toolbarActions}>
-                  <button type="button" className={styles.primaryBtn} onClick={() => setShowPosters(true)}>
-                    Show posters
-                  </button>
-                  <button type="button" className={styles.secondaryBtn} onClick={exportDoctors}>
-                    Export doctors
-                  </button>
-                </div>
-              </div>
-              <div className={styles.detailCard}>
-                <div className={styles.detailLogo}>
-                  {selectedDoctor.logo ? (
-                    <img src={selectedDoctor.logo} alt={`${selectedDoctor.name} logo`} />
-                  ) : (
-                    <span>—</span>
-                  )}
-                </div>
-                <div className={styles.detailGrid}>
-                  {[
-                    ['Doctor ID', selectedDoctor.id],
-                    ['Name', selectedDoctor.name],
-                    ['Degree', selectedDoctor.doctorDegree],
-                    ['Clinic / Hospital', selectedDoctor.clinicName],
-                    ['Contact Number', selectedDoctor.contactnumber],
-                    ['Status', selectedDoctor.active ? 'Active' : 'Inactive'],
-                    ['Posters made', selectedDoctor.postersMade],
-                    ['Downloads', selectedDoctor.downloadCount],
-                    ['Created', selectedDoctor.createdAt ? new Date(selectedDoctor.createdAt).toLocaleString() : '—'],
-                    ['Last updated', selectedDoctor.updatedAt ? new Date(selectedDoctor.updatedAt).toLocaleString() : '—'],
-                  ].map(([label, value]) => (
-                    <div key={label} className={styles.detailField}>
-                      <span>{label}</span>
-                      <strong>{value || '—'}</strong>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </>
+          {selectedAdmin && (
+            <UsersDoctorsBoard
+              adminId={selectedAdmin.id}
+              onBack={() => setSelectedAdmin(null)}
+            />
           )}
         </section>
       </div>
 
-      {showPosters && selectedDoctor && (
-        <div className={styles.posterOverlay} role="dialog" aria-modal="true" aria-label="Doctor posters">
-          <div className={styles.posterOverlayHeader}>
-            <div>
-              <p className={styles.previewEyebrow}>Posters</p>
-              <h2>{selectedDoctor.name}</h2>
-              <p className={styles.previewMeta}>
-                {doctorPosters.length} {doctorPosters.length === 1 ? 'poster' : 'posters'}
-              </p>
-            </div>
-            <button type="button" className={styles.secondaryBtn} onClick={() => setShowPosters(false)}>
-              Close
-            </button>
-          </div>
-          <div className={styles.posterOverlayBody}>
-            {doctorPosters.length === 0 ? (
-              <p className={styles.posterEmpty}>No posters yet.</p>
-            ) : (
-              <div className={styles.posterGallery} style={posterGalleryStyle(doctorPosters.length)}>
-                {doctorPosters.map((poster, index) => {
-                  const kind = inferPosterKind(poster);
-                  return (
-                    <div 
-                      key={poster.id || index} 
-                      className={styles.posterOverlayItem}
-                      onClick={() => setSelectedPosterToDownload(poster)}
-                      style={{ cursor: 'pointer' }}
-                    >
-                      {kind === 'video' ? (
-                        <video src={poster.image} controls playsInline preload="metadata" />
-                      ) : (
-                        <img src={poster.image} alt={poster.label || `Poster ${index + 1}`} />
-                      )}
-                      <em>{poster.label || `Poster ${index + 1}`}</em>
-                      <small>{kind}</small>
-                    </div>
-                  );
-                })}
+      {showModal && (
+        <div className={styles.modalOverlay} onClick={() => setShowModal(false)}>
+          <div className={styles.modal} role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()}>
+            <h2 className={styles.modalTitle}>{editingAdmin ? 'Edit admin' : 'Add admin'}</h2>
+            <form onSubmit={saveAdmin} className={styles.form}>
+              <label className={styles.field}>
+                <span>Username</span>
+                <input
+                  value={form.username}
+                  onChange={(event) => {
+                    setForm((prev) => ({ ...prev, username: event.target.value }));
+                    if (formErrors.username) setFormErrors((prev) => ({ ...prev, username: null }));
+                  }}
+                />
+                {formErrors.username && <span className={styles.fieldError}>{formErrors.username}</span>}
+              </label>
+              <label className={styles.field}>
+                <span>{editingAdmin ? 'Password (leave blank to keep)' : 'Password'}</span>
+                <input
+                  type="password"
+                  value={form.password}
+                  onChange={(event) => {
+                    setForm((prev) => ({ ...prev, password: event.target.value }));
+                    if (formErrors.password) setFormErrors((prev) => ({ ...prev, password: null }));
+                  }}
+                  autoComplete="new-password"
+                />
+                {formErrors.password && <span className={styles.fieldError}>{formErrors.password}</span>}
+              </label>
+              <div className={styles.modalActions}>
+                <button type="button" className={styles.secondaryBtn} onClick={() => setShowModal(false)}>
+                  Cancel
+                </button>
+                <button type="submit" className={styles.primaryBtn} disabled={saving}>
+                  {saving ? 'Saving…' : 'Save'}
+                </button>
               </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {selectedPosterToDownload && selectedDoctor && (
-        <div className={styles.posterOverlay} style={{ zIndex: 9999, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }} onClick={() => setSelectedPosterToDownload(null)}>
-          <div onClick={(e) => e.stopPropagation()} style={{ background: '#fff', padding: 20, borderRadius: 8, display: 'flex', flexDirection: 'column', alignItems: 'center', maxWidth: '90%', maxHeight: '90%' }}>
-            {inferPosterKind(selectedPosterToDownload) === 'video' ? (
-              <video src={selectedPosterToDownload.image} controls style={{ maxHeight: '70vh', maxWidth: '100%' }} />
-            ) : (
-              <img src={selectedPosterToDownload.image} alt="Poster" style={{ maxHeight: '70vh', maxWidth: '100%', objectFit: 'contain' }} />
-            )}
-            <div style={{ marginTop: 20, display: 'flex', gap: 10 }}>
-              <button className={styles.secondaryBtn} onClick={() => setSelectedPosterToDownload(null)}>Close</button>
-              <button 
-                type="button"
-                onClick={() => handleForceDownload(selectedPosterToDownload.image, `Poster_${selectedDoctor.name}_${selectedPosterToDownload.label || 'download'}`)}
-                className={styles.primaryBtn} 
-              >
-                Download
-              </button>
-            </div>
+            </form>
           </div>
         </div>
       )}

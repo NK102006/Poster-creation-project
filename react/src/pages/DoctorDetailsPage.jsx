@@ -157,6 +157,8 @@ export default function DoctorDetailsPage({
       user={user}
       onLogout={onLogout}
       onBrandClick={onBrandClick || onStartNew}
+      onBack={onBack}
+      backLabel="Back"
       headerActions={
         onOpenExisting ? (
           <button type="button" className={styles.headerAction} onClick={onOpenExisting}>
@@ -166,11 +168,6 @@ export default function DoctorDetailsPage({
       }
     >
       <div className={styles.hero}>
-        {onBack && (
-          <button type="button" className={styles.backLink} onClick={onBack}>
-            ← Back to doctor
-          </button>
-        )}
         <h1 className={styles.heroTitle}>
           {editingExisting ? 'Create poster' : 'Doctor details'}
         </h1>

@@ -41,21 +41,6 @@
   text-align: center;
 }
 
-.progressTrack {
-  height: 3px;
-  border-radius: 999px;
-  background: rgba(31, 111, 159, 0.12);
-  overflow: hidden;
-  margin-bottom: 18px;
-}
-
-.progressFill {
-  height: 100%;
-  background: linear-gradient(90deg, var(--color-accent), var(--color-accent-soft));
-  border-radius: inherit;
-  transition: width 0.45s ease;
-}
-
 .stepRow {
   display: flex;
   justify-content: center;

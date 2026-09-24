@@ -19,7 +19,7 @@ export default function LoginForm({ onSuccess }) {
       <Alert>{formError}</Alert>
 
       <TextField
-        label="Employee ID"
+        label="Employee ID or username"
         inputMode="numeric"
         autoComplete="username"
         value={values.id}

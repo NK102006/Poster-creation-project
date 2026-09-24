@@ -131,25 +131,52 @@
 
 .row {
   display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  width: 100%;
+  padding: 6px 6px 6px 6px;
+  border-radius: 16px;
+  border: 1px solid rgba(31, 111, 159, 0.12);
+  background: rgba(255, 255, 255, 0.85);
+  transition: border-color 0.18s ease, background 0.18s ease;
+}
+
+.row:hover {
+  border-color: rgba(74, 159, 212, 0.45);
+  background: rgba(74, 159, 212, 0.06);
+}
+
+.rowMain {
+  display: grid;
   grid-template-columns: 52px minmax(0, 1fr) auto;
   gap: 14px;
   align-items: center;
   width: 100%;
   text-align: left;
-  padding: 12px;
-  border-radius: 16px;
-  border: 1px solid rgba(31, 111, 159, 0.12);
-  background: rgba(255, 255, 255, 0.85);
+  padding: 8px;
+  border: none;
+  background: transparent;
   color: var(--color-text);
   cursor: pointer;
-  transition: border-color 0.18s ease, transform 0.18s ease, background 0.18s ease;
   font-family: var(--font-body);
 }
 
-.row:hover {
-  border-color: rgba(74, 159, 212, 0.45);
-  background: rgba(74, 159, 212, 0.08);
-  transform: translateY(-1px);
+.removeBtn {
+  border: 1px solid rgba(196, 91, 74, 0.4);
+  background: transparent;
+  color: var(--color-error);
+  border-radius: 10px;
+  padding: 8px 12px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: var(--font-body);
+  margin-right: 6px;
+}
+
+.removeBtn:hover {
+  background: rgba(196, 91, 74, 0.08);
 }
 
 .avatar {
@@ -210,6 +237,10 @@
 
 @media (max-width: 640px) {
   .row {
+    grid-template-columns: 1fr;
+  }
+
+  .rowMain {
     grid-template-columns: 48px minmax(0, 1fr);
   }
 
@@ -218,6 +249,11 @@
     flex-direction: row;
     gap: 12px;
     align-items: center;
+  }
+
+  .removeBtn {
+    margin: 0 8px 8px;
+    justify-self: end;
   }
 }
 
