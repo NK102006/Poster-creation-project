@@ -132,7 +132,7 @@ function userColumns({ showAdmin }) {
         }]
       : []),
     {
-      title: 'Doctors made',
+      title: 'Total doctors',
       data: 'doctorCount',
       render: (data) => String(data ?? 0),
     },
@@ -293,7 +293,7 @@ export default function UsersDoctorsBoard({
   const headerBackLabel = selectedDoctor
     ? '← Doctors'
     : selectedUser
-      ? '← Users'
+      ? '← Employees'
       : onBack
         ? backLabel
         : '';
@@ -431,7 +431,7 @@ export default function UsersDoctorsBoard({
     setModalError('');
     try {
       if (!editingUser && needsAdminPick && !userForm.ownerAdmin) {
-        setModalError('Select an admin for this user');
+        setModalError('Select an admin for this employee');
         setSaving(false);
         return;
       }
@@ -493,7 +493,7 @@ export default function UsersDoctorsBoard({
   };
 
   const deleteUser = async (user) => {
-    if (!window.confirm(`Delete user ${user.empid || user.id} and their doctors?`)) return;
+    if (!window.confirm(`Delete employee ${user.empid || user.id} and their doctors?`)) return;
     setError('');
     try {
       const path = adminId
@@ -535,8 +535,13 @@ export default function UsersDoctorsBoard({
   });
 
   const exportUsers = () => {
+    if (users.length === 0) {
+      setError('No data available to export');
+      setTimeout(() => setError(''), 3000);
+      return;
+    }
     const rows = [
-      ['ID', 'Employee ID', 'Admin', 'Doctors made'],
+      ['ID', 'Employee ID', 'Admin', 'Total doctors'],
       ...users.map((user) => [user.id, user.empid, user.adminUsername || adminName || '', user.doctorCount ?? 0]),
     ];
     downloadFile(
@@ -549,6 +554,11 @@ export default function UsersDoctorsBoard({
 
   const exportDoctors = async () => {
     if (!selectedUser) return;
+    if (doctors.length === 0) {
+      setError('No data available to export');
+      setTimeout(() => setError(''), 3000);
+      return;
+    }
     setLoading(true);
     setError('');
     try {
@@ -604,10 +614,10 @@ export default function UsersDoctorsBoard({
   const page = selectedDoctor
     ? 'Doctor details'
     : selectedUser
-      ? `${selectedUser.empid || 'User'}’s doctors`
+      ? `${selectedUser.empid || 'Employee'}’s doctors`
       : adminName
-        ? `${adminName}’s users`
-        : 'Users';
+        ? `${adminName}’s employees`
+        : 'Employees';
 
   const doctorPosters = selectedDoctor?.posters || [];
 
@@ -641,10 +651,10 @@ export default function UsersDoctorsBoard({
             </>
           )}
           <button type="button" className={styles.secondaryBtn} onClick={exportUsers}>
-            Export users
+            Export employees
           </button>
           <button type="button" className={styles.primaryBtn} onClick={openCreateUser}>
-            + Add user
+            + Add employee
           </button>
         </>
       )}
@@ -681,7 +691,7 @@ export default function UsersDoctorsBoard({
       {!selectedUser && (
         <div className={styles.tableCard}>
           <div ref={usersHostRef} className={styles.dtHost} />
-          {!loading && users.length === 0 && <p className={styles.emptyState}>No users found.</p>}
+          {!loading && users.length === 0 && <p className={styles.emptyState}>No employees found.</p>}
         </div>
       )}
 
@@ -689,7 +699,7 @@ export default function UsersDoctorsBoard({
         <div className={styles.tableCard}>
           <div ref={doctorsHostRef} className={styles.dtHost} />
           {!loading && doctors.length === 0 && (
-            <p className={styles.emptyState}>This user has not created any doctors yet.</p>
+            <p className={styles.emptyState}>This employee has not created any doctors yet.</p>
           )}
         </div>
       )}
@@ -728,7 +738,7 @@ export default function UsersDoctorsBoard({
       {showUserModal && (
         <div className={styles.modalOverlay} onClick={closeUserModal}>
           <div className={styles.modal} role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()}>
-            <h2 className={styles.modalTitle}>{editingUser ? 'Edit user' : 'Add user'}</h2>
+            <h2 className={styles.modalTitle}>{editingUser ? 'Edit employee' : 'Add employee'}</h2>
             <form onSubmit={saveUser} className={styles.form} noValidate>
               {modalError && <p className={styles.error}>{modalError}</p>}
               {needsAdminPick && !editingUser && (

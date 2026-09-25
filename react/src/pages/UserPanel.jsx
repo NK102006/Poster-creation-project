@@ -31,6 +31,7 @@ export default function UserPanel() {
   const [formData, setFormData] = useState({});
   const [formFieldErrors, setFormFieldErrors] = useState({});
   const [saving, setSaving] = useState(false);
+  const [exportError, setExportError] = useState('');
   const hostRef = useRef(null);
   const tableRef = useRef(null);
 
@@ -289,6 +290,11 @@ export default function UserPanel() {
   const handleExport = async () => {
     try {
       const doctors = await apiRequest('/admin/collections/doctors');
+      if (!doctors || doctors.length === 0) {
+        setExportError('No data available to export');
+        setTimeout(() => setExportError(''), 3000);
+        return;
+      }
       const rows = [
         ['Name', 'Degree', 'Clinic / Hospital', 'Contact Number'],
         ...doctors.map((doctor) => [
@@ -413,6 +419,7 @@ export default function UserPanel() {
               </button>
             </div>
           </div>
+          {exportError && <p className={styles.error} style={{ margin: '0 24px 16px' }}>{exportError}</p>}
           <div className={styles.tableCard}>
             <div ref={hostRef} className={styles.dtHost} />
           </div>
@@ -430,7 +437,9 @@ export default function UserPanel() {
                   <input
                     type="text"
                     inputMode={field === 'contactnumber' ? 'numeric' : undefined}
+                    minLength={field === 'contactnumber' ? 10 : undefined}
                     maxLength={field === 'contactnumber' ? 10 : undefined}
+                    pattern={field === 'contactnumber' ? '[0-9]{10}' : undefined}
                     value={formData[field] ?? ''}
                     onChange={(event) => {
                       const next = field === 'contactnumber'
@@ -438,6 +447,12 @@ export default function UserPanel() {
                         : event.target.value;
                       setFormData((prev) => ({ ...prev, [field]: next }));
                       if (formFieldErrors[field]) setFormFieldErrors((prev) => ({ ...prev, [field]: null }));
+                    }}
+                    onBlur={(event) => {
+                      if (field === 'contactnumber') {
+                        const err = validatePhoneNumber(event.target.value);
+                        if (err) setFormFieldErrors((prev) => ({ ...prev, contactnumber: err }));
+                      }
                     }}
                   />
                   {formFieldErrors[field] && <span className={styles.fieldError}>{formFieldErrors[field]}</span>}

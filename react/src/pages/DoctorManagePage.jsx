@@ -188,12 +188,21 @@ export default function DoctorManagePage({
   };
 
   const handleContinue = async () => {
-    if (isInactive) {
-      setError('Reactivate this doctor before continuing.');
+    const errs = {};
+    if (!form.name?.trim()) errs.name = 'Doctor name is required';
+    if (!form.doctorDegree?.trim()) errs.doctorDegree = "Doctor's degree is required";
+    if (!form.clinicName?.trim()) errs.clinicName = 'Clinic / Hospital name is required';
+    const phoneError = validatePhoneNumber(form.contactnumber);
+    if (phoneError) errs.contactnumber = phoneError;
+
+    if (Object.keys(errs).length > 0) {
+      setFormFieldErrors(errs);
+      setError('Please fix the errors above before continuing.');
       return;
     }
-    if (!form.doctorDegree?.trim()) {
-      setError("Doctor's degree is required before continuing.");
+
+    if (isInactive) {
+      setError('Reactivate this doctor before continuing.');
       return;
     }
     setSaving(true);
@@ -330,11 +339,17 @@ export default function DoctorManagePage({
                 <input
                   type="tel"
                   inputMode="numeric"
+                  minLength={10}
                   maxLength={10}
+                  pattern="[0-9]{10}"
                   value={form.contactnumber}
                   onChange={(e) => {
                     setForm((p) => ({ ...p, contactnumber: sanitizePhoneInput(e.target.value) }));
                     if (formFieldErrors.contactnumber) setFormFieldErrors((p) => ({ ...p, contactnumber: null }));
+                  }}
+                  onBlur={(e) => {
+                    const err = validatePhoneNumber(e.target.value);
+                    if (err) setFormFieldErrors((p) => ({ ...p, contactnumber: err }));
                   }}
                 />
                 {formFieldErrors.contactnumber && <span className={styles.fieldError}>{formFieldErrors.contactnumber}</span>}

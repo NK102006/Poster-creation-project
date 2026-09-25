@@ -55,7 +55,7 @@ const adminColumns = [
     render: (data) => escapeHtml(data || '—'),
   },
   {
-    title: 'Users',
+    title: 'Employees',
     data: 'userCount',
     render: (data) => String(data ?? 0),
   },
@@ -129,7 +129,7 @@ export default function SuperAdminPortal() {
       setClosingModal(false);
     },
     remove: async (admin) => {
-      if (!window.confirm(`Delete admin ${admin.username} and every user and doctor under them?`)) return;
+      if (!window.confirm(`Delete admin ${admin.username} and every employee and doctor under them?`)) return;
       try {
         await apiRequest(`/superadmin/admins/${admin.id}`, { method: 'DELETE' });
         loadAdmins();

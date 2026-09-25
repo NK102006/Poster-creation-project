@@ -453,13 +453,19 @@ export default function PosterGenerator({
                     id="step-doc-contact"
                     type="tel"
                     inputMode="numeric"
+                    minLength={10}
                     maxLength={10}
+                    pattern="[0-9]{10}"
                     placeholder="10-digit mobile number"
                     className={styles.inputField}
                     value={formData.contactnumber}
                     onChange={(e) => {
                       setFormData?.((prev) => ({ ...prev, contactnumber: sanitizePhoneInput(e.target.value) }));
                       if (fieldErrors.contactnumber) setFieldErrors(prev => ({ ...prev, contactnumber: null }));
+                    }}
+                    onBlur={(e) => {
+                      const err = validatePhoneNumber(e.target.value);
+                      if (err) setFieldErrors(prev => ({ ...prev, contactnumber: err }));
                     }}
                   />
                   {fieldErrors.contactnumber && <span className={styles.fieldError}>{fieldErrors.contactnumber}</span>}

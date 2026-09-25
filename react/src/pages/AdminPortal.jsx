@@ -61,6 +61,7 @@ export default function AdminPortal() {
   const [password, setPassword] = useState('');
   const [loginError, setLoginError] = useState('');
   const [loginFieldErrors, setLoginFieldErrors] = useState({});
+  const [exportError, setExportError] = useState('');
   const [boardContext, setBoardContext] = useState({ backLabel: '', onNavigateBack: null });
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
@@ -108,6 +109,12 @@ export default function AdminPortal() {
         apiRequest('/admin/collections/users'),
         apiRequest('/admin/collections/doctors')
       ]);
+
+      if ((!users || users.length === 0) && (!doctors || doctors.length === 0)) {
+        setExportError('No data available to export');
+        setTimeout(() => setExportError(''), 3000);
+        return;
+      }
 
       const zip = new JSZip();
 
@@ -163,7 +170,7 @@ export default function AdminPortal() {
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = 'All_Users_And_Doctors.zip';
+      link.download = 'All_Employees_And_Doctors.zip';
       link.click();
       URL.revokeObjectURL(url);
     } catch (err) {
@@ -210,7 +217,7 @@ export default function AdminPortal() {
         <nav className={styles.nav}>
           <p className={styles.navLabel}>Collections</p>
           <button type="button" className={`${styles.navItem} ${styles.navActive}`}>
-            <span className={styles.navIcon}>U</span>Users
+            <span className={styles.navIcon}>E</span>Employees
           </button>
         </nav>
 
@@ -257,6 +264,7 @@ export default function AdminPortal() {
             </button>
           </div>
         </header>
+        {exportError && <p className={styles.error} style={{ margin: '16px 24px 0' }}>{exportError}</p>}
         <section className={styles.panel}>
           <UsersDoctorsBoard
             showAdminColumn={auth.role === 'superadmin'}
