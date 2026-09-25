@@ -1075,6 +1075,18 @@
   padding-top: 8px;
 }
 
+.downloadRow {
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+
+.downloadStatus {
+  color: #4caf50;
+  font-size: 14px;
+  font-weight: 500;
+  margin-right: auto;
+}
+
 .secondaryBtn {
   background: #ffffff;
   border: 1px solid rgba(31, 111, 159, 0.2);
@@ -1107,8 +1119,14 @@
   font-family: var(--font-body);
 }
 
-.primaryBtn:hover {
+.primaryBtn:hover:not(:disabled) {
   transform: translateY(-1px);
+}
+
+.primaryBtn:disabled {
+  opacity: 0.5;
+  cursor: default;
+  box-shadow: none;
 }
 
 @media (max-width: 720px) {
@@ -1228,7 +1246,7 @@
 .previewPoster {
   height: 100%;
   min-height: 0;
-  aspect-ratio: 9 / 16;
+  aspect-ratio: 1080 / 1350;
   overflow: hidden;
   border-radius: 12px;
   box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);

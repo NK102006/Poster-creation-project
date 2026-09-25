@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { mapThemeToRiskFactor, themePageStyle } from '../lib/posterExport';
 import { apiRequest } from '../lib/apiClient';
 import RiskFactorPoster from './RiskFactorPoster';
+import PosterFooterOverlay from './PosterFooterOverlay';
+import { fitPosterScale } from '../lib/posterFooterLayout';
 import styles from './PosterCarousel.module.css';
 
 function posterLabel(poster) {
@@ -26,7 +28,7 @@ function ScaledRiskFactorPoster({
     const measure = () => {
       const { width, height } = host.getBoundingClientRect();
       if (width < 1 || height < 1) return;
-      setScale(Math.min(width, height) / 736);
+      setScale(fitPosterScale(width, height));
     };
     measure();
     const observer = new ResizeObserver(measure);
@@ -100,27 +102,31 @@ export function PosterPage({
     );
   }
 
-  if (poster.kind === 'master') {
+  const rawImage = poster.image || poster.src || poster.imageUrl;
+  if (rawImage) {
+    const imageSrc =
+      /^(https?:|data:|blob:)/.test(rawImage) || rawImage.startsWith('/')
+        ? rawImage
+        : `/${rawImage}`;
     return (
       <div
         className={`${styles.blankPage} ${styles.componentPage}`}
-        style={{ ...pageStyle, padding: 0, overflow: 'hidden' }}
+        style={{ ...pageStyle, position: 'relative', overflow: 'hidden' }}
         id={isCaptureTarget ? 'doctor-poster-capture' : undefined}
       >
         <img
-          src={poster.image.startsWith('http') ? poster.image : '/' + poster.image}
+          src={imageSrc}
           alt={label}
-          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+          style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
           crossOrigin="anonymous"
         />
-        <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '10px', background: 'rgba(255,255,255,0.85)', display: 'flex', alignItems: 'center', gap: '10px' }}>
-          {doctorFields.logo && <img src={doctorFields.logo} alt="Logo" style={{ width: 40, height: 40, borderRadius: '50%', objectFit: 'cover' }} />}
-          <div>
-            <div style={{ fontWeight: 'bold', fontSize: '14px', color: '#000' }}>{doctorFields.doctorName}</div>
-            <div style={{ fontSize: '10px', color: '#555' }}>{doctorFields.doctorDegree} | {doctorFields.clinicName}</div>
-            <div style={{ fontSize: '10px', color: '#555' }}>{doctorFields.phone}</div>
-          </div>
-        </div>
+        <PosterFooterOverlay
+          logo={doctorFields?.logo}
+          doctorName={doctorFields?.doctorName}
+          doctorDegree={doctorFields?.doctorDegree}
+          clinicName={doctorFields?.clinicName}
+          phone={doctorFields?.phone}
+        />
       </div>
     );
   }
@@ -382,6 +388,9 @@ export default function PosterCarousel({
   variant = 'grid',
   onPosterClick,
   onSlidesChange,
+  selectedIds = [],
+  onSelectedIdsChange,
+  selectionEnabled = false,
   doctorFields = {
     clinicName: '',
     doctorName: '',
@@ -449,6 +458,18 @@ export default function PosterCarousel({
 
   const safeIndex = Math.max(0, Math.min(activeIndex, Math.max(slides.length - 1, 0)));
   const pageStyle = themePageStyle(theme);
+
+  const selectedSet = useMemo(() => new Set(selectedIds), [selectedIds]);
+  const canSelect = selectionEnabled && typeof onSelectedIdsChange === 'function';
+
+  const toggleSelected = (posterId) => {
+    if (!canSelect) return;
+    if (selectedSet.has(posterId)) {
+      onSelectedIdsChange(selectedIds.filter((id) => id !== posterId));
+      return;
+    }
+    onSelectedIdsChange([...selectedIds, posterId]);
+  };
 
   const goTo = useCallback(
     (index) => {
@@ -518,37 +539,52 @@ export default function PosterCarousel({
             const label = posterLabel(poster);
             const sendLabel = posterSendLabel(index);
             const isActive = index === safeIndex;
+            const isSelected = selectedSet.has(poster.id);
 
-            return (
-              <button
-                key={poster.id}
-                type="button"
-                className={`${styles.gridCard} ${isActive ? styles.gridCardActive : ''}`}
-                onClick={(e) => {
-                  goTo(index);
-                  if (onPosterClick) {
-                    const rect = e.currentTarget.getBoundingClientRect();
-                    onPosterClick(poster, { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 });
-                  }
-                }}
-                aria-label={label}
-                aria-current={isActive ? 'true' : undefined}
-              >
-                <PosterPage
-                  poster={poster}
-                  label={label}
-                  pageStyle={pageStyle}
-                  isCaptureTarget={isActive}
-                  theme={theme}
-                  doctorFields={doctorFields}
-                />
-                <p className={styles.sendDate}>
-                  Send <strong>{sendLabel}</strong>
-                </p>
-              </button>
-            );
-          })}
-        </div>
+              return (
+                <div
+                  key={poster.id}
+                  className={`${styles.gridCard} ${isActive ? styles.gridCardActive : ''} ${isSelected ? styles.gridCardSelected : ''}`}
+                >
+                  {canSelect ? (
+                    <label className={styles.selectCheck}>
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={() => toggleSelected(poster.id)}
+                        aria-label={`Select ${label}`}
+                      />
+                    </label>
+                  ) : null}
+                  <button
+                    type="button"
+                    className={styles.gridCardHit}
+                    onClick={(e) => {
+                      goTo(index);
+                      if (onPosterClick) {
+                        const rect = e.currentTarget.getBoundingClientRect();
+                        onPosterClick(poster, { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 });
+                      }
+                    }}
+                    aria-label={label}
+                    aria-current={isActive ? 'true' : undefined}
+                  >
+                    <PosterPage
+                      poster={poster}
+                      label={label}
+                      pageStyle={pageStyle}
+                      isCaptureTarget={isActive}
+                      theme={theme}
+                      doctorFields={doctorFields}
+                    />
+                    <p className={styles.sendDate}>
+                      Send <strong>{sendLabel}</strong>
+                    </p>
+                  </button>
+                </div>
+              );
+            })}
+          </div>
       )}
     </div>
   );

@@ -48,6 +48,8 @@ export default function PosterGenerator({
   const [logoCropState, setLogoCropState] = useState(null);
   const [tempLogoCropState, setTempLogoCropState] = useState(null);
 
+  const [selectedPosterIds, setSelectedPosterIds] = useState([]);
+  const [multiSelect, setMultiSelect] = useState(false);
   const [previewModalOpen, setPreviewModalOpen] = useState(false);
   const [closingModal, setClosingModal] = useState(false);
   const [modalOrigin, setModalOrigin] = useState({ x: window.innerWidth / 2, y: window.innerHeight / 2 });
@@ -183,6 +185,9 @@ export default function PosterGenerator({
     theme: selectedTheme,
     doctorFields,
     onSlidesChange: setCarouselSlides,
+    selectedIds: selectedPosterIds,
+    onSelectedIdsChange: setSelectedPosterIds,
+    selectionEnabled: multiSelect,
     onPosterClick: (poster, originCoords) => {
       setModalPoster(poster);
       if (originCoords) setModalOrigin(originCoords);
@@ -275,7 +280,28 @@ export default function PosterGenerator({
     }
   };
 
-  const handleDownloadZip = async () => {
+  const startMultiSelect = () => {
+    setMultiSelect(true);
+    setDownloadSuccess(false);
+  };
+
+  const cancelMultiSelect = () => {
+    setMultiSelect(false);
+    setSelectedPosterIds([]);
+  };
+
+  const handleDownloadZip = async (scope = 'all') => {
+    const pack =
+      scope === 'selected'
+        ? carouselSlides.filter((poster) => selectedPosterIds.includes(poster.id))
+        : carouselSlides;
+    if (pack.length === 0) {
+      setDownloadMessage(scope === 'selected' ? 'Select at least one poster.' : 'No posters to zip.');
+      setDownloadSuccess(true);
+      setTimeout(() => setDownloadSuccess(false), 4000);
+      return;
+    }
+
     try {
       setIsGenerating(true);
       setDownloadSuccess(false);
@@ -285,13 +311,12 @@ export default function PosterGenerator({
         .replace(/[^a-zA-Z0-9_-]/g, '_')
         .replace(/_+/g, '_');
 
-      const pack = carouselSlides;
       let generalCounter = 0;
       for (let i = 0; i < pack.length; i += 1) {
         const poster = pack[i];
         const label = poster.label || `Poster-${++generalCounter}`;
         const safeLabel = label.replace(/[^a-zA-Z0-9_-]/g, '_');
-        
+
         if (poster.kind === 'video') {
           const res = await fetch(poster.videoUrl);
           const videoBlob = await res.blob();
@@ -312,7 +337,7 @@ export default function PosterGenerator({
         } else {
           firstBlob = await renderPosterBlob(pack[0], firstLabel);
         }
-        onAutoSave(formData, logoFile, firstBlob, pack[0].kind).catch(() => {});
+        onAutoSave(formData, logoFile, firstBlob, firstKind).catch(() => {});
       }
 
       const zipBlob = await zip.generateAsync({ type: 'blob' });
@@ -324,7 +349,7 @@ export default function PosterGenerator({
       URL.revokeObjectURL(url);
 
       setIsGenerating(false);
-      setDownloadMessage(`Zip ready!`);
+      setDownloadMessage(`Zip ready — ${pack.length} poster${pack.length === 1 ? '' : 's'}.`);
       setDownloadSuccess(true);
       setTimeout(() => setDownloadSuccess(false), 6000);
     } catch (err) {
@@ -559,22 +584,55 @@ export default function PosterGenerator({
               <PosterCarousel key={selectedThemeId} variant="grid" {...carouselProps} />
             </div>
 
-            <div className={styles.navRow} style={{ justifyContent: 'flex-end' }}>
-              <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-                {downloadSuccess && (
-                  <span style={{ color: '#4caf50', fontSize: 14, fontWeight: 500 }}>
-                    {downloadMessage || 'Download complete.'}
-                  </span>
-                )}
-                <button
-                  type="button"
-                  className={styles.primaryBtn}
-                  onClick={handleDownloadZip}
-                  disabled={isGenerating}
-                >
-                  {isGenerating ? 'Preparing ZIP…' : 'Download all posters as ZIP'}
-                </button>
-              </div>
+            <div className={`${styles.navRow} ${styles.downloadRow}`}>
+              {downloadSuccess && (
+                <span className={styles.downloadStatus}>
+                  {downloadMessage || 'Download complete.'}
+                </span>
+              )}
+              {multiSelect ? (
+                <>
+                  <button
+                    type="button"
+                    className={styles.secondaryBtn}
+                    onClick={cancelMultiSelect}
+                    disabled={isGenerating}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    className={styles.primaryBtn}
+                    onClick={() => handleDownloadZip('selected')}
+                    disabled={isGenerating || selectedPosterIds.length === 0}
+                  >
+                    {isGenerating
+                      ? 'Preparing ZIP…'
+                      : selectedPosterIds.length === 0
+                        ? 'Download selected as ZIP'
+                        : `Download ${selectedPosterIds.length} selected as ZIP`}
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    className={styles.secondaryBtn}
+                    onClick={startMultiSelect}
+                    disabled={isGenerating}
+                  >
+                    Select multiple posters
+                  </button>
+                  <button
+                    type="button"
+                    className={styles.primaryBtn}
+                    onClick={() => handleDownloadZip('all')}
+                    disabled={isGenerating}
+                  >
+                    {isGenerating ? 'Preparing ZIP…' : 'Download all as ZIP'}
+                  </button>
+                </>
+              )}
             </div>
           </div>
         )}

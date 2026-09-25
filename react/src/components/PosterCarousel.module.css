@@ -85,13 +85,54 @@
   border: none;
   background: transparent;
   padding: 8px 4px 0;
-  cursor: pointer;
   text-align: center;
   display: flex;
   flex-direction: column;
   gap: 8px;
   position: relative;
   z-index: 1;
+}
+
+.gridCardHit {
+  border: none;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  font: inherit;
+  color: inherit;
+}
+
+.selectCheck {
+  position: absolute;
+  top: 12px;
+  left: 8px;
+  z-index: 10;
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 4px 10px rgba(31, 111, 159, 0.2);
+}
+
+.selectCheck input {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: #1f6f9f;
+  cursor: pointer;
+}
+
+.gridCardSelected .blankPage {
+  box-shadow:
+    0 14px 28px rgba(31, 111, 159, 0.22),
+    0 0 0 2px rgba(31, 111, 159, 0.7);
 }
 
 .gridCard:hover {
@@ -107,7 +148,7 @@
 .blankPage {
   position: relative;
   width: 100%;
-  aspect-ratio: 3 / 4;
+  aspect-ratio: 1080 / 1350;
   border-radius: 12px;
   background: linear-gradient(180deg, #ffffff 0%, var(--color-surface) 100%);
   border: 1px solid rgba(31, 111, 159, 0.1);
@@ -139,8 +180,8 @@
   position: absolute;
   top: 50%;
   left: 50%;
-  width: 736px;
-  height: 736px;
+  width: 1080px;
+  height: 1350px;
   transform-origin: center center;
   pointer-events: none;
 }
