@@ -417,7 +417,7 @@ export default function PosterCarousel({
 
   return (
     <div className={styles.carousel}>
-      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12, gap: '8px', flexWrap: 'wrap' }}>
+      <div className={styles.categoryRow}>
         {[
           { id: 'all', label: 'All Categories' },
           { id: 'education', label: 'Education' },
@@ -427,21 +427,10 @@ export default function PosterCarousel({
           <button
             key={cat.id}
             type="button"
+            className={`${styles.categoryBtn} ${filter === cat.id ? styles.categoryBtnActive : ''}`}
             onClick={() => {
               setFilter(cat.id);
               onIndexChange?.(0);
-            }}
-            style={{
-              padding: '6px 14px',
-              borderRadius: '20px',
-              border: filter === cat.id ? '1px solid #1f6f9f' : '1px solid rgba(31, 111, 159, 0.2)',
-              background: filter === cat.id ? '#1f6f9f' : '#f4f9fc',
-              color: filter === cat.id ? '#fff' : 'var(--color-text)',
-              fontSize: '13px',
-              cursor: 'pointer',
-              fontWeight: 500,
-              transition: 'all 0.2s ease',
-              outline: 'none'
             }}
           >
             {cat.label}

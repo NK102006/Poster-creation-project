@@ -683,17 +683,15 @@ export default function PosterGenerator({
           >
             <div className={styles.previewModalContent} onClick={e => e.stopPropagation()}>
             <button 
+              type="button"
+              className={styles.previewClose}
               onClick={closePreview}
-              style={{ 
-                position: 'absolute', top: -36, right: -40, background: 'none', border: 'none', 
-                color: '#000', fontSize: 28, cursor: 'pointer', fontWeight: 'bold',
-                textShadow: '0 2px 4px rgba(255,255,255,0.8)' 
-              }}
+              aria-label="Close poster preview"
             >
               ✕
             </button>
             
-            <div style={{ height: '100%', minHeight: 0, aspectRatio: '9/16', overflow: 'hidden', borderRadius: 12, boxShadow: '0 20px 50px rgba(0,0,0,0.5)', position: 'relative' }}>
+            <div className={styles.previewPoster}>
               <PosterPage
                 poster={modalPoster || monthlyPosters[0]}
                 label={modalPoster?.id || 'Poster'}

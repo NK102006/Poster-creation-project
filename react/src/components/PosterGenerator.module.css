@@ -1127,8 +1127,23 @@
     grid-template-columns: 1fr;
   }
 
+  .stepRow {
+    justify-content: center;
+    width: auto;
+    gap: 8px;
+  }
+
+  .stepTab {
+    flex: 0 0 auto;
+    width: auto;
+    justify-content: center;
+    padding: 8px 12px;
+    gap: 6px;
+  }
+
   .stepLabel {
-    display: none;
+    font-size: 12px;
+    white-space: nowrap;
   }
 }
 
@@ -1194,4 +1209,57 @@
   flex-direction: column;
   gap: 20px;
   align-items: center;
+}
+
+.previewClose {
+  position: absolute;
+  top: -36px;
+  right: -40px;
+  background: none;
+  border: none;
+  color: #000;
+  font-size: 28px;
+  cursor: pointer;
+  font-weight: 700;
+  line-height: 1;
+  text-shadow: 0 2px 4px rgba(255, 255, 255, 0.8);
+}
+
+.previewPoster {
+  height: 100%;
+  min-height: 0;
+  aspect-ratio: 9 / 16;
+  overflow: hidden;
+  border-radius: 12px;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+  position: relative;
+}
+
+@media (max-width: 480px) {
+  .previewModalWrapper {
+    padding: 16px 12px 24px;
+    justify-content: center;
+  }
+
+  .previewModalContent {
+    width: min(100%, 320px);
+    height: auto;
+    max-height: 90vh;
+    gap: 12px;
+  }
+
+  .previewClose {
+    position: static;
+    align-self: flex-end;
+    top: auto;
+    right: auto;
+    font-size: 26px;
+    padding: 0 2px 4px;
+  }
+
+  .previewPoster {
+    width: 100%;
+    height: auto;
+    max-height: calc(90vh - 140px);
+  }
 }
