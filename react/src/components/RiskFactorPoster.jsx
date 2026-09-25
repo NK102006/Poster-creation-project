@@ -31,7 +31,6 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { forwardRef, useEffect, useState } from 'react';
-import bpPhoto from '../assets/bp-photo.jpg';
 
 // ─── THEMES ──────────────────────────────────────────────────────────────────
 // Every theme is a light-tinted background with DARK text, plus deep colours for
@@ -255,7 +254,7 @@ const RiskFactorPoster = forwardRef(function RiskFactorPoster(
     phone = '+91 00000 00000',
     theme = 'blue',
     logoFit = 'cover',
-    photo = bpPhoto,
+    photo = '',
     id = 'risk-factor-poster',
   },
   ref

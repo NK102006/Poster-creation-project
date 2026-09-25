@@ -1,21 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { getActiveFestival, getGeneralPosters, getMonthlyPosters } from '../lib/posterCatalog';
 import { mapThemeToRiskFactor, themePageStyle } from '../lib/posterExport';
-import { getPosterTiming, getSendDateForIndex } from '../lib/posterSchedule';
+import { apiRequest } from '../lib/apiClient';
 import RiskFactorPoster from './RiskFactorPoster';
 import styles from './PosterCarousel.module.css';
 
-function posterLabel(poster, generalPosters) {
-  if (poster.kind === 'festival') return poster.festivalName || 'Festival';
-  const gIdx = Math.max(0, generalPosters.findIndex((p) => p.id === poster.id));
-  return `Poster-${gIdx + 1}`;
+function posterLabel(poster) {
+  return poster.label || 'Poster';
 }
 
-function posterSendLabel(poster, index, total) {
-  if (poster.kind === 'festival') {
-    return getPosterTiming({ mode: 'festival' }).sendLabel;
-  }
-  return getSendDateForIndex(index, total);
+function posterSendLabel(index) {
+  return `Day ${index + 1}`;
 }
 
 function ScaledRiskFactorPoster({
@@ -106,6 +100,31 @@ export function PosterPage({
     );
   }
 
+  if (poster.kind === 'master') {
+    return (
+      <div
+        className={`${styles.blankPage} ${styles.componentPage}`}
+        style={{ ...pageStyle, padding: 0, overflow: 'hidden' }}
+        id={isCaptureTarget ? 'doctor-poster-capture' : undefined}
+      >
+        <img
+          src={poster.image.startsWith('http') ? poster.image : '/' + poster.image}
+          alt={label}
+          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+          crossOrigin="anonymous"
+        />
+        <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '10px', background: 'rgba(255,255,255,0.85)', display: 'flex', alignItems: 'center', gap: '10px' }}>
+          {doctorFields.logo && <img src={doctorFields.logo} alt="Logo" style={{ width: 40, height: 40, borderRadius: '50%', objectFit: 'cover' }} />}
+          <div>
+            <div style={{ fontWeight: 'bold', fontSize: '14px', color: '#000' }}>{doctorFields.doctorName}</div>
+            <div style={{ fontSize: '10px', color: '#555' }}>{doctorFields.doctorDegree} | {doctorFields.clinicName}</div>
+            <div style={{ fontSize: '10px', color: '#555' }}>{doctorFields.phone}</div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div
       className={styles.blankPage}
@@ -175,7 +194,6 @@ function ScrollView({
   safeIndex,
   goTo,
   pageStyle,
-  generalPosters,
   theme,
   doctorFields,
 }) {
@@ -237,7 +255,7 @@ function ScrollView({
 
   const active = slides[safeIndex];
   const sendLabel = active
-    ? posterSendLabel(active, safeIndex, slides.length)
+    ? posterSendLabel(safeIndex)
     : '';
 
   return (
@@ -285,7 +303,7 @@ function ScrollView({
                   : distance === 1
                     ? styles.slideNear
                     : styles.slideFar;
-              const label = posterLabel(poster, generalPosters);
+              const label = posterLabel(poster);
 
               return (
                 <button
@@ -349,7 +367,7 @@ function ScrollView({
             aria-selected={index === safeIndex}
             className={`${styles.dot} ${index === safeIndex ? styles.dotActive : ''}`}
             onClick={() => lockedGoTo(index)}
-            aria-label={`Go to ${posterLabel(poster, generalPosters)}`}
+            aria-label={`Go to ${posterLabel(poster)}`}
           />
         ))}
       </div>
@@ -360,11 +378,10 @@ function ScrollView({
 export default function PosterCarousel({
   activeIndex = 0,
   onIndexChange,
-  mode = 'general',
-  onModeChange,
   theme,
   variant = 'grid',
   onPosterClick,
+  onSlidesChange,
   doctorFields = {
     clinicName: '',
     doctorName: '',
@@ -373,46 +390,71 @@ export default function PosterCarousel({
     logo: null,
   },
 }) {
-  const festival = useMemo(() => getActiveFestival(new Date()), []);
-  const generalPosters = useMemo(() => getGeneralPosters(), []);
-  const monthlyPosters = useMemo(() => getMonthlyPosters(new Date()), []);
-
   const [filter, setFilter] = useState('all');
+  const [selectedMonth, setSelectedMonth] = useState('');
+  const [masterPosters, setMasterPosters] = useState([]);
+
+  useEffect(() => {
+    const fetchMasterPosters = async () => {
+      try {
+        const query = selectedMonth ? `?month=${selectedMonth}` : '';
+        const res = await apiRequest(`/posters${query}`);
+        if (res.posters) {
+          setMasterPosters(res.posters.map((p, idx) => ({
+            id: p._id,
+            kind: 'master',
+            image: p.posterlink,
+            category: p.category,
+            month: p.month,
+            color: p.color,
+            label: `Poster-${idx + 1}`
+          })));
+        }
+      } catch (err) {
+        console.error('Error fetching master posters:', err);
+      }
+    };
+    fetchMasterPosters();
+  }, [selectedMonth]);
 
   const slides = useMemo(() => {
-    if (filter === 'festivals') return monthlyPosters.filter((p) => p.kind === 'festival');
-    if (filter === 'videos') return monthlyPosters.filter((p) => p.kind === 'video');
-    if (filter === 'education') return monthlyPosters.filter((p) => p.kind === 'gk');
-    return monthlyPosters;
-  }, [monthlyPosters, filter]);
+    let combined = [...masterPosters];
+
+    if (filter === 'festivals') {
+      return combined.filter(p => p.category?.toLowerCase().includes('festival'));
+    }
+    if (filter === 'videos') {
+      return combined.filter(p => p.category?.toLowerCase().includes('video'));
+    }
+    if (filter === 'education') {
+      return combined.filter(p => p.category?.toLowerCase().includes('education') || p.category?.toLowerCase().includes('gk'));
+    }
+    if (theme) {
+      const themeStr = `${theme.id} ${theme.name}`.toLowerCase();
+      combined = combined.filter(p => {
+        if (!p.color || p.color.trim() === '') return true; // Show for all if no color
+        const c = p.color.toLowerCase().trim();
+        return themeStr.includes(c) || c.includes(themeStr);
+      });
+    }
+
+    return combined;
+  }, [filter, masterPosters, theme]);
+
+  useEffect(() => {
+    if (onSlidesChange) {
+      onSlidesChange(slides);
+    }
+  }, [slides, onSlidesChange]);
 
   const safeIndex = Math.max(0, Math.min(activeIndex, Math.max(slides.length - 1, 0)));
   const pageStyle = themePageStyle(theme);
 
-  const handleFestivalChange = (e) => {
-    const value = e.target.value;
-    if (!value) return;
-    onModeChange?.('festival');
-    const festIndex = slides.findIndex((p) => p.kind === 'festival');
-    onIndexChange?.(festIndex >= 0 ? festIndex : 0);
-  };
-
-  const handleGeneralChange = (e) => {
-    const value = e.target.value;
-    if (value === '') return;
-    const idx = Number(value);
-    onModeChange?.('general');
-    const targetId = generalPosters[idx]?.id;
-    const sIdx = slides.findIndex((p) => p.id === targetId);
-    onIndexChange?.(sIdx >= 0 ? sIdx : 0);
-  };
-
   const goTo = useCallback(
     (index) => {
-      onModeChange?.(slides[index]?.kind === 'festival' ? 'festival' : 'general');
       onIndexChange?.(index);
     },
-    [onIndexChange, onModeChange, slides]
+    [onIndexChange]
   );
 
   return (
@@ -437,6 +479,25 @@ export default function PosterCarousel({
           </button>
         ))}
       </div>
+      
+      <div className={styles.categoryRow} style={{ justifyContent: 'flex-end' }}>
+        <select 
+          className={`${styles.categoryBtn} ${styles.monthSelect}`}
+          value={selectedMonth}
+          onChange={(e) => {
+            setSelectedMonth(e.target.value);
+            onIndexChange?.(0);
+          }}
+          style={{ outline: 'none' }}
+        >
+          <option value="" style={{ color: '#000' }}>Select</option>
+          {['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'].map(m => (
+            <option key={m} value={m} style={{ color: '#000' }}>{m}</option>
+          ))}
+        </select>
+      </div>
+
+
 
       {slides.length === 0 ? (
         <div style={{ padding: '60px 20px', textAlign: 'center', color: 'var(--color-text-muted)', background: 'linear-gradient(180deg, #f4f9fc 0%, var(--color-surface) 100%)', borderRadius: 16, border: '1px solid rgba(31, 111, 159, 0.14)' }}>
@@ -448,15 +509,14 @@ export default function PosterCarousel({
           safeIndex={safeIndex}
           goTo={goTo}
           pageStyle={pageStyle}
-          generalPosters={generalPosters}
           theme={theme}
           doctorFields={doctorFields}
         />
       ) : (
         <div className={styles.posterGridBox}>
           {slides.map((poster, index) => {
-            const label = posterLabel(poster, generalPosters);
-            const sendLabel = posterSendLabel(poster, index, slides.length);
+            const label = posterLabel(poster);
+            const sendLabel = posterSendLabel(index);
             const isActive = index === safeIndex;
 
             return (

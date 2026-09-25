@@ -81,6 +81,70 @@ export async function renderRiskFactorPosterBlob(fields) {
   }
 }
 
+export async function renderMasterPosterBlob(poster, fields) {
+  const host = document.createElement('div');
+  host.style.cssText =
+    'position:fixed;left:-10000px;top:0;width:736px;height:736px;pointer-events:none;opacity:0;';
+  document.body.appendChild(host);
+
+  const root = createRoot(host);
+  const imgUrl = poster.image.startsWith('http') ? poster.image : '/' + poster.image;
+
+  root.render(
+    createElement('div', {
+      style: { width: '736px', height: '736px', position: 'relative', overflow: 'hidden', background: '#fff' },
+      className: 'master-export'
+    }, [
+      createElement('img', {
+        key: 'bg',
+        src: imgUrl,
+        crossOrigin: 'anonymous',
+        style: { width: '100%', height: '100%', objectFit: 'cover' }
+      }),
+      createElement('div', {
+        key: 'overlay',
+        style: {
+          position: 'absolute', bottom: 0, left: 0, right: 0,
+          padding: '20px', background: 'rgba(255,255,255,0.85)',
+          display: 'flex', alignItems: 'center', gap: '20px'
+        }
+      }, [
+        fields.logo ? createElement('img', {
+          key: 'logo',
+          src: fields.logo,
+          crossOrigin: 'anonymous',
+          style: { width: '80px', height: '80px', borderRadius: '50%', objectFit: 'cover' }
+        }) : null,
+        createElement('div', { key: 'text' }, [
+          createElement('div', { key: 't1', style: { fontWeight: 'bold', fontSize: '28px', color: '#000' } }, fields.doctorName),
+          createElement('div', { key: 't2', style: { fontSize: '20px', color: '#555', marginTop: '4px' } }, `${fields.doctorDegree} | ${fields.clinicName}`),
+          createElement('div', { key: 't3', style: { fontSize: '20px', color: '#555', marginTop: '4px' } }, fields.phone)
+        ])
+      ])
+    ])
+  );
+
+  await new Promise((resolve) => {
+    requestAnimationFrame(() => requestAnimationFrame(resolve));
+  });
+
+  const node = host.querySelector('.master-export');
+  await waitForImages(node);
+
+  try {
+    const dataUrl = await toJpeg(node, {
+      quality: 0.95,
+      pixelRatio: 2,
+      cacheBust: true,
+    });
+    const res = await fetch(dataUrl);
+    return res.blob();
+  } finally {
+    root.unmount();
+    host.remove();
+  }
+}
+
 function hexToRgb(hex) {
   const h = String(hex || '').replace('#', '');
   if (h.length !== 6) return { r: 243, g: 235, b: 224 };

@@ -6,6 +6,7 @@ import { canAccessPage, clearAuth, readAuth, writeAuth } from '../lib/authSessio
 import { sanitizePasswordInput, sanitizeUsernameInput, validateNewPassword, validatePassword } from '../features/auth/validators';
 import StaffLogin from './StaffLogin';
 import UsersDoctorsBoard from './UsersDoctorsBoard';
+import MasterPostersBoard from './MasterPostersBoard';
 import styles from './AdminPortal.module.css';
 
 function escapeHtml(value) {
@@ -95,6 +96,7 @@ export default function SuperAdminPortal() {
   const [saving, setSaving] = useState(false);
   const [boardContext, setBoardContext] = useState({ user: null, doctor: null });
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState('admins'); // 'admins' or 'posters'
   const hostRef = useRef(null);
   const actionRef = useRef({});
 
@@ -316,17 +318,30 @@ export default function SuperAdminPortal() {
           <p className={styles.navLabel}>Oversight</p>
           <button
             type="button"
-            className={`${styles.navItem} ${!selectedAdmin ? styles.navActive : ''}`}
-            onClick={() => setSelectedAdmin(null)}
+            className={`${styles.navItem} ${activeTab === 'admins' && !selectedAdmin ? styles.navActive : ''}`}
+            onClick={() => {
+              setActiveTab('admins');
+              setSelectedAdmin(null);
+            }}
           >
             <span className={styles.navIcon}>A</span>Admins
           </button>
-          {selectedAdmin && (
+          {selectedAdmin && activeTab === 'admins' && (
             <button type="button" className={`${styles.navItem} ${styles.navActive}`}>
               <span className={styles.navIcon}>U</span>
               {selectedAdmin.username}
             </button>
           )}
+          <button
+            type="button"
+            className={`${styles.navItem} ${activeTab === 'posters' ? styles.navActive : ''}`}
+            onClick={() => {
+              setActiveTab('posters');
+              setSelectedAdmin(null);
+            }}
+          >
+            <span className={styles.navIcon}>P</span>Posters
+          </button>
         </nav>
 
         <div className={`${styles.sidebarMobileActions} ${styles.mobileOnly}`}>
@@ -357,24 +372,26 @@ export default function SuperAdminPortal() {
             </svg>
           </button>
           <div id="topbar-left" style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-            {selectedAdmin ? (
-            <button
-              type="button"
-              className={styles.secondaryBtn}
-              onClick={() => {
-                if (boardContext.onNavigateBack) {
-                  boardContext.onNavigateBack();
-                  return;
-                }
-                setBoardContext({ user: null, doctor: null });
-                setSelectedAdmin(null);
-              }}
-            >
-              {boardContext.backLabel || '← Admins'}
-            </button>
-          ) : (
-            <h1 className={styles.pageTitle}>Admins</h1>
-          )}
+            {activeTab === 'posters' ? (
+              <h1 className={styles.pageTitle}>Posters</h1>
+            ) : selectedAdmin ? (
+              <button
+                type="button"
+                className={styles.secondaryBtn}
+                onClick={() => {
+                  if (boardContext.onNavigateBack) {
+                    boardContext.onNavigateBack();
+                    return;
+                  }
+                  setBoardContext({ user: null, doctor: null });
+                  setSelectedAdmin(null);
+                }}
+              >
+                {boardContext.backLabel || '← Admins'}
+              </button>
+            ) : (
+              <h1 className={styles.pageTitle}>Admins</h1>
+            )}
           </div>
           <div className={styles.topbarRight}>
             <div id="topbar-actions" className={styles.desktopOnly} style={{ gap: '10px' }} />
@@ -387,7 +404,11 @@ export default function SuperAdminPortal() {
         <section className={styles.panel}>
           {error && <p className={styles.error}>{error}</p>}
 
-          {!selectedAdmin && (
+          {activeTab === 'posters' && (
+            <MasterPostersBoard onContextChange={setBoardContext} />
+          )}
+
+          {activeTab === 'admins' && !selectedAdmin && (
             <>
               <div className={`${styles.toolbar} ${styles.desktopOnly}`}>
                 <div />
@@ -405,7 +426,7 @@ export default function SuperAdminPortal() {
             </>
           )}
 
-          {selectedAdmin && (
+          {activeTab === 'admins' && selectedAdmin && (
             <UsersDoctorsBoard
               adminId={selectedAdmin.id}
               adminName={selectedAdmin.username}

@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import { apiRequest } from '../lib/apiClient';
 import StudioShell from '../components/StudioShell';
 import LogoCanvas from '../components/LogoCanvas';
-import { getSendDateForIndex } from '../lib/posterSchedule';
 import { sanitizePhoneInput, validatePhoneNumber } from '../features/auth/validators';
 import styles from './DoctorManagePage.module.css';
 

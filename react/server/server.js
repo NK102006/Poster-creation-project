@@ -47,6 +47,7 @@ fs.mkdirSync(path.join(UPLOADS_DIR, 'posters'), { recursive: true });
 fs.mkdirSync(path.join(UPLOADS_DIR, 'festival_posters'), { recursive: true });
 fs.mkdirSync(path.join(UPLOADS_DIR, 'education_posters'), { recursive: true });
 fs.mkdirSync(path.join(UPLOADS_DIR, 'videos'), { recursive: true });
+fs.mkdirSync(path.join(UPLOADS_DIR, 'master_posters'), { recursive: true });
 app.use('/uploads', express.static(UPLOADS_DIR));
 
 // Schemas & Models
@@ -88,6 +89,14 @@ const userSchema = new mongoose.Schema({
   password: { type: String, required: true },
   ownerAdmin: { type: mongoose.Schema.Types.ObjectId, ref: 'Admin', default: null, index: true },
 }, { strict: false, timestamps: true });
+
+const templatePosterSchema = new mongoose.Schema({
+  posterlink: { type: String, required: true },
+  category: { type: String, default: '' },
+  color: { type: String, default: '' },
+  month: { type: String, default: '' },
+  uploaddate: { type: Date, default: Date.now }
+}, { timestamps: true });
 
 const adminSchema = new mongoose.Schema({
   username: { type: String, required: true, unique: true, trim: true },
@@ -167,6 +176,7 @@ attachPasswordHashing(adminSchema);
 export const Doctor = mongoose.model('Doctor', doctorSchema);
 export const User = mongoose.model('User', userSchema);
 export const Admin = mongoose.model('Admin', adminSchema);
+export const Poster = mongoose.model('Poster', templatePosterSchema);
 
 const SUPERADMIN_USERNAME = 'superadmin';
 const SUPERADMIN_PASSWORD = 'superadmin123';
@@ -2096,6 +2106,97 @@ async function ensureMongoRunning() {
     'Could not start MongoDB automatically. Install/start it manually, then retry.'
   );
 }
+
+
+// --- Superadmin Template Posters API ---
+app.get('/api/posters', requireAuth('superadmin', 'admin', 'user'), async (req, res) => {
+  try {
+    const { month } = req.query;
+    const filter = month ? { month: { $regex: `^${String(month)}$`, $options: 'i' } } : {};
+    const posters = await Poster.find(filter).sort({ uploaddate: -1 });
+    res.status(200).json({ posters });
+  } catch (error) {
+    console.error('Error fetching posters:', error);
+    res.status(500).json({ message: 'Failed to fetch posters' });
+  }
+});
+
+app.get('/api/superadmin/posters', requireAuth('superadmin'), async (req, res) => {
+  try {
+    const posters = await Poster.find().sort({ uploaddate: -1 });
+    res.status(200).json({ posters });
+  } catch (error) {
+    console.error('Error fetching posters:', error);
+    res.status(500).json({ message: 'Failed to fetch posters' });
+  }
+});
+
+app.post('/api/superadmin/posters', requireAuth('superadmin'), upload.any(), async (req, res) => {
+  try {
+    const { category, color, month, uploaddate } = req.body;
+    let posterlink = req.body.posterlink || '';
+
+    const posterFile = req.files?.find((f) => f.fieldname === 'posterFile');
+    if (posterFile) {
+      posterlink = await saveFile(posterFile.buffer, posterFile.originalname, 'master_posters');
+    }
+
+    if (!posterlink) {
+      return res.status(400).json({ message: 'Poster file or link is required' });
+    }
+
+    const newPoster = new Poster({
+      posterlink,
+      category: category || '',
+      color: color || '',
+      month: month || '',
+      ...(uploaddate ? { uploaddate: new Date(uploaddate) } : {}),
+    });
+
+    await newPoster.save();
+    res.status(201).json({ success: true, poster: newPoster });
+  } catch (error) {
+    console.error('Error creating poster:', error);
+    res.status(500).json({ message: 'Failed to upload poster' });
+  }
+});
+
+app.put('/api/superadmin/posters/:id', requireAuth('superadmin'), upload.any(), async (req, res) => {
+  try {
+    const { category, color, month, uploaddate } = req.body;
+    const poster = await Poster.findById(req.params.id);
+    if (!poster) return res.status(404).json({ message: 'Poster not found' });
+
+    const posterFile = req.files?.find((f) => f.fieldname === 'posterFile');
+    if (posterFile) {
+      poster.posterlink = await saveFile(posterFile.buffer, posterFile.originalname, 'master_posters');
+    } else if (req.body.posterlink) {
+      poster.posterlink = req.body.posterlink;
+    }
+
+    if (category !== undefined) poster.category = category;
+    if (color !== undefined) poster.color = color;
+    if (month !== undefined) poster.month = month;
+    if (uploaddate) poster.uploaddate = new Date(uploaddate);
+
+    await poster.save();
+    res.status(200).json({ success: true, poster });
+  } catch (error) {
+    console.error('Error updating poster:', error);
+    res.status(500).json({ message: 'Failed to update poster' });
+  }
+});
+
+app.delete('/api/superadmin/posters/:id', requireAuth('superadmin'), async (req, res) => {
+  try {
+    const poster = await Poster.findByIdAndDelete(req.params.id);
+    if (!poster) return res.status(404).json({ message: 'Poster not found' });
+    res.status(200).json({ success: true });
+  } catch (error) {
+    console.error('Error deleting poster:', error);
+    res.status(500).json({ message: 'Failed to delete poster' });
+  }
+});
 
 const startServer = async () => {
   try {

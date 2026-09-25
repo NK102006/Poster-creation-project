@@ -5,11 +5,11 @@ import JSZip from 'jszip';
 import { POSTER_THEMES } from './Poster';
 import PosterCarousel, { PosterPage } from './PosterCarousel';
 import LogoCanvas from './LogoCanvas';
-import { getGeneralPosters, getMonthlyPosters } from '../lib/posterCatalog';
 import {
   mapThemeToRiskFactor,
   renderBlankPosterBlob,
   renderRiskFactorPosterBlob,
+  renderMasterPosterBlob,
 } from '../lib/posterExport';
 import styles from './PosterGenerator.module.css';
 import { sanitizePhoneInput, validatePhoneNumber } from '../features/auth/validators';
@@ -35,7 +35,7 @@ export default function PosterGenerator({
   const [isSavingInitial, setIsSavingInitial] = useState(false);
   const [selectedThemeId, setSelectedThemeId] = useState('theme-warm-red');
   const [activePosterIndex, setActivePosterIndex] = useState(0);
-  const [posterMode, setPosterMode] = useState('general');
+  const [carouselSlides, setCarouselSlides] = useState([]);
   const [isGenerating, setIsGenerating] = useState(false);
   const [downloadSuccess, setDownloadSuccess] = useState(false);
   const [downloadMessage, setDownloadMessage] = useState('');
@@ -51,9 +51,6 @@ export default function PosterGenerator({
   const [previewModalOpen, setPreviewModalOpen] = useState(false);
   const [closingModal, setClosingModal] = useState(false);
   const [modalOrigin, setModalOrigin] = useState({ x: window.innerWidth / 2, y: window.innerHeight / 2 });
-
-  const generalPosters = useMemo(() => getGeneralPosters(), []);
-  const monthlyPosters = useMemo(() => getMonthlyPosters(new Date()), []);
 
   const selectedTheme =
     POSTER_THEMES.find((t) => t.id === selectedThemeId) || POSTER_THEMES[0];
@@ -183,10 +180,9 @@ export default function PosterGenerator({
   const carouselProps = {
     activeIndex: activePosterIndex,
     onIndexChange: setActivePosterIndex,
-    mode: posterMode,
-    onModeChange: setPosterMode,
     theme: selectedTheme,
     doctorFields,
+    onSlidesChange: setCarouselSlides,
     onPosterClick: (poster, originCoords) => {
       setModalPoster(poster);
       if (originCoords) setModalOrigin(originCoords);
@@ -196,6 +192,9 @@ export default function PosterGenerator({
   };
 
   const renderPosterBlob = async (poster, label) => {
+    if (poster?.kind === 'master') {
+      return renderMasterPosterBlob(poster, doctorFields);
+    }
     if (poster?.template === 'risk-factor') {
       return renderRiskFactorPosterBlob({
         ...doctorFields,
@@ -210,30 +209,22 @@ export default function PosterGenerator({
       setIsGenerating(true);
       setDownloadSuccess(false);
 
-      const targetPoster = modalPoster || monthlyPosters[0];
+      const targetPoster = modalPoster || carouselSlides[0];
 
-      const label =
-        targetPoster?.kind === 'festival'
-          ? targetPoster.festivalName || 'Festival'
-          : `Poster-${
-              targetPoster?.kind === 'festival'
-                ? 1
-                : Math.max(
-                    1,
-                    generalPosters.findIndex((p) => p.id === targetPoster?.id) + 1
-                  )
-            }`;
+      const label = targetPoster?.label || 'Poster';
 
       const cleanDocName = formattedDoctorName
         .replace(/[^a-zA-Z0-9_-]/g, '_')
         .replace(/_+/g, '_');
       const posterLabel = targetPoster?.id || 'poster';
       const posterKind =
-        targetPoster?.kind === 'festival'
-          ? 'festival'
-          : targetPoster?.kind === 'video'
-            ? 'video'
-            : 'education';
+        targetPoster?.kind === 'master'
+          ? 'master'
+          : targetPoster?.kind === 'festival'
+            ? 'festival'
+            : targetPoster?.kind === 'video'
+              ? 'video'
+              : 'education';
       const saveMeta = { kind: posterKind, label };
 
       if (targetPoster?.kind === 'video') {
@@ -294,14 +285,11 @@ export default function PosterGenerator({
         .replace(/[^a-zA-Z0-9_-]/g, '_')
         .replace(/_+/g, '_');
 
-      const pack = getMonthlyPosters(new Date());
+      const pack = carouselSlides;
       let generalCounter = 0;
       for (let i = 0; i < pack.length; i += 1) {
         const poster = pack[i];
-        const label =
-          poster.kind === 'festival'
-            ? poster.festivalName || 'Festival'
-            : `Poster-${++generalCounter}`;
+        const label = poster.label || `Poster-${++generalCounter}`;
         const safeLabel = label.replace(/[^a-zA-Z0-9_-]/g, '_');
         
         if (poster.kind === 'video') {
@@ -316,14 +304,8 @@ export default function PosterGenerator({
 
       if (onAutoSave && pack[0]) {
         let firstBlob;
-        const firstLabel =
-          pack[0].kind === 'festival' ? pack[0].festivalName : 'Poster-1';
-        const firstKind =
-          pack[0].kind === 'festival'
-            ? 'festival'
-            : pack[0].kind === 'video'
-              ? 'video'
-              : 'education';
+        const firstLabel = pack[0].label || 'Poster-1';
+        const firstKind = pack[0].kind || 'master';
         if (pack[0].kind === 'video') {
           const res = await fetch(pack[0].videoUrl);
           firstBlob = await res.blob();
@@ -699,8 +681,8 @@ export default function PosterGenerator({
             
             <div className={styles.previewPoster}>
               <PosterPage
-                poster={modalPoster || monthlyPosters[0]}
-                label={modalPoster?.id || 'Poster'}
+                poster={modalPoster || carouselSlides[0] || { kind: 'master', image: '', template: 'blank' }}
+                label={modalPoster?.label || 'Poster'}
                 pageStyle={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}
                 isCaptureTarget={false}
                 theme={selectedTheme}
