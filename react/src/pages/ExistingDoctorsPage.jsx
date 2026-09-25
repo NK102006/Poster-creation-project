@@ -39,7 +39,7 @@ export default function ExistingDoctorsPage({ user, onLogout, onBack, onSelectDo
     let active = true;
     const timer = setTimeout(() => {
       if (active) loadDoctors(query, page);
-    }, query ? 250 : 0);
+    }, query ? 200 : 0);
     return () => {
       active = false;
       clearTimeout(timer);

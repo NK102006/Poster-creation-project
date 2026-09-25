@@ -64,6 +64,10 @@
   box-shadow: var(--shadow-card);
 }
 
+.searchForm {
+  width: 100%;
+}
+
 .searchLabel {
   display: block;
   font-size: 11px;

@@ -545,23 +545,20 @@ app.get('/api/doctors', async (req, res) => {
 
     if (q) {
       const escaped = escapeRegex(q);
-      const or = [
+      filter.$or = [
         { name: { $regex: escaped, $options: 'i' } },
         { clinicName: { $regex: escaped, $options: 'i' } },
         { doctorDegree: { $regex: escaped, $options: 'i' } },
-      ];
-      const digits = q.replace(/\D/g, '');
-      if (digits) {
-        or.push({
+        {
           $expr: {
             $regexMatch: {
               input: { $toString: { $ifNull: ['$contactnumber', ''] } },
-              regex: escapeRegex(digits),
+              regex: escaped,
+              options: 'i',
             },
           },
-        });
-      }
-      filter.$or = or;
+        },
+      ];
     }
 
     const [doctors, totalFiltered, total] = await Promise.all([
@@ -1788,18 +1785,16 @@ app.get('/api/admin/datatables/:collection', requireAuth('superadmin', 'admin', 
           { name: { $regex: escapedSearch, $options: 'i' } },
           { clinicName: { $regex: escapedSearch, $options: 'i' } },
           { doctorDegree: { $regex: escapedSearch, $options: 'i' } },
-        ];
-        const digits = searchValue.replace(/\D/g, '');
-        if (digits) {
-          or.push({
+          {
             $expr: {
               $regexMatch: {
                 input: { $toString: { $ifNull: ['$contactnumber', ''] } },
-                regex: escapeRegex(digits),
+                regex: escapedSearch,
+                options: 'i',
               },
             },
-          });
-        }
+          },
+        ];
         if (/^[a-f\d]{24}$/i.test(searchValue)) {
           or.push({ _id: searchValue });
         }
