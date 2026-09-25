@@ -176,11 +176,24 @@ function escapeRegex(value) {
 }
 
 function getAuthFromRequest(req) {
-  if (req.session?.auth?.role) return req.session.auth;
-  const role = String(req.headers['x-auth-role'] || '').trim();
-  const id = String(req.headers['x-auth-id'] || '').trim();
-  if (role === 'superadmin' || role === 'admin' || role === 'user') {
-    return { role, id: id || null };
+  const headerRole = String(req.headers['x-auth-role'] || '').trim();
+  const headerId = String(req.headers['x-auth-id'] || '').trim();
+
+  if (req.session?.auths && headerRole) {
+    if (req.session.auths[headerRole]) {
+      return req.session.auths[headerRole];
+    }
+  }
+
+  if (req.session?.auth?.role) {
+    if (headerRole && req.session.auth.role !== headerRole) {
+      return null;
+    }
+    return req.session.auth;
+  }
+
+  if (headerRole === 'superadmin' || headerRole === 'admin' || headerRole === 'user') {
+    return { role: headerRole, id: headerId || null };
   }
   return null;
 }
@@ -433,7 +446,11 @@ async function findUserByLoginId(id) {
 }
 
 function setAuthSession(req, auth) {
-  if (req.session) req.session.auth = auth;
+  if (req.session) {
+    if (!req.session.auths) req.session.auths = {};
+    req.session.auths[auth.role] = auth;
+    req.session.auth = auth;
+  }
   return auth;
 }
 
@@ -482,7 +499,17 @@ app.post('/api/login', async (req, res) => {
 });
 
 app.post('/api/logout', (req, res) => {
+  const headerRole = String(req.headers['x-auth-role'] || '').trim();
   if (req.session) {
+    if (req.session.auths && headerRole) {
+      delete req.session.auths[headerRole];
+      if (req.session.auth && req.session.auth.role === headerRole) {
+        delete req.session.auth;
+      }
+      if (Object.keys(req.session.auths).length > 0) {
+        return res.status(200).json({ success: true });
+      }
+    }
     req.session.destroy(() => {
       res.status(200).json({ success: true });
     });
