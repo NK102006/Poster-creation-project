@@ -465,17 +465,6 @@ app.post('/api/login', async (req, res) => {
   }
 
   try {
-    if (loginId === SUPERADMIN_USERNAME && pass === SUPERADMIN_PASSWORD) {
-      const auth = setAuthSession(req, buildAuthPayload('superadmin'));
-      return res.status(200).json({ success: true, message: 'Login successful', user: auth, auth });
-    }
-
-    const admin = await findAdminByUsername(loginId);
-    if (admin && await verifyPassword(pass, admin.password)) {
-      const auth = setAuthSession(req, buildAuthPayload('admin', admin));
-      return res.status(200).json({ success: true, message: 'Login successful', user: auth, auth });
-    }
-
     const user = await findUserByLoginId(loginId);
     if (!user) {
       return res.status(401).json({ success: false, message: 'Invalid employee ID or password' });
@@ -1122,10 +1111,6 @@ app.post('/api/admin/login', async (req, res) => {
   const { username, password } = req.body || {};
   const loginId = String(username || '').trim();
   const pass = String(password || '');
-  if (loginId === SUPERADMIN_USERNAME && pass === SUPERADMIN_PASSWORD) {
-    const auth = setAuthSession(req, buildAuthPayload('superadmin'));
-    return res.status(200).json({ success: true, message: 'Login successful', auth });
-  }
   try {
     const admin = await findAdminByUsername(loginId);
     if (!admin || !(await verifyPassword(pass, admin.password))) {
@@ -1146,16 +1131,7 @@ app.post('/api/userpanel/login', async (req, res) => {
   if (!loginId || !pass) {
     return res.status(400).json({ success: false, message: 'Username / employee ID and password are required' });
   }
-  if (loginId === SUPERADMIN_USERNAME && pass === SUPERADMIN_PASSWORD) {
-    const auth = setAuthSession(req, buildAuthPayload('superadmin'));
-    return res.status(200).json({ success: true, message: 'Login successful', auth });
-  }
   try {
-    const admin = await findAdminByUsername(loginId);
-    if (admin && await verifyPassword(pass, admin.password)) {
-      const auth = setAuthSession(req, buildAuthPayload('admin', admin));
-      return res.status(200).json({ success: true, message: 'Login successful', auth });
-    }
     const user = await findUserByLoginId(loginId);
     if (user && await verifyPassword(pass, user.password)) {
       const auth = setAuthSession(req, buildAuthPayload('user', user));

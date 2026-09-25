@@ -540,7 +540,7 @@ export default function UsersDoctorsBoard({
       ...users.map((user) => [user.id, user.empid, user.adminUsername || adminName || '', user.doctorCount ?? 0]),
     ];
     downloadFile(
-      new Blob([rows.map((row) => row.map(csvCell).join(',')).join('\n')], {
+      new Blob(['\ufeff' + rows.map((row) => row.map(csvCell).join(',')).join('\r\n')], {
         type: 'text/csv;charset=utf-8;',
       }),
       'users.csv'
@@ -588,11 +588,11 @@ export default function UsersDoctorsBoard({
         rows.push([
           doctor.id, doctor.name, doctor.doctorDegree, doctor.clinicName, doctor.contactnumber,
           doctor.active ? 'Active' : 'Inactive', doctor.postersMade, doctor.downloadCount,
-          logoFile, filesByKind.education.join('; '), filesByKind.festival.join('; '), filesByKind.video.join('; '),
+          logoFile, filesByKind.education.join('\n'), filesByKind.festival.join('\n'), filesByKind.video.join('\n'),
         ]);
       }
 
-      zip.file('doctors.csv', rows.map((row) => row.map(csvCell).join(',')).join('\n'));
+      zip.file('doctors.csv', '\ufeff' + rows.map((row) => row.map(csvCell).join(',')).join('\r\n'));
       downloadFile(await zip.generateAsync({ type: 'blob' }), `${selectedUser.empid || 'user'}-doctors.zip`);
     } catch (err) {
       setError(err.message || 'Could not export doctors');
