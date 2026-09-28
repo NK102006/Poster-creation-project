@@ -28,8 +28,9 @@ export default function UserPanel() {
   const [closingModal, setClosingModal] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
-  const [formData, setFormData] = useState({});
+  const [formData, setFormData] = useState({ dynamicFields: {} });
   const [formFieldErrors, setFormFieldErrors] = useState({});
+  const [doctorFields, setDoctorFields] = useState([]);
   const [saving, setSaving] = useState(false);
   const [exportError, setExportError] = useState('');
   const hostRef = useRef(null);
@@ -82,9 +83,21 @@ export default function UserPanel() {
   useEffect(() => {
     if (!isLoggedIn) return undefined;
 
-    const openEdit = (item) => {
+    apiRequest('/doctor-fields').then(res => {
+      if (res && res.fields) {
+        setDoctorFields(res.fields);
+      }
+    }).catch(console.error);
+
+    const openEdit = async (item) => {
+      try {
+        const res = await apiRequest('/doctor-fields');
+        if (res && res.fields) setDoctorFields(res.fields);
+      } catch (err) {
+        console.error(err);
+      }
       setEditingItem(item);
-      setFormData({ ...item });
+      setFormData({ dynamicFields: {}, ...item });
       setShowModal(true);
       setClosingModal(false);
     };
@@ -227,9 +240,15 @@ export default function UserPanel() {
     };
   }, [isLoggedIn]);
 
-  const openCreate = () => {
+  const openCreate = async () => {
+    try {
+      const res = await apiRequest('/doctor-fields');
+      if (res && res.fields) setDoctorFields(res.fields);
+    } catch (err) {
+      console.error(err);
+    }
     setEditingItem(null);
-    setFormData({ name: '', clinicName: '', contactnumber: '', doctorDegree: '' });
+    setFormData({ dynamicFields: {} });
     setFormFieldErrors({});
     setShowModal(true);
     setClosingModal(false);
@@ -247,17 +266,27 @@ export default function UserPanel() {
     event.preventDefault();
 
     const errors = {};
-    const requiredFields = ['name', 'doctorDegree', 'clinicName', 'contactnumber'];
-    for (const f of requiredFields) {
-      if (f === 'contactnumber') {
-        const phoneError = validatePhoneNumber(formData.contactnumber);
-        if (phoneError) errors.contactnumber = phoneError;
+    const enabledFields = doctorFields.filter(f => f.enabled);
+
+    for (const f of enabledFields) {
+      const isDynamic = !f.isStandard;
+      const val = isDynamic ? (formData.dynamicFields?.[f.key] || '') : (formData[f.key] || '');
+
+      if (f.key === 'contactnumber') {
+        const phoneError = validatePhoneNumber(val);
+        if (phoneError) {
+           errors[f.key] = phoneError;
+        } else if (f.required && !String(val).trim()) {
+           errors[f.key] = `${f.label} is required`;
+        }
         continue;
       }
-      if (!formData[f] || !String(formData[f]).trim()) {
-        errors[f] = `${formatLabel(f)} is required`;
+
+      if (f.required && !String(val).trim()) {
+        errors[f.key] = `${f.label} is required`;
       }
     }
+
     if (Object.keys(errors).length > 0) {
       setFormFieldErrors(errors);
       return;
@@ -431,33 +460,44 @@ export default function UserPanel() {
           <div className={styles.modal} role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()}>
             <h2 className={styles.modalTitle}>{editingItem ? 'Edit doctor' : 'Add doctor'}</h2>
             <form onSubmit={handleSave} className={styles.form}>
-              {['name', 'doctorDegree', 'clinicName', 'contactnumber'].map((field) => (
-                <label key={field} className={styles.field}>
-                  <span>{formatLabel(field)}</span>
-                  <input
-                    type="text"
-                    inputMode={field === 'contactnumber' ? 'numeric' : undefined}
-                    minLength={field === 'contactnumber' ? 10 : undefined}
-                    maxLength={field === 'contactnumber' ? 10 : undefined}
-                    pattern={field === 'contactnumber' ? '[0-9]{10}' : undefined}
-                    value={formData[field] ?? ''}
-                    onChange={(event) => {
-                      const next = field === 'contactnumber'
-                        ? sanitizePhoneInput(event.target.value)
-                        : event.target.value;
-                      setFormData((prev) => ({ ...prev, [field]: next }));
-                      if (formFieldErrors[field]) setFormFieldErrors((prev) => ({ ...prev, [field]: null }));
-                    }}
-                    onBlur={(event) => {
-                      if (field === 'contactnumber') {
-                        const err = validatePhoneNumber(event.target.value);
-                        if (err) setFormFieldErrors((prev) => ({ ...prev, contactnumber: err }));
-                      }
-                    }}
-                  />
-                  {formFieldErrors[field] && <span className={styles.fieldError}>{formFieldErrors[field]}</span>}
-                </label>
-              ))}
+              {doctorFields.filter(f => f.enabled).map((field) => {
+                const isDynamic = !field.isStandard;
+                const value = isDynamic ? (formData.dynamicFields?.[field.key] ?? '') : (formData[field.key] ?? '');
+                
+                return (
+                  <label key={field.key} className={styles.field}>
+                    <span>{field.label} {field.required ? '*' : ''}</span>
+                    <input
+                      type={field.type || 'text'}
+                      inputMode={field.key === 'contactnumber' ? 'numeric' : undefined}
+                      minLength={field.key === 'contactnumber' ? 10 : undefined}
+                      maxLength={field.key === 'contactnumber' ? 10 : undefined}
+                      pattern={field.key === 'contactnumber' ? '[0-9]{10}' : undefined}
+                      value={value}
+                      onChange={(event) => {
+                        const next = field.key === 'contactnumber'
+                          ? sanitizePhoneInput(event.target.value)
+                          : event.target.value;
+                        
+                        setFormData((prev) => {
+                          if (isDynamic) {
+                            return { ...prev, dynamicFields: { ...prev.dynamicFields, [field.key]: next } };
+                          }
+                          return { ...prev, [field.key]: next };
+                        });
+                        if (formFieldErrors[field.key]) setFormFieldErrors((prev) => ({ ...prev, [field.key]: null }));
+                      }}
+                      onBlur={(event) => {
+                        if (field.key === 'contactnumber') {
+                          const err = validatePhoneNumber(event.target.value);
+                          if (err) setFormFieldErrors((prev) => ({ ...prev, contactnumber: err }));
+                        }
+                      }}
+                    />
+                    {formFieldErrors[field.key] && <span className={styles.fieldError}>{formFieldErrors[field.key]}</span>}
+                  </label>
+                );
+              })}
               <div className={styles.modalActions}>
                 <button type="button" className={styles.secondaryBtn} onClick={closeModal}>
                   Cancel

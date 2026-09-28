@@ -44,6 +44,8 @@ export default function MasterPostersBoard({ onContextChange }) {
   const [closingModal, setClosingModal] = useState(false);
   const [editingPoster, setEditingPoster] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [modalError, setModalError] = useState('');
+  const [formErrors, setFormErrors] = useState({});
   
   const [form, setForm] = useState({
     category: '',
@@ -88,6 +90,8 @@ export default function MasterPostersBoard({ onContextChange }) {
         uploaddate: poster.uploaddate ? new Date(poster.uploaddate).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
       });
       setPosterFile(null);
+      setModalError('');
+      setFormErrors({});
       setShowModal(true);
       setClosingModal(false);
     },
@@ -155,6 +159,8 @@ export default function MasterPostersBoard({ onContextChange }) {
     setEditingPoster(null);
     setForm({ category: '', color: '', month: '', uploaddate: new Date().toISOString().split('T')[0] });
     setPosterFile(null);
+    setModalError('');
+    setFormErrors({});
     setShowModal(true);
     setClosingModal(false);
   };
@@ -169,12 +175,22 @@ export default function MasterPostersBoard({ onContextChange }) {
 
   const handleSave = async (event) => {
     event.preventDefault();
-    if (!editingPoster && !posterFile) {
-      setError('Please select a poster image to upload.');
+    
+    const errs = {};
+    if (!editingPoster && !posterFile) errs.posterFile = 'Please select a poster image to upload.';
+    if (!form.category.trim()) errs.category = 'Category is required.';
+    if (!form.color.trim()) errs.color = 'Color is required.';
+    if (!form.month.trim()) errs.month = 'Month is required.';
+    if (!form.uploaddate) errs.uploaddate = 'Upload date is required.';
+
+    if (Object.keys(errs).length > 0) {
+      setFormErrors(errs);
       return;
     }
+
     setSaving(true);
-    setError('');
+    setFormErrors({});
+    setModalError('');
 
     const formData = new FormData();
     if (posterFile) formData.append('posterFile', posterFile);
@@ -198,7 +214,7 @@ export default function MasterPostersBoard({ onContextChange }) {
       closeModal();
       loadPosters();
     } catch (err) {
-      setError(err.message || 'Could not save poster');
+      setModalError(err.message || 'Could not save poster');
     } finally {
       setSaving(false);
     }
@@ -228,47 +244,83 @@ export default function MasterPostersBoard({ onContextChange }) {
           <div className={styles.modal} style={{ maxWidth: '500px' }} role="dialog" aria-modal="true" onClick={e => e.stopPropagation()}>
             <h2 className={styles.modalTitle}>{editingPoster ? 'Edit poster' : 'Add poster'}</h2>
             
-            <form onSubmit={handleSave} className={styles.form}>
+            {modalError && <p className={styles.error} style={{ marginBottom: '16px' }}>{modalError}</p>}
+            
+            <form onSubmit={handleSave} className={styles.form} noValidate>
               <label className={styles.field}>
                 <span>Poster Image {editingPoster ? '(Leave blank to keep)' : '*'}</span>
                 <input 
                   type="file" 
                   accept="image/*"
-                  onChange={e => setPosterFile(e.target.files?.[0])}
+                  onChange={e => {
+                    setPosterFile(e.target.files?.[0]);
+                    if (formErrors.posterFile) setFormErrors(p => ({ ...p, posterFile: null }));
+                  }}
                 />
+                {formErrors.posterFile && <span className={styles.fieldError}>{formErrors.posterFile}</span>}
               </label>
               
               <label className={styles.field}>
-                <span>Category</span>
+                <span>Category *</span>
                 <input 
                   value={form.category} 
-                  onChange={e => setForm(p => ({ ...p, category: e.target.value }))}
+                  onChange={e => {
+                    setForm(p => ({ ...p, category: e.target.value }));
+                    if (formErrors.category) setFormErrors(p => ({ ...p, category: null }));
+                  }}
                 />
+                {formErrors.category && <span className={styles.fieldError}>{formErrors.category}</span>}
               </label>
 
               <label className={styles.field}>
-                <span>Color</span>
+                <span>Color *</span>
                 <input 
                   value={form.color} 
-                  onChange={e => setForm(p => ({ ...p, color: e.target.value }))}
+                  onChange={e => {
+                    setForm(p => ({ ...p, color: e.target.value }));
+                    if (formErrors.color) setFormErrors(p => ({ ...p, color: null }));
+                  }}
                 />
+                {formErrors.color && <span className={styles.fieldError}>{formErrors.color}</span>}
               </label>
 
               <label className={styles.field}>
-                <span>Month</span>
-                <input 
+                <span>Month *</span>
+                <select 
                   value={form.month} 
-                  onChange={e => setForm(p => ({ ...p, month: e.target.value }))}
-                />
+                  onChange={e => {
+                    setForm(p => ({ ...p, month: e.target.value }));
+                    if (formErrors.month) setFormErrors(p => ({ ...p, month: null }));
+                  }}
+                >
+                  <option value="">Select Month</option>
+                  <option value="January">January</option>
+                  <option value="February">February</option>
+                  <option value="March">March</option>
+                  <option value="April">April</option>
+                  <option value="May">May</option>
+                  <option value="June">June</option>
+                  <option value="July">July</option>
+                  <option value="August">August</option>
+                  <option value="September">September</option>
+                  <option value="October">October</option>
+                  <option value="November">November</option>
+                  <option value="December">December</option>
+                </select>
+                {formErrors.month && <span className={styles.fieldError}>{formErrors.month}</span>}
               </label>
 
               <label className={styles.field}>
-                <span>Upload Date</span>
+                <span>Upload Date *</span>
                 <input 
                   type="date"
                   value={form.uploaddate} 
-                  onChange={e => setForm(p => ({ ...p, uploaddate: e.target.value }))}
+                  onChange={e => {
+                    setForm(p => ({ ...p, uploaddate: e.target.value }));
+                    if (formErrors.uploaddate) setFormErrors(p => ({ ...p, uploaddate: null }));
+                  }}
                 />
+                {formErrors.uploaddate && <span className={styles.fieldError}>{formErrors.uploaddate}</span>}
               </label>
 
               <div className={styles.modalActions}>

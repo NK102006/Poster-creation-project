@@ -58,6 +58,7 @@ const posterEntrySchema = new mongoose.Schema(
     createdAt: { type: Date, default: Date.now },
     kind: { type: String, enum: ['education', 'festival', 'video'], default: 'education' },
     label: { type: String, default: '' },
+    month: { type: String, default: '' },
   },
   { _id: true }
 );
@@ -74,14 +75,15 @@ function normalizePosterKind(value, imageHint = '') {
 const doctorSchema = new mongoose.Schema({
   ownerUser: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null, index: true },
   name: { type: String, required: true },
-  clinicName: { type: String, required: true, trim: true },
+  clinicName: { type: String, trim: true },
   doctorDegree: { type: String, trim: true, default: '' },
-  contactnumber: { type: Number, required: true },
+  contactnumber: { type: Number },
   logo: { type: mongoose.Schema.Types.Mixed },
   poster: { type: mongoose.Schema.Types.Mixed }, // latest poster (legacy + convenience)
   posters: { type: [posterEntrySchema], default: [] },
   downloadCount: { type: Number, default: 0 },
   active: { type: Boolean, default: true },
+  dynamicFields: { type: mongoose.Schema.Types.Mixed, default: {} },
 }, { timestamps: true });
 
 const userSchema = new mongoose.Schema({
@@ -172,6 +174,17 @@ async function ensureHashedPasswords(Model, fallback = 'pass1234') {
 
 attachPasswordHashing(userSchema);
 attachPasswordHashing(adminSchema);
+
+const doctorFieldConfigSchema = new mongoose.Schema({
+  key: { type: String, required: true, unique: true },
+  label: { type: String, required: true },
+  type: { type: String, required: true }, // 'text', 'number', 'tel', 'email' etc.
+  required: { type: Boolean, default: false },
+  isStandard: { type: Boolean, default: false },
+  enabled: { type: Boolean, default: true },
+  order: { type: Number, default: 0 }
+});
+export const DoctorField = mongoose.model('DoctorField', doctorFieldConfigSchema);
 
 export const Doctor = mongoose.model('Doctor', doctorSchema);
 export const User = mongoose.model('User', userSchema);
@@ -373,6 +386,23 @@ function formatDoctor(doc, { includePosters = false, light = false } = {}) {
   const obj = doc.toObject ? doc.toObject() : { ...doc };
   const { postersMade, downloadCount } = getPosterStats(obj);
 
+  const postersArray = Array.isArray(obj.posters) ? obj.posters : [];
+  const monthlyDownloads = {};
+  const monthlyPosters = {};
+  postersArray.forEach((p) => {
+    if (!p.createdAt) return;
+    let m = new Date(p.createdAt).getMonth(); // fallback: 0 = Jan, 11 = Dec
+    if (p.month) {
+      const monthPrefix = String(p.month).trim().toLowerCase().slice(0, 3);
+      const mIndex = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'].indexOf(monthPrefix);
+      if (mIndex !== -1) {
+        m = mIndex;
+      }
+    }
+    monthlyDownloads[m] = (monthlyDownloads[m] || 0) + (Number(p.downloads) || 0);
+    monthlyPosters[m] = (monthlyPosters[m] || 0) + 1;
+  });
+
   const base = {
     id: obj._id,
     name: obj.name,
@@ -385,6 +415,9 @@ function formatDoctor(doc, { includePosters = false, light = false } = {}) {
     ownerUser: obj.ownerUser ? String(obj.ownerUser) : null,
     createdAt: obj.createdAt,
     updatedAt: obj.updatedAt,
+    dynamicFields: obj.dynamicFields || {},
+    monthlyDownloads,
+    monthlyPosters,
   };
 
   if (light) {
@@ -732,6 +765,7 @@ app.post('/api/doctors', requireAuth('superadmin', 'admin', 'user'), upload.any(
   let posterName = posterFile?.originalname || '';
   const posterKind = normalizePosterKind(req.body.posterKind, posterName);
   const posterLabel = String(req.body.posterLabel || '').trim();
+  const posterMonth = String(req.body.posterMonth || '').trim();
 
   // Also support base64 fallback if sent in body
   if (!logoBuffer && req.body.logo && typeof req.body.logo === 'string' && req.body.logo.startsWith('data:')) {
@@ -744,21 +778,22 @@ app.post('/api/doctors', requireAuth('superadmin', 'admin', 'user'), upload.any(
     posterBuffer = Buffer.from(base64Data, 'base64');
   }
 
-  if (!String(clinicName || '').trim()) {
-    return res.status(400).json({ success: false, message: 'Clinic/Hospital name is required.' });
-  }
-
-  if (!String(doctorDegree || '').trim()) {
-    return res.status(400).json({ success: false, message: "Doctor's degree is required." });
+  let parsedDynamicFields = {};
+  if (req.body.dynamicFields) {
+    try {
+      parsedDynamicFields = JSON.parse(req.body.dynamicFields);
+    } catch (e) {
+      console.error('Failed to parse dynamicFields');
+    }
   }
 
   try {
     const cleanedContact = contactnumber
-      ? assertContactNumber(contactnumber)
-      : 9999999999;
+      ? assertContactNumber(contactnumber, { required: false })
+      : null;
     const cleanedDegree = String(doctorDegree).trim();
 
-    if (cleanedContact !== 9999999999) {
+    if (cleanedContact) {
       const existingDoc = await Doctor.findOne({ contactnumber: cleanedContact });
       if (existingDoc && (!doctorId || String(existingDoc._id) !== String(doctorId))) {
          return res.status(400).json({ success: false, message: 'This mobile number already exists' });
@@ -772,10 +807,11 @@ app.post('/api/doctors', requireAuth('superadmin', 'admin', 'user'), upload.any(
         return res.status(404).json({ success: false, message: 'Doctor not found' });
       }
 
-      doctor.name = name?.trim() || doctor.name;
-      doctor.clinicName = String(clinicName).trim();
-      doctor.doctorDegree = cleanedDegree;
-      doctor.contactnumber = cleanedContact;
+      if (name) doctor.name = name.trim();
+      if (clinicName !== undefined) doctor.clinicName = String(clinicName).trim();
+      if (doctorDegree !== undefined) doctor.doctorDegree = cleanedDegree;
+      if (cleanedContact !== null) doctor.contactnumber = cleanedContact;
+      doctor.dynamicFields = { ...doctor.dynamicFields, ...parsedDynamicFields };
       if (logoBuffer) doctor.logo = await saveFile(logoBuffer, logoName, 'logos');
 
       if (posterBuffer) {
@@ -793,6 +829,7 @@ app.post('/api/doctors', requireAuth('superadmin', 'admin', 'user'), upload.any(
           createdAt: new Date(),
           kind: posterKind,
           label: posterLabel,
+          month: posterMonth,
         });
         if (countDownload) {
           doctor.downloadCount = (Number(doctor.downloadCount) || 0) + 1;
@@ -828,13 +865,14 @@ app.post('/api/doctors', requireAuth('superadmin', 'admin', 'user'), upload.any(
     const docData = {
       ownerUser,
       name: name?.trim() || 'Doctor',
-      clinicName: String(clinicName).trim(),
+      clinicName: clinicName ? String(clinicName).trim() : '',
       doctorDegree: cleanedDegree,
       contactnumber: cleanedContact,
       logo: logoPath,
       active: true,
       posters: [],
       downloadCount: 0,
+      dynamicFields: parsedDynamicFields,
     };
 
     if (posterBuffer) {
@@ -852,6 +890,7 @@ app.post('/api/doctors', requireAuth('superadmin', 'admin', 'user'), upload.any(
           createdAt: new Date(),
           kind: posterKind,
           label: posterLabel,
+          month: posterMonth,
         },
       ];
       docData.downloadCount = countDownload ? 1 : 0;
@@ -1148,6 +1187,42 @@ app.post('/api/userpanel/login', async (req, res) => {
   } catch (error) {
     console.error('Userpanel login error:', error);
     return res.status(500).json({ success: false, message: 'Server error during login' });
+  }
+});
+
+// --- Doctor Fields Config ---
+app.get('/api/doctor-fields', async (req, res) => {
+  try {
+    const fields = await DoctorField.find().sort({ order: 1 });
+    res.json({ success: true, fields });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+app.post('/api/superadmin/doctor-fields', requireAuth('superadmin'), async (req, res) => {
+  res.status(403).json({ success: false, message: 'Adding new fields is disabled. You can only edit the standard fields.' });
+});
+
+app.put('/api/superadmin/doctor-fields/:id', requireAuth('superadmin'), async (req, res) => {
+  try {
+    const field = await DoctorField.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    if (!field) return res.status(404).json({ success: false, message: 'Field not found' });
+    res.json({ success: true, field });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+app.delete('/api/superadmin/doctor-fields/:id', requireAuth('superadmin'), async (req, res) => {
+  try {
+    const field = await DoctorField.findById(req.params.id);
+    if (!field) return res.status(404).json({ success: false, message: 'Field not found' });
+    if (field.isStandard) return res.status(400).json({ success: false, message: 'Cannot delete a standard field, but you can disable it.' });
+    await field.deleteOne();
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
   }
 });
 
@@ -2241,6 +2316,22 @@ const startServer = async () => {
     );
     if (downloadBackfill.modifiedCount) {
       console.log(`Backfilled downloadCount for ${downloadBackfill.modifiedCount} doctor(s)`);
+    }
+
+    const existingFields = await DoctorField.countDocuments();
+    if (existingFields === 0) {
+      console.log('Seeding standard doctor fields...');
+      await DoctorField.insertMany([
+        { key: 'name', label: 'Doctor Name', type: 'text', required: true, isStandard: true, enabled: true, order: 1 },
+        { key: 'clinicName', label: 'Clinic Name', type: 'text', required: true, isStandard: true, enabled: true, order: 2 },
+        { key: 'doctorDegree', label: 'Degree', type: 'text', required: false, isStandard: true, enabled: true, order: 3 },
+        { key: 'contactnumber', label: 'Contact Number', type: 'tel', required: true, isStandard: true, enabled: true, order: 4 },
+      ]);
+    } else {
+      const removed = await DoctorField.deleteMany({ isStandard: false });
+      if (removed.deletedCount > 0) {
+        console.log(`Removed ${removed.deletedCount} non-standard doctor fields to enforce strict 4-field limit.`);
+      }
     }
 
     app.listen(PORT, () => {

@@ -16,7 +16,9 @@ export default function DoctorDetailsPage({
   initialStep = 1,
 }) {
   const [doctor, setDoctor] = useState(existingDoctor);
+  const [doctorFields, setDoctorFields] = useState([]);
   const [formData, setFormData] = useState({
+    dynamicFields: {},
     name: existingDoctor?.name || '',
     contactnumber: existingDoctor?.contactnumber
       ? String(existingDoctor.contactnumber)
@@ -30,14 +32,23 @@ export default function DoctorDetailsPage({
   const editingExisting = Boolean(doctor || existingDoctor || doctorId);
 
   useEffect(() => {
-    if (!doctorId || existingDoctor?.id === doctorId) return;
     let cancelled = false;
     (async () => {
+      try {
+        const fieldsRes = await apiRequest('/doctor-fields');
+        if (!cancelled && fieldsRes?.fields) setDoctorFields(fieldsRes.fields);
+      } catch (err) {
+        console.warn('Could not load fields:', err);
+      }
+
+      if (!doctorId || existingDoctor?.id === doctorId) return;
+
       try {
         const res = await apiRequest(`/doctors/${doctorId}`);
         if (cancelled || !res?.doctor) return;
         setDoctor(res.doctor);
         setFormData({
+          dynamicFields: res.doctor.dynamicFields || {},
           name: res.doctor.name || '',
           contactnumber: res.doctor.contactnumber
             ? String(res.doctor.contactnumber)
@@ -88,10 +99,13 @@ export default function DoctorDetailsPage({
       data.append('poster', posterBlob, `poster.${ext}`);
       if (saveMeta?.kind) data.append('posterKind', saveMeta.kind);
       if (saveMeta?.label) data.append('posterLabel', saveMeta.label);
+      if (saveMeta?.month) data.append('posterMonth', saveMeta.month);
     }
     if (saveMeta?.kind) {
       data.append('posterKind', saveMeta.kind);
     }
+    
+    data.append('dynamicFields', JSON.stringify(currentFormData?.dynamicFields || formData.dynamicFields || {}));
 
     try {
       const result = await apiRequest('/doctors', {
@@ -181,6 +195,7 @@ export default function DoctorDetailsPage({
       <PosterGenerator
         formData={formData}
         setFormData={setFormData}
+        formFieldConfig={doctorFields}
         logoFile={logoFile}
         setLogoFile={setLogoFile}
         logoPreview={logoPreview}

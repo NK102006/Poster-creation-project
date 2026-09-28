@@ -297,10 +297,9 @@
   color: var(--color-primary);
 }
 
-.field input[type='text'],
-.field input:not([type]),
-.field input[type='tel'],
-.field input[type='search'] {
+.field input:not([type='file']):not([type='checkbox']):not([type='radio']),
+.field select,
+.field textarea {
   padding: 11px 13px;
   border-radius: 10px;
   border: 1.5px solid rgba(31, 111, 159, 0.16);
@@ -581,4 +580,17 @@
   .continueBtn {
     width: 100%;
   }
+}
+
+.monthSelect {
+  padding: 4px 8px;
+  border-radius: 6px;
+  border: 1px solid rgba(31,111,159,0.2);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-primary);
+  background: #fff;
+  cursor: pointer;
+  font-family: inherit;
+  outline: none;
 }

@@ -7,6 +7,7 @@ import { sanitizePasswordInput, sanitizeUsernameInput, validateNewPassword, vali
 import StaffLogin from './StaffLogin';
 import UsersDoctorsBoard from './UsersDoctorsBoard';
 import MasterPostersBoard from './MasterPostersBoard';
+import DoctorFieldsBoard from './DoctorFieldsBoard';
 import styles from './AdminPortal.module.css';
 
 function escapeHtml(value) {
@@ -183,7 +184,7 @@ export default function SuperAdminPortal() {
       table.destroy();
       host.innerHTML = '';
     };
-  }, [isLoggedIn, selectedAdmin, admins]);
+  }, [isLoggedIn, selectedAdmin, admins, activeTab]);
 
   const handleLogin = async (event) => {
     event.preventDefault();
@@ -342,6 +343,16 @@ export default function SuperAdminPortal() {
           >
             <span className={styles.navIcon}>P</span>Posters
           </button>
+          <button
+            type="button"
+            className={`${styles.navItem} ${activeTab === 'fields' ? styles.navActive : ''}`}
+            onClick={() => {
+              setActiveTab('fields');
+              setSelectedAdmin(null);
+            }}
+          >
+            <span className={styles.navIcon}>F</span>Doctor Fields
+          </button>
         </nav>
 
         <div className={`${styles.sidebarMobileActions} ${styles.mobileOnly}`}>
@@ -374,6 +385,8 @@ export default function SuperAdminPortal() {
           <div id="topbar-left" style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
             {activeTab === 'posters' ? (
               <h1 className={styles.pageTitle}>Posters</h1>
+            ) : activeTab === 'fields' ? (
+              <h1 className={styles.pageTitle}>Doctor Fields</h1>
             ) : selectedAdmin ? (
               <button
                 type="button"
@@ -406,6 +419,10 @@ export default function SuperAdminPortal() {
 
           {activeTab === 'posters' && (
             <MasterPostersBoard onContextChange={setBoardContext} />
+          )}
+
+          {activeTab === 'fields' && (
+            <DoctorFieldsBoard onContextChange={setBoardContext} />
           )}
 
           {activeTab === 'admins' && !selectedAdmin && (

@@ -20,8 +20,9 @@ const STEPS = [
 ];
 
 export default function PosterGenerator({
-  formData = { name: '', contactnumber: '', clinicName: '', doctorDegree: '' },
+  formData = { name: '', contactnumber: '', clinicName: '', doctorDegree: '', dynamicFields: {} },
   setFormData,
+  formFieldConfig = [],
   logoFile = null,
   setLogoFile,
   logoPreview = null,
@@ -97,18 +98,42 @@ export default function PosterGenerator({
 
   const handleContinueToDesign = () => {
     const hasLogo = Boolean(logoFile || logoPreview);
-    const hasName = Boolean(formData.name?.trim());
-    const hasContact = Boolean(formData.contactnumber?.trim());
-    const hasClinic = Boolean(formData.clinicName?.trim());
-    const hasDegree = Boolean(formData.doctorDegree?.trim());
-
     const errors = {};
-    if (!hasName) errors.name = 'Doctor full name is required.';
-    if (!hasDegree) errors.doctorDegree = 'Doctor\'s degree is required.';
-    if (!hasClinic) errors.clinicName = 'Clinic / Hospital name is required.';
-    const phoneError = validatePhoneNumber(formData.contactnumber);
-    if (phoneError) errors.contactnumber = phoneError;
+
     if (!hasLogo) errors.logo = 'Doctor photo or clinic logo is required.';
+
+    if (formFieldConfig && formFieldConfig.length > 0) {
+      const enabledFields = formFieldConfig.filter(f => f.enabled);
+      for (const f of enabledFields) {
+        const isDynamic = !f.isStandard;
+        const val = isDynamic ? (formData.dynamicFields?.[f.key] || '') : (formData[f.key] || '');
+
+        if (f.key === 'contactnumber') {
+          const phoneError = validatePhoneNumber(val);
+          if (phoneError) {
+             errors[f.key] = phoneError;
+          } else if (f.required && !String(val).trim()) {
+             errors[f.key] = `${f.label} is required`;
+          }
+          continue;
+        }
+
+        if (f.required && !String(val).trim()) {
+          errors[f.key] = `${f.label} is required`;
+        }
+      }
+    } else {
+      const hasName = Boolean(formData.name?.trim());
+      const hasContact = Boolean(formData.contactnumber?.trim());
+      const hasClinic = Boolean(formData.clinicName?.trim());
+      const hasDegree = Boolean(formData.doctorDegree?.trim());
+
+      if (!hasName) errors.name = 'Doctor full name is required.';
+      if (!hasDegree) errors.doctorDegree = 'Doctor\'s degree is required.';
+      if (!hasClinic) errors.clinicName = 'Clinic / Hospital name is required.';
+      const phoneError = validatePhoneNumber(formData.contactnumber);
+      if (phoneError) errors.contactnumber = phoneError;
+    }
 
     if (Object.keys(errors).length > 0) {
       setFieldErrors(errors);
@@ -137,15 +162,35 @@ export default function PosterGenerator({
   };
 
   const checkCanNavigate = (targetStep) => {
+    if (targetStep <= 1) return true;
     const hasLogo = Boolean(logoFile || logoPreview);
-    const hasName = Boolean(formData.name?.trim());
-    const hasContact = !validatePhoneNumber(formData.contactnumber);
-    const hasClinic = Boolean(formData.clinicName?.trim());
-    const hasDegree = Boolean(formData.doctorDegree?.trim());
+    let allValid = hasLogo;
 
-    if (targetStep > 1 && (!hasName || !hasDegree || !hasContact || !hasClinic || !hasLogo)) {
+    if (formFieldConfig && formFieldConfig.length > 0) {
+      const enabledFields = formFieldConfig.filter(f => f.enabled && f.required);
+      for (const f of enabledFields) {
+        const isDynamic = !f.isStandard;
+        const val = isDynamic ? (formData.dynamicFields?.[f.key] || '') : (formData[f.key] || '');
+        if (!String(val).trim()) {
+          allValid = false;
+          break;
+        }
+        if (f.key === 'contactnumber' && validatePhoneNumber(val)) {
+          allValid = false;
+          break;
+        }
+      }
+    } else {
+      const hasName = Boolean(formData.name?.trim());
+      const hasContact = !validatePhoneNumber(formData.contactnumber);
+      const hasClinic = Boolean(formData.clinicName?.trim());
+      const hasDegree = Boolean(formData.doctorDegree?.trim());
+      if (!hasName || !hasDegree || !hasContact || !hasClinic) allValid = false;
+    }
+
+    if (!allValid) {
       setStepError(
-        'Please fill in all required fields (Name, Degree, Clinic/Hospital, Contact, and Logo) to proceed.'
+        'Please fill in all required fields and Logo to proceed.'
       );
       return false;
     }
@@ -225,7 +270,7 @@ export default function PosterGenerator({
             : targetPoster?.kind === 'video'
               ? 'video'
               : 'education';
-      const saveMeta = { kind: posterKind, label };
+      const saveMeta = { kind: posterKind, label, month: targetPoster?.month || '' };
 
       if (targetPoster?.kind === 'video') {
         const res = await fetch(targetPoster.videoUrl);
@@ -306,13 +351,15 @@ export default function PosterGenerator({
         let firstBlob;
         const firstLabel = pack[0].label || 'Poster-1';
         const firstKind = pack[0].kind || 'master';
+        const firstMonth = pack[0].month || '';
+        const firstSaveMeta = { kind: firstKind, label: firstLabel, month: firstMonth };
         if (pack[0].kind === 'video') {
           const res = await fetch(pack[0].videoUrl);
           firstBlob = await res.blob();
         } else {
           firstBlob = await renderPosterBlob(pack[0], firstLabel);
         }
-        onAutoSave(formData, logoFile, firstBlob, pack[0].kind).catch(() => {});
+        onAutoSave(formData, logoFile, firstBlob, firstSaveMeta).catch(() => {});
       }
 
       const zipBlob = await zip.generateAsync({ type: 'blob' });
@@ -373,85 +420,127 @@ export default function PosterGenerator({
 
             <div className={styles.docFormCard}>
               <div className={styles.formGrid}>
-                <div className={styles.formGroup}>
-                  <label className={styles.formLabel} htmlFor="step-doc-name">
-                    Doctor full name <span className={styles.requiredStar}>*</span>
-                  </label>
-                  <input
-                    id="step-doc-name"
-                    type="text"
-                    placeholder="e.g. Dr. Emily Watson"
-                    className={styles.inputField}
-                    value={formData.name}
-                    onChange={(e) => {
-                      setFormData?.((prev) => ({ ...prev, name: e.target.value }));
-                      if (fieldErrors.name) setFieldErrors(prev => ({ ...prev, name: null }));
-                    }}
-                  />
-                  {fieldErrors.name && <span className={styles.fieldError}>{fieldErrors.name}</span>}
-                </div>
+                {formFieldConfig && formFieldConfig.length > 0 ? formFieldConfig.filter(f => f.enabled).map((field) => {
+                  const isDynamic = !field.isStandard;
+                  const value = isDynamic ? (formData.dynamicFields?.[field.key] ?? '') : (formData[field.key] ?? '');
+                  return (
+                    <div key={field.key} className={styles.formGroup}>
+                      <label className={styles.formLabel} htmlFor={`step-doc-${field.key}`}>
+                        {field.label} {field.required ? <span className={styles.requiredStar}>*</span> : ''}
+                      </label>
+                      <input
+                        id={`step-doc-${field.key}`}
+                        type={field.type || 'text'}
+                        inputMode={field.key === 'contactnumber' ? 'numeric' : undefined}
+                        minLength={field.key === 'contactnumber' ? 10 : undefined}
+                        maxLength={field.key === 'contactnumber' ? 10 : undefined}
+                        pattern={field.key === 'contactnumber' ? '[0-9]{10}' : undefined}
+                        placeholder={field.key === 'name' ? 'e.g. Dr. Emily Watson' : field.key === 'doctorDegree' ? 'e.g. MBBS, MD' : field.key === 'contactnumber' ? '10-digit mobile number' : ''}
+                        className={styles.inputField}
+                        value={value}
+                        onChange={(e) => {
+                          const next = field.key === 'contactnumber' ? sanitizePhoneInput(e.target.value) : e.target.value;
+                          setFormData?.((prev) => {
+                            if (isDynamic) {
+                              return { ...prev, dynamicFields: { ...prev.dynamicFields, [field.key]: next } };
+                            }
+                            return { ...prev, [field.key]: next };
+                          });
+                          if (fieldErrors[field.key]) setFieldErrors(prev => ({ ...prev, [field.key]: null }));
+                        }}
+                        onBlur={(e) => {
+                          if (field.key === 'contactnumber') {
+                            const err = validatePhoneNumber(e.target.value);
+                            if (err) setFieldErrors(prev => ({ ...prev, contactnumber: err }));
+                          }
+                        }}
+                      />
+                      {fieldErrors[field.key] && <span className={styles.fieldError}>{fieldErrors[field.key]}</span>}
+                    </div>
+                  );
+                }) : (
+                  <>
+                    <div className={styles.formGroup}>
+                      <label className={styles.formLabel} htmlFor="step-doc-name">
+                        Doctor full name <span className={styles.requiredStar}>*</span>
+                      </label>
+                      <input
+                        id="step-doc-name"
+                        type="text"
+                        placeholder="e.g. Dr. Emily Watson"
+                        className={styles.inputField}
+                        value={formData.name}
+                        onChange={(e) => {
+                          setFormData?.((prev) => ({ ...prev, name: e.target.value }));
+                          if (fieldErrors.name) setFieldErrors(prev => ({ ...prev, name: null }));
+                        }}
+                      />
+                      {fieldErrors.name && <span className={styles.fieldError}>{fieldErrors.name}</span>}
+                    </div>
 
-                <div className={styles.formGroup}>
-                  <label className={styles.formLabel} htmlFor="step-doc-degree">
-                    Doctor&apos;s degree <span className={styles.requiredStar}>*</span>
-                  </label>
-                  <input
-                    id="step-doc-degree"
-                    type="text"
-                    placeholder="e.g. MBBS, MD (Medicine)"
-                    className={styles.inputField}
-                    value={formData.doctorDegree || ''}
-                    onChange={(e) => {
-                      setFormData?.((prev) => ({ ...prev, doctorDegree: e.target.value }));
-                      if (fieldErrors.doctorDegree) setFieldErrors(prev => ({ ...prev, doctorDegree: null }));
-                    }}
-                  />
-                  {fieldErrors.doctorDegree && <span className={styles.fieldError}>{fieldErrors.doctorDegree}</span>}
-                </div>
+                    <div className={styles.formGroup}>
+                      <label className={styles.formLabel} htmlFor="step-doc-degree">
+                        Doctor&apos;s degree <span className={styles.requiredStar}>*</span>
+                      </label>
+                      <input
+                        id="step-doc-degree"
+                        type="text"
+                        placeholder="e.g. MBBS, MD (Medicine)"
+                        className={styles.inputField}
+                        value={formData.doctorDegree || ''}
+                        onChange={(e) => {
+                          setFormData?.((prev) => ({ ...prev, doctorDegree: e.target.value }));
+                          if (fieldErrors.doctorDegree) setFieldErrors(prev => ({ ...prev, doctorDegree: null }));
+                        }}
+                      />
+                      {fieldErrors.doctorDegree && <span className={styles.fieldError}>{fieldErrors.doctorDegree}</span>}
+                    </div>
 
-                <div className={styles.formGroup}>
-                  <label className={styles.formLabel} htmlFor="step-clinic-name">
-                    Clinic / Hospital name <span className={styles.requiredStar}>*</span>
-                  </label>
-                  <input
-                    id="step-clinic-name"
-                    type="text"
-                    placeholder="e.g. City Care Hospital"
-                    className={styles.inputField}
-                    value={formData.clinicName || ''}
-                    onChange={(e) => {
-                      setFormData?.((prev) => ({ ...prev, clinicName: e.target.value }));
-                      if (fieldErrors.clinicName) setFieldErrors(prev => ({ ...prev, clinicName: null }));
-                    }}
-                  />
-                  {fieldErrors.clinicName && <span className={styles.fieldError}>{fieldErrors.clinicName}</span>}
-                </div>
+                    <div className={styles.formGroup}>
+                      <label className={styles.formLabel} htmlFor="step-clinic-name">
+                        Clinic / Hospital name <span className={styles.requiredStar}>*</span>
+                      </label>
+                      <input
+                        id="step-clinic-name"
+                        type="text"
+                        placeholder="e.g. City Care Hospital"
+                        className={styles.inputField}
+                        value={formData.clinicName || ''}
+                        onChange={(e) => {
+                          setFormData?.((prev) => ({ ...prev, clinicName: e.target.value }));
+                          if (fieldErrors.clinicName) setFieldErrors(prev => ({ ...prev, clinicName: null }));
+                        }}
+                      />
+                      {fieldErrors.clinicName && <span className={styles.fieldError}>{fieldErrors.clinicName}</span>}
+                    </div>
 
-                <div className={styles.formGroup}>
-                  <label className={styles.formLabel} htmlFor="step-doc-contact">
-                    WhatsApp contact number <span className={styles.requiredStar}>*</span>
-                  </label>
-                  <input
-                    id="step-doc-contact"
-                    type="tel"
-                    inputMode="numeric"
-                    minLength={10}
-                    maxLength={10}
-                    pattern="[0-9]{10}"
-                    placeholder="10-digit mobile number"
-                    className={styles.inputField}
-                    value={formData.contactnumber}
-                    onChange={(e) => {
-                      setFormData?.((prev) => ({ ...prev, contactnumber: sanitizePhoneInput(e.target.value) }));
-                      if (fieldErrors.contactnumber) setFieldErrors(prev => ({ ...prev, contactnumber: null }));
-                    }}
-                    onBlur={(e) => {
-                      const err = validatePhoneNumber(e.target.value);
-                      if (err) setFieldErrors(prev => ({ ...prev, contactnumber: err }));
-                    }}
-                  />
-                  {fieldErrors.contactnumber && <span className={styles.fieldError}>{fieldErrors.contactnumber}</span>}
-                </div>
+                    <div className={styles.formGroup}>
+                      <label className={styles.formLabel} htmlFor="step-doc-contact">
+                        WhatsApp contact number <span className={styles.requiredStar}>*</span>
+                      </label>
+                      <input
+                        id="step-doc-contact"
+                        type="tel"
+                        inputMode="numeric"
+                        minLength={10}
+                        maxLength={10}
+                        pattern="[0-9]{10}"
+                        placeholder="10-digit mobile number"
+                        className={styles.inputField}
+                        value={formData.contactnumber}
+                        onChange={(e) => {
+                          setFormData?.((prev) => ({ ...prev, contactnumber: sanitizePhoneInput(e.target.value) }));
+                          if (fieldErrors.contactnumber) setFieldErrors(prev => ({ ...prev, contactnumber: null }));
+                        }}
+                        onBlur={(e) => {
+                          const err = validatePhoneNumber(e.target.value);
+                          if (err) setFieldErrors(prev => ({ ...prev, contactnumber: err }));
+                        }}
+                      />
+                      {fieldErrors.contactnumber && <span className={styles.fieldError}>{fieldErrors.contactnumber}</span>}
+                    </div>
+                  </>
+                )}
               </div>
 
               <div className={styles.formGroup}>

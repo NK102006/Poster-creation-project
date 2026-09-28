@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import DataTable from 'datatables.net-dt';
 import 'datatables.net-dt/css/dataTables.dataTables.css';
@@ -191,6 +191,11 @@ const doctorColumns = [
     data: 'postersMade',
     render: (data) => String(data ?? 0),
   },
+  {
+    title: 'Downloads',
+    data: 'downloadCount',
+    render: (data) => String(data ?? 0),
+  },
 ];
 
 function useDataTable({ enabled, data, columns, onRowAction }) {
@@ -264,6 +269,8 @@ export default function UsersDoctorsBoard({
   const [modalError, setModalError] = useState('');
   const [importing, setImporting] = useState(false);
   const [importSummary, setImportSummary] = useState('');
+  const [doctorFields, setDoctorFields] = useState([]);
+  const [filterMonth, setFilterMonth] = useState('');
   const userImportRef = useRef(null);
   const navigateBackRef = useRef(() => {});
   const needsAdminPick = showAdminColumn && !adminId;
@@ -320,6 +327,12 @@ export default function UsersDoctorsBoard({
       onNavigateBack: () => navigateBackRef.current(),
     });
   }, [selectedUser, selectedDoctor, headerBackLabel, onContextChange]);
+
+  useEffect(() => {
+    apiRequest('/doctor-fields').then(res => {
+      if (res?.fields) setDoctorFields(res.fields);
+    }).catch(() => {});
+  }, []);
 
   useEffect(() => {
     if (!needsAdminPick) return undefined;
@@ -524,9 +537,18 @@ export default function UsersDoctorsBoard({
     },
   });
 
+  const displayedDoctors = useMemo(() => {
+    if (filterMonth === '') return doctors;
+    return doctors.map(doc => ({
+      ...doc,
+      postersMade: doc.monthlyPosters?.[filterMonth] || 0,
+      downloadCount: doc.monthlyDownloads?.[filterMonth] || 0,
+    }));
+  }, [doctors, filterMonth]);
+
   const doctorsHostRef = useDataTable({
     enabled: Boolean(selectedUser) && !selectedDoctor,
-    data: doctors,
+    data: displayedDoctors,
     columns: doctorColumns,
     onRowAction: (action, doctor) => {
       if (!doctor || action === 'edit-user' || action === 'delete-user') return;
@@ -697,6 +719,31 @@ export default function UsersDoctorsBoard({
 
       {selectedUser && !selectedDoctor && (
         <div className={styles.tableCard}>
+          <div style={{ padding: '16px 16px 0', display: 'flex', justifyContent: 'flex-end', gap: '8px', alignItems: 'center' }}>
+            <span style={{ fontSize: '14px', color: 'var(--color-text-muted)' }}>Filter stats by month:</span>
+            <select
+              className={styles.monthSelect}
+              value={filterMonth}
+              onChange={(e) => setFilterMonth(e.target.value)}
+              style={{
+                padding: '4px 8px',
+                borderRadius: '6px',
+                border: '1px solid rgba(31,111,159,0.2)',
+                fontSize: '12px',
+                fontWeight: 600,
+                color: 'var(--color-primary)',
+                background: '#fff',
+                cursor: 'pointer',
+                fontFamily: 'inherit',
+                outline: 'none',
+              }}
+            >
+              <option value="">All Time</option>
+              {['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'].map((m, i) => (
+                <option key={i} value={i}>{m}</option>
+              ))}
+            </select>
+          </div>
           <div ref={doctorsHostRef} className={styles.dtHost} />
           {!loading && doctors.length === 0 && (
             <p className={styles.emptyState}>This employee has not created any doctors yet.</p>
@@ -705,24 +752,50 @@ export default function UsersDoctorsBoard({
       )}
 
       {selectedDoctor && (
-        <div className={styles.detailCard}>
-          <div className={styles.detailLogo}>
-            {selectedDoctor.logo ? (
-              <img src={selectedDoctor.logo} alt={`${selectedDoctor.name} logo`} />
-            ) : (
-              <span>—</span>
-            )}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', alignItems: 'center' }}>
+            <span style={{ fontSize: '14px', color: 'var(--color-text-muted)' }}>Filter stats by month:</span>
+            <select
+              className={styles.monthSelect}
+              value={filterMonth}
+              onChange={(e) => setFilterMonth(e.target.value)}
+              style={{
+                padding: '4px 8px',
+                borderRadius: '6px',
+                border: '1px solid rgba(31,111,159,0.2)',
+                fontSize: '12px',
+                fontWeight: 600,
+                color: 'var(--color-primary)',
+                background: '#fff',
+                cursor: 'pointer',
+                fontFamily: 'inherit',
+                outline: 'none',
+              }}
+            >
+              <option value="">All Time</option>
+              {['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'].map((m, i) => (
+                <option key={i} value={i}>{m}</option>
+              ))}
+            </select>
           </div>
-          <div className={styles.detailGrid}>
+          <div className={styles.detailCard}>
+            <div className={styles.detailLogo}>
+              {selectedDoctor.logo ? (
+                <img src={selectedDoctor.logo} alt={`${selectedDoctor.name} logo`} />
+              ) : (
+                <span>—</span>
+              )}
+            </div>
+            <div className={styles.detailGrid}>
             {[
               ['Doctor ID', selectedDoctor.id],
-              ['Name', selectedDoctor.name],
-              ['Degree', selectedDoctor.doctorDegree],
-              ['Clinic / Hospital', selectedDoctor.clinicName],
-              ['Contact Number', selectedDoctor.contactnumber],
+              ...doctorFields.filter(f => f.enabled).map(f => [
+                f.label, 
+                f.isStandard ? selectedDoctor[f.key] : selectedDoctor.dynamicFields?.[f.key]
+              ]),
               ['Status', selectedDoctor.active ? 'Active' : 'Inactive'],
-              ['Posters made', selectedDoctor.postersMade],
-              ['Downloads', selectedDoctor.downloadCount],
+              ['Posters made', filterMonth === '' ? selectedDoctor.postersMade : selectedDoctor.monthlyPosters?.[filterMonth] || 0],
+              ['Downloads', filterMonth === '' ? selectedDoctor.downloadCount : selectedDoctor.monthlyDownloads?.[filterMonth] || 0],
               ['Created', selectedDoctor.createdAt ? new Date(selectedDoctor.createdAt).toLocaleString() : '—'],
               ['Last updated', selectedDoctor.updatedAt ? new Date(selectedDoctor.updatedAt).toLocaleString() : '—'],
             ].map(([label, value]) => (
@@ -732,6 +805,7 @@ export default function UsersDoctorsBoard({
               </div>
             ))}
           </div>
+        </div>
         </div>
       )}
 

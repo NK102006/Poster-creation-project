@@ -6,10 +6,7 @@ import { sanitizePhoneInput, validatePhoneNumber } from '../features/auth/valida
 import styles from './DoctorManagePage.module.css';
 
 const EMPTY_FORM = {
-  name: '',
-  clinicName: '',
-  contactnumber: '',
-  doctorDegree: '',
+  dynamicFields: {},
 };
 
 export default function DoctorManagePage({
@@ -30,12 +27,14 @@ export default function DoctorManagePage({
   const [message, setMessage] = useState(null);
   const [error, setError] = useState(null);
   const [formFieldErrors, setFormFieldErrors] = useState({});
+  const [doctorFields, setDoctorFields] = useState([]);
 
   const [originalLogoUrl, setOriginalLogoUrl] = useState(null);
   const [showCropModal, setShowCropModal] = useState(false);
   const [croppedLogoData, setCroppedLogoData] = useState(null);
   const [logoCropState, setLogoCropState] = useState(null);
   const [tempLogoCropState, setTempLogoCropState] = useState(null);
+  const [filterMonth, setFilterMonth] = useState('');
 
   const isInactive = doctor?.active === false;
 
@@ -43,13 +42,15 @@ export default function DoctorManagePage({
     setLoading(true);
     setError(null);
     try {
+      const fieldsRes = await apiRequest('/doctor-fields');
+      if (fieldsRes?.fields) setDoctorFields(fieldsRes.fields);
+
       const res = await apiRequest(`/doctors/${doctorId}`);
       setDoctor(res.doctor);
       setForm({
-        name: res.doctor.name || '',
-        clinicName: res.doctor.clinicName || '',
+        ...res.doctor,
         contactnumber: res.doctor.contactnumber ? String(res.doctor.contactnumber) : '',
-        doctorDegree: res.doctor.doctorDegree || '',
+        dynamicFields: res.doctor.dynamicFields || {},
       });
       setLogoPreview(res.doctor.logo || '');
       setLogoFile(null);
@@ -72,11 +73,20 @@ export default function DoctorManagePage({
     e.preventDefault();
 
     const errs = {};
-    if (!form.name.trim()) errs.name = 'Doctor name is required';
-    if (!form.doctorDegree.trim()) errs.doctorDegree = "Doctor's degree is required";
-    if (!form.clinicName.trim()) errs.clinicName = 'Clinic / Hospital name is required';
-    const phoneError = validatePhoneNumber(form.contactnumber);
-    if (phoneError) errs.contactnumber = phoneError;
+    const enabledFields = doctorFields.filter(f => f.enabled);
+
+    for (const f of enabledFields) {
+      const isDynamic = !f.isStandard;
+      const val = isDynamic ? (form.dynamicFields?.[f.key] || '') : (form[f.key] || '');
+
+      if (f.key === 'contactnumber') {
+        const phoneError = validatePhoneNumber(val);
+        if (phoneError) errs[f.key] = phoneError;
+        else if (f.required && !String(val).trim()) errs[f.key] = `${f.label} is required`;
+        continue;
+      }
+      if (f.required && !String(val).trim()) errs[f.key] = `${f.label} is required`;
+    }
     
     if (Object.keys(errs).length > 0) {
       setFormFieldErrors(errs);
@@ -89,10 +99,10 @@ export default function DoctorManagePage({
     setError(null);
     try {
       const data = new FormData();
-      data.append('name', form.name.trim());
-      data.append('clinicName', form.clinicName.trim());
-      data.append('contactnumber', form.contactnumber.trim());
-      data.append('doctorDegree', form.doctorDegree.trim());
+      for (const f of doctorFields.filter(field => field.enabled)) {
+        if (f.isStandard) data.append(f.key, (form[f.key] || '').trim());
+      }
+      data.append('dynamicFields', JSON.stringify(form.dynamicFields || {}));
       if (logoFile) data.append('logo', logoFile);
       else if (logoPreview?.startsWith('data:')) data.append('logo', logoPreview);
 
@@ -188,11 +198,20 @@ export default function DoctorManagePage({
 
   const handleContinue = async () => {
     const errs = {};
-    if (!form.name?.trim()) errs.name = 'Doctor name is required';
-    if (!form.doctorDegree?.trim()) errs.doctorDegree = "Doctor's degree is required";
-    if (!form.clinicName?.trim()) errs.clinicName = 'Clinic / Hospital name is required';
-    const phoneError = validatePhoneNumber(form.contactnumber);
-    if (phoneError) errs.contactnumber = phoneError;
+    const enabledFields = doctorFields.filter(f => f.enabled);
+
+    for (const f of enabledFields) {
+      const isDynamic = !f.isStandard;
+      const val = isDynamic ? (form.dynamicFields?.[f.key] || '') : (form[f.key] || '');
+
+      if (f.key === 'contactnumber') {
+        const phoneError = validatePhoneNumber(val);
+        if (phoneError) errs[f.key] = phoneError;
+        else if (f.required && !String(val).trim()) errs[f.key] = `${f.label} is required`;
+        continue;
+      }
+      if (f.required && !String(val).trim()) errs[f.key] = `${f.label} is required`;
+    }
 
     if (Object.keys(errs).length > 0) {
       setFormFieldErrors(errs);
@@ -208,10 +227,10 @@ export default function DoctorManagePage({
     setError(null);
     try {
       const data = new FormData();
-      data.append('name', form.name.trim());
-      data.append('clinicName', form.clinicName.trim());
-      data.append('contactnumber', form.contactnumber.trim());
-      data.append('doctorDegree', form.doctorDegree.trim());
+      for (const f of doctorFields.filter(field => field.enabled)) {
+        if (f.isStandard) data.append(f.key, String(form[f.key] || '').trim());
+      }
+      data.append('dynamicFields', JSON.stringify(form.dynamicFields || {}));
       if (logoFile) data.append('logo', logoFile);
       else if (logoPreview?.startsWith('data:')) data.append('logo', logoPreview);
 
@@ -226,6 +245,12 @@ export default function DoctorManagePage({
       setSaving(false);
     }
   };
+
+  const missingRequired = doctorFields.filter(f => f.enabled && f.required).some(f => {
+    const isDynamic = !f.isStandard;
+    const val = isDynamic ? form.dynamicFields?.[f.key] : form[f.key];
+    return !String(val || '').trim();
+  });
 
   return (
     <StudioShell
@@ -259,21 +284,44 @@ export default function DoctorManagePage({
             <div className={styles.profileCopy}>
               <div className={styles.profileTop}>
                 <p className={styles.profileEyebrow}>Doctor profile</p>
-                <span className={isInactive ? styles.statusPillInactive : styles.statusPill}>
-                  {isInactive ? 'Inactive' : 'Active'}
-                </span>
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                  <select
+                    className={styles.monthSelect}
+                    value={filterMonth}
+                    onChange={(e) => setFilterMonth(e.target.value)}
+                  >
+                    <option value="">All Time</option>
+                    {['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'].map((m, i) => (
+                      <option key={i} value={i}>{m}</option>
+                    ))}
+                  </select>
+                  <span className={isInactive ? styles.statusPillInactive : styles.statusPill}>
+                    {isInactive ? 'Inactive' : 'Active'}
+                  </span>
+                </div>
               </div>
               <h1 className={styles.profileName}>{doctor.name || 'Doctor'}</h1>
               <p className={styles.profileMeta}>
-                {[form.doctorDegree, form.clinicName].filter(Boolean).join(' · ') || 'Add clinic and degree'}
+                {[
+                  doctorFields.find(f => f.key === 'doctorDegree')?.enabled ? form.doctorDegree : null, 
+                  doctorFields.find(f => f.key === 'clinicName')?.enabled ? form.clinicName : null
+                ].filter(Boolean).join(' · ') || 'Add details'}
               </p>
               <div className={styles.metricRow}>
                 <div className={styles.metric}>
-                  <strong>{doctor.postersMade || 0}</strong>
+                  <strong>
+                    {filterMonth === '' 
+                      ? (doctor.postersMade || 0) 
+                      : (doctor.monthlyPosters?.[filterMonth] || 0)}
+                  </strong>
                   <span>Posters</span>
                 </div>
                 <div className={styles.metric}>
-                  <strong>{doctor.downloadCount || 0}</strong>
+                  <strong>
+                    {filterMonth === '' 
+                      ? (doctor.downloadCount || 0) 
+                      : (doctor.monthlyDownloads?.[filterMonth] || 0)}
+                  </strong>
                   <span>Downloads</span>
                 </div>
                 <div className={styles.metric}>
@@ -299,60 +347,40 @@ export default function DoctorManagePage({
             </div>
 
             <div className={styles.formGrid}>
-              <label className={styles.field}>
-                <span>Doctor full name</span>
-                <input
-                  value={form.name}
-                  onChange={(e) => {
-                    setForm((p) => ({ ...p, name: e.target.value }));
-                    if (formFieldErrors.name) setFormFieldErrors((p) => ({ ...p, name: null }));
-                  }}
-                />
-                {formFieldErrors.name && <span className={styles.fieldError}>{formFieldErrors.name}</span>}
-              </label>
-              <label className={styles.field}>
-                <span>Doctor&apos;s degree</span>
-                <input
-                  value={form.doctorDegree}
-                  onChange={(e) => {
-                    setForm((p) => ({ ...p, doctorDegree: e.target.value }));
-                    if (formFieldErrors.doctorDegree) setFormFieldErrors((p) => ({ ...p, doctorDegree: null }));
-                  }}
-                  placeholder="e.g. MBBS, MD (Medicine)"
-                />
-                {formFieldErrors.doctorDegree && <span className={styles.fieldError}>{formFieldErrors.doctorDegree}</span>}
-              </label>
-              <label className={styles.field}>
-                <span>Clinic / Hospital name</span>
-                <input
-                  value={form.clinicName}
-                  onChange={(e) => {
-                    setForm((p) => ({ ...p, clinicName: e.target.value }));
-                    if (formFieldErrors.clinicName) setFormFieldErrors((p) => ({ ...p, clinicName: null }));
-                  }}
-                />
-                {formFieldErrors.clinicName && <span className={styles.fieldError}>{formFieldErrors.clinicName}</span>}
-              </label>
-              <label className={styles.field}>
-                <span>WhatsApp contact</span>
-                <input
-                  type="tel"
-                  inputMode="numeric"
-                  minLength={10}
-                  maxLength={10}
-                  pattern="[0-9]{10}"
-                  value={form.contactnumber}
-                  onChange={(e) => {
-                    setForm((p) => ({ ...p, contactnumber: sanitizePhoneInput(e.target.value) }));
-                    if (formFieldErrors.contactnumber) setFormFieldErrors((p) => ({ ...p, contactnumber: null }));
-                  }}
-                  onBlur={(e) => {
-                    const err = validatePhoneNumber(e.target.value);
-                    if (err) setFormFieldErrors((p) => ({ ...p, contactnumber: err }));
-                  }}
-                />
-                {formFieldErrors.contactnumber && <span className={styles.fieldError}>{formFieldErrors.contactnumber}</span>}
-              </label>
+              {doctorFields.filter(f => f.enabled).map(field => {
+                const isDynamic = !field.isStandard;
+                const value = isDynamic ? (form.dynamicFields?.[field.key] ?? '') : (form[field.key] ?? '');
+                
+                return (
+                  <label key={field.key} className={styles.field}>
+                    <span>{field.label} {field.required ? '*' : ''}</span>
+                    <input
+                      type={field.type || 'text'}
+                      inputMode={field.key === 'contactnumber' ? 'numeric' : undefined}
+                      minLength={field.key === 'contactnumber' ? 10 : undefined}
+                      maxLength={field.key === 'contactnumber' ? 10 : undefined}
+                      pattern={field.key === 'contactnumber' ? '[0-9]{10}' : undefined}
+                      value={value}
+                      placeholder={field.key === 'doctorDegree' ? 'e.g. MBBS, MD (Medicine)' : ''}
+                      onChange={(e) => {
+                        const next = field.key === 'contactnumber' ? sanitizePhoneInput(e.target.value) : e.target.value;
+                        setForm(p => {
+                          if (isDynamic) return { ...p, dynamicFields: { ...p.dynamicFields, [field.key]: next } };
+                          return { ...p, [field.key]: next };
+                        });
+                        if (formFieldErrors[field.key]) setFormFieldErrors(p => ({ ...p, [field.key]: null }));
+                      }}
+                      onBlur={(e) => {
+                        if (field.key === 'contactnumber') {
+                          const err = validatePhoneNumber(e.target.value);
+                          if (err) setFormFieldErrors(p => ({ ...p, contactnumber: err }));
+                        }
+                      }}
+                    />
+                    {formFieldErrors[field.key] && <span className={styles.fieldError}>{formFieldErrors[field.key]}</span>}
+                  </label>
+                );
+              })}
             </div>
 
             <label className={styles.field}>
@@ -396,12 +424,12 @@ export default function DoctorManagePage({
                   type="button"
                   className={styles.continueBtn}
                   onClick={handleContinue}
-                  disabled={isInactive || !form.doctorDegree?.trim()}
+                  disabled={isInactive || missingRequired}
                   title={
                     isInactive
                       ? 'Activate this doctor to continue'
-                      : !form.doctorDegree?.trim()
-                        ? "Add doctor's degree to continue"
+                      : missingRequired
+                        ? "Fill all required fields to continue"
                         : 'Save & next'
                   }
                 >
