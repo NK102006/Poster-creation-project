@@ -3,7 +3,6 @@ import MedicalAtmosphere from './components/MedicalAtmosphere.jsx';
 import LoginPage from './pages/LoginPage.jsx';
 import DoctorHubPage from './pages/DoctorHubPage.jsx';
 import DoctorDetailsPage from './pages/DoctorDetailsPage.jsx';
-import ExistingDoctorsPage from './pages/ExistingDoctorsPage.jsx';
 import DoctorManagePage from './pages/DoctorManagePage.jsx';
 import AdminPortal from './pages/AdminPortal.jsx';
 import SuperAdminPortal from './pages/SuperAdminPortal.jsx';
@@ -250,11 +249,12 @@ export default function App() {
     );
   } else if (view === 'existing') {
     screen = (
-      <ExistingDoctorsPage
+      <UserPanel
         user={currentUser}
         onLogout={handleLogout}
         onBrandClick={goToHub}
         onBack={goToHub}
+        onAddNew={goToNewDoctor}
         onSelectDoctor={(doc) => {
           setSelectedDoctor(doc);
           navigate('manage', { doctorId: doc.id, doctor: doc });

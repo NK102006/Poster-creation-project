@@ -7,6 +7,10 @@
   font-family: var(--font-body);
 }
 
+.shellFull {
+  grid-template-columns: 1fr;
+}
+
 /* —— Login —— */
 .loginPage {
   min-height: 100vh;
@@ -302,6 +306,48 @@
   font-size: 13px;
 }
 
+.dateFilter {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+
+.dateFilter label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.dateFilter input[type="date"] {
+  border: 1px solid rgba(31, 111, 159, 0.18);
+  border-radius: 10px;
+  padding: 8px 10px;
+  font: inherit;
+  color: var(--color-text);
+  background: #fff;
+}
+
+.posterSendDate {
+  display: block;
+  margin-top: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-primary-rich);
+}
+
+.posterDoctorName {
+  display: block;
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
 .searchWrap {
   position: relative;
   flex: 1;
@@ -352,6 +398,10 @@
   width: 100%;
   max-width: 100%;
   min-width: 0;
+}
+
+.dtHostClickable :global(tbody tr) {
+  cursor: pointer;
 }
 
 .dtHost :global(.dt-container),
@@ -1053,8 +1103,14 @@
   .mobileOnly {
     display: flex !important;
   }
-  .shell {
+  .shell,
+  .shellFull {
     grid-template-columns: 1fr;
+  }
+
+  .shellFull .topbar {
+    grid-template-columns: 1fr auto;
+    padding-left: 18px;
   }
 
   .sidebar {

@@ -1788,6 +1788,7 @@ app.get('/api/admin/datatables/:collection', requireAuth('superadmin', 'admin', 
     const sort = { [sortField === 'id' ? 'createdAt' : sortField]: orderDir };
 
     const filter = { ...scope };
+    const extras = [];
     if (searchValue) {
       if (collection === 'doctors') {
         const escapedSearch = escapeRegex(searchValue);
@@ -1808,7 +1809,7 @@ app.get('/api/admin/datatables/:collection', requireAuth('superadmin', 'admin', 
         if (/^[a-f\d]{24}$/i.test(searchValue)) {
           or.push({ _id: searchValue });
         }
-        filter.$or = or;
+        extras.push({ $or: or });
       } else {
         const or = [
           { empid: { $regex: searchValue, $options: 'i' } },
@@ -1818,8 +1819,43 @@ app.get('/api/admin/datatables/:collection', requireAuth('superadmin', 'admin', 
           or.push({ empid: asNumber });
           or.push({ id: asNumber });
         }
-        filter.$or = or;
+        extras.push({ $or: or });
       }
+    }
+
+    const fromStr = String(req.query.from ?? req.query.dateFrom ?? '').trim();
+    const toStr = String(req.query.to ?? req.query.dateTo ?? '').trim();
+    if (collection === 'doctors' && (fromStr || toStr)) {
+      const range = {};
+      if (fromStr) {
+        const from = new Date(fromStr);
+        if (!Number.isNaN(from.getTime())) {
+          from.setHours(0, 0, 0, 0);
+          range.$gte = from;
+        }
+      }
+      if (toStr) {
+        const to = new Date(toStr);
+        if (!Number.isNaN(to.getTime())) {
+          to.setHours(23, 59, 59, 999);
+          range.$lte = to;
+        }
+      }
+      if (Object.keys(range).length) {
+        extras.push({
+          $or: [
+            { createdAt: range },
+            { updatedAt: range },
+            { 'posters.createdAt': range },
+          ],
+        });
+      }
+    }
+
+    if (extras.length === 1) {
+      Object.assign(filter, extras[0]);
+    } else if (extras.length > 1) {
+      filter.$and = extras;
     }
 
     const recordsTotal = await Model.countDocuments(scope);

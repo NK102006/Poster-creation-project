@@ -16,7 +16,7 @@ import { sanitizePhoneInput, validatePhoneNumber } from '../features/auth/valida
 
 const STEPS = [
   { id: 1, label: 'Doctor Details', short: 'Details' },
-  { id: 2, label: 'Design', short: 'Design' },
+  { id: 2, label: 'Preview', short: 'Preview' },
 ];
 
 export default function PosterGenerator({
@@ -33,7 +33,6 @@ export default function PosterGenerator({
 }) {
   const [currentStep, setCurrentStep] = useState(initialStep);
   const [isSavingInitial, setIsSavingInitial] = useState(false);
-  const [selectedThemeId, setSelectedThemeId] = useState('theme-warm-red');
   const [activePosterIndex, setActivePosterIndex] = useState(0);
   const [carouselSlides, setCarouselSlides] = useState([]);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -54,8 +53,7 @@ export default function PosterGenerator({
   const [closingModal, setClosingModal] = useState(false);
   const [modalOrigin, setModalOrigin] = useState({ x: window.innerWidth / 2, y: window.innerHeight / 2 });
 
-  const selectedTheme =
-    POSTER_THEMES.find((t) => t.id === selectedThemeId) || POSTER_THEMES[0];
+  const selectedTheme = POSTER_THEMES.find((t) => t.id === 'theme-blue') || POSTER_THEMES[0];
   const isStepComplete = (step) => currentStep > step;
   const [modalPoster, setModalPoster] = useState(null);
 
@@ -152,11 +150,6 @@ export default function PosterGenerator({
       return false;
     }
 
-    if (targetStep > 2 && !selectedThemeId) {
-      setStepError('Please choose a theme before previewing.');
-      return false;
-    }
-
     setStepError(null);
     return true;
   };
@@ -182,7 +175,6 @@ export default function PosterGenerator({
   const carouselProps = {
     activeIndex: activePosterIndex,
     onIndexChange: setActivePosterIndex,
-    theme: selectedTheme,
     doctorFields,
     onSlidesChange: setCarouselSlides,
     selectedIds: selectedPosterIds,
@@ -540,48 +532,9 @@ export default function PosterGenerator({
 
         {currentStep === 2 && (
           <div className={styles.stepContent}>
-            <div className={styles.atelier}>
-              <div className={styles.atelierBlock}>
-                <div className={styles.atelierHeader}>
-                  <h3 className={styles.atelierTitle}>Colour theme</h3>
-                </div>
-
-                <div className={styles.themeJewels} role="listbox" aria-label="Colour theme">
-                  {POSTER_THEMES.map((theme) => {
-                    const isSelected = theme.id === selectedThemeId;
-                    return (
-                      <button
-                        key={theme.id}
-                        type="button"
-                        role="option"
-                        aria-selected={isSelected}
-                        className={`${styles.themeJewel} ${isSelected ? styles.themeJewelActive : ''}`}
-                        onClick={() => setSelectedThemeId(theme.id)}
-                      >
-                        <span
-                          className={styles.jewelFace}
-                          style={{
-                            background: `linear-gradient(145deg, ${theme.headerBg}, ${theme.footerBg})`,
-                            boxShadow: `inset 0 0 0 1px rgba(255,255,255,0.18), 0 12px 28px ${theme.cardGlow}`,
-                          }}
-                        />
-                        <span className={styles.jewelMeta}>
-                          <span className={styles.jewelName}>{theme.name}</span>
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              <div className={styles.selectionSummary}>
-                <p className={styles.summaryValue}>{selectedTheme.name}</p>
-              </div>
-            </div>
-
             <div className={styles.designPreview}>
-              <h3 className={styles.previewHeading}>Live preview</h3>
-              <PosterCarousel key={selectedThemeId} variant="grid" {...carouselProps} />
+              <h3 className={styles.previewHeading}>Preview</h3>
+              <PosterCarousel variant="grid" {...carouselProps} />
             </div>
 
             <div className={`${styles.navRow} ${styles.downloadRow}`}>
