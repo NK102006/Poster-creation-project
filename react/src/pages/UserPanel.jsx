@@ -554,10 +554,10 @@ export default function UserPanel({
         onBack={onBack}
         backLabel="Home"
         wide
-        subheaderExtra={dateFilters}
+        subheaderExtra={<h1 className={styles.pageTitle}>Doctors list</h1>}
       >
         <div className={styles.toolbar}>
-          <h1 className={styles.pageTitle}>Doctors list</h1>
+          {dateFilters}
           <div className={styles.toolbarActions}>{listActions}</div>
         </div>
         {listBody}
