@@ -316,17 +316,7 @@ export default function PosterThemesBoard({ onContextChange, onNavigateToPosters
   return (
     <>
       <div className={`${styles.toolbar} ${styles.desktopOnly}`}>
-        <div>
-          {onNavigateToPosters && (
-            <button
-              type="button"
-              className={styles.secondaryBtn}
-              onClick={onNavigateToPosters}
-            >
-              ← Back to Posters
-            </button>
-          )}
-        </div>
+        <div></div>
         <button type="button" className={styles.primaryBtn} onClick={openCreate}>
           + Add theme
         </button>
