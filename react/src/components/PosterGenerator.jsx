@@ -474,7 +474,7 @@ export default function PosterGenerator({
 
             <div className={styles.docFormCard}>
               <div className={styles.formGrid}>
-                {formFieldConfig && formFieldConfig.length > 0 ? formFieldConfig.filter(f => f.enabled).map((field) => {
+                {formFieldConfig && formFieldConfig.length > 0 ? formFieldConfig.filter(f => f.enabled && f.key !== 'logo' && f.key !== 'photo' && f.type !== 'file').map((field) => {
                   const isDynamic = !field.isStandard;
                   const value = isDynamic ? (formData.dynamicFields?.[field.key] ?? '') : (formData[field.key] ?? '');
                   return (
@@ -597,48 +597,50 @@ export default function PosterGenerator({
                 )}
               </div>
 
-              <div className={styles.formGroup}>
-                <label className={styles.formLabel}>
-                  Doctor photo or clinic logo <span className={styles.requiredStar}>*</span>
-                </label>
+              {(!formFieldConfig || formFieldConfig.length === 0 || formFieldConfig.some(f => (f.key === 'logo' || f.key === 'photo' || f.type === 'file') && f.enabled)) && (
+                <div className={styles.formGroup}>
+                  <label className={styles.formLabel}>
+                    Doctor photo or clinic logo <span className={styles.requiredStar}>*</span>
+                  </label>
 
-                <input
-                  id="step-doc-logo"
-                  type="file"
-                  accept="image/*"
-                  className="bs-form-control bs-mb-3"
-                  onChange={(e) => {
-                    handleFileChange(e);
-                    if (fieldErrors.logo) setFieldErrors(prev => ({ ...prev, logo: null }));
-                  }}
-                />
-                {fieldErrors.logo && <span className={styles.fieldError}>{fieldErrors.logo}</span>}
+                  <input
+                    id="step-doc-logo"
+                    type="file"
+                    accept="image/*"
+                    className="bs-form-control bs-mb-3"
+                    onChange={(e) => {
+                      handleFileChange(e);
+                      if (fieldErrors.logo) setFieldErrors(prev => ({ ...prev, logo: null }));
+                    }}
+                  />
+                  {fieldErrors.logo && <span className={styles.fieldError}>{fieldErrors.logo}</span>}
 
-                {logoPreview && (
-                  <div className={styles.filePreviewWrap}>
-                    <img src={logoPreview} alt="Doctor Logo Preview" className={styles.fileThumb} />
-                    <div className={styles.fileDetails}>
-                      <span className={styles.fileName}>{logoFile?.name || 'Selected logo'}</span>
+                  {logoPreview && (
+                    <div className={styles.filePreviewWrap}>
+                      <img src={logoPreview} alt="Doctor Logo Preview" className={styles.fileThumb} />
+                      <div className={styles.fileDetails}>
+                        <span className={styles.fileName}>{logoFile?.name || 'Selected logo'}</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleAdjustClick}
+                        className={styles.primaryBtn}
+                        style={{ marginRight: 8, padding: '4px 10px' }}
+                      >
+                        Adjust
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleRemoveLogo}
+                        className={styles.primaryBtn}
+                        style={{ padding: '4px 10px' }}
+                      >
+                        Remove
+                      </button>
                     </div>
-                    <button
-                      type="button"
-                      onClick={handleAdjustClick}
-                      className={styles.primaryBtn}
-                      style={{ marginRight: 8, padding: '4px 10px' }}
-                    >
-                      Adjust
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleRemoveLogo}
-                      className={styles.primaryBtn}
-                      style={{ padding: '4px 10px' }}
-                    >
-                      Remove
-                    </button>
-                  </div>
-                )}
-              </div>
+                  )}
+                </div>
+              )}
             </div>
 
             <div className={styles.navRow}>

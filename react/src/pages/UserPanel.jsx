@@ -492,7 +492,7 @@ export default function UserPanel({
           <div className={styles.modal} role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()}>
             <h2 className={styles.modalTitle}>{editingItem ? 'Edit doctor' : 'Add doctor'}</h2>
             <form onSubmit={handleSave} className={styles.form}>
-              {doctorFields.filter(f => f.enabled && f.key !== 'logo').map((field) => {
+              {doctorFields.filter(f => f.enabled && f.key !== 'logo' && f.key !== 'photo' && f.type !== 'file').map((field) => {
                 const isDynamic = !field.isStandard;
                 const value = isDynamic ? (formData.dynamicFields?.[field.key] ?? '') : (formData[field.key] ?? '');
 
