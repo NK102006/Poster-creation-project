@@ -51,6 +51,48 @@
   gap: 12px;
 }
 
+.profileTopActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.showPostersBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid rgba(31, 111, 159, 0.18);
+  background: rgba(255, 255, 255, 0.88);
+  color: var(--color-primary);
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  font-family: var(--font-body);
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.showPostersBtn:hover {
+  border-color: rgba(74, 159, 212, 0.5);
+  background: rgba(74, 159, 212, 0.1);
+}
+
+.showPostersCount {
+  display: inline-grid;
+  place-items: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: rgba(31, 111, 159, 0.1);
+  color: var(--color-primary-rich);
+  font-size: 11px;
+  font-weight: 700;
+}
+
 .profileEyebrow {
   margin: 0;
   font-size: 11px;

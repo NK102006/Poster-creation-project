@@ -4,6 +4,8 @@ import 'datatables.net-dt/css/dataTables.dataTables.css';
 import { apiRequest } from '../lib/apiClient';
 import { canAccessPage, clearAuth, readAuth, writeAuth } from '../lib/authSession';
 import StaffLogin from './StaffLogin';
+import StudioShell from '../components/StudioShell';
+import DatePicker from '../components/DatePicker';
 import { sanitizePhoneInput, validatePassword, validatePhoneNumber } from '../features/auth/validators';
 import styles from './AdminPortal.module.css';
 
@@ -16,41 +18,6 @@ function formatLabel(key) {
   if (key === 'clinicName') return 'Clinic / Hospital';
   if (key === 'doctorDegree') return 'Degree';
   return key.charAt(0).toUpperCase() + key.slice(1);
-}
-
-function inferPosterKind(poster) {
-  const raw = String(poster?.kind || '').toLowerCase();
-  if (raw === 'festival' || raw === 'video' || raw === 'education') return raw;
-  if (raw === 'gk') return 'education';
-  const src = String(poster?.image || '');
-  if (src.includes('.mp4') || src.includes('video') || src.startsWith('data:video')) {
-    return 'video';
-  }
-  return 'education';
-}
-
-function posterGalleryStyle(count) {
-  if (count <= 1) return { gridTemplateColumns: 'minmax(320px, 480px)', justifyContent: 'center' };
-  if (count <= 2) return { gridTemplateColumns: 'repeat(2, minmax(280px, 1fr))' };
-  if (count <= 4) return { gridTemplateColumns: 'repeat(2, minmax(260px, 1fr))' };
-  if (count <= 6) return { gridTemplateColumns: 'repeat(3, minmax(240px, 1fr))' };
-  return { gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))' };
-}
-
-function formatPosterSendDate(value) {
-  if (!value) return 'Send date not set';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return 'Send date not set';
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const compare = new Date(date);
-  compare.setHours(0, 0, 0, 0);
-  const label = date.toLocaleDateString('en-GB', {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-  });
-  return compare > today ? `Send ${label}` : `Sent ${label}`;
 }
 
 function dateInRange(value, fromStr, toStr) {
@@ -95,10 +62,6 @@ export default function UserPanel({
   const [exportError, setExportError] = useState('');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
-  const [showPosters, setShowPosters] = useState(false);
-  const [posterItems, setPosterItems] = useState([]);
-  const [postersLoading, setPostersLoading] = useState(false);
-  const [posterError, setPosterError] = useState('');
   const hostRef = useRef(null);
   const tableRef = useRef(null);
   const dateFromRef = useRef('');
@@ -338,15 +301,6 @@ export default function UserPanel({
     if (isLoggedIn) tableRef.current?.ajax?.reload(null, false);
   }, [dateFrom, dateTo, isLoggedIn]);
 
-  useEffect(() => {
-    if (!showPosters) return undefined;
-    const onKeyDown = (event) => {
-      if (event.key === 'Escape') setShowPosters(false);
-    };
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
-  }, [showPosters]);
-
   const openCreate = () => {
     if (onAddNew) {
       onAddNew();
@@ -431,31 +385,6 @@ export default function UserPanel({
     return dates.some((value) => dateInRange(value, dateFrom, dateTo));
   };
 
-  const openPosters = async () => {
-    setShowPosters(true);
-    setPostersLoading(true);
-    setPosterError('');
-    try {
-      const doctors = await apiRequest('/admin/collections/doctors');
-      const items = (doctors || []).flatMap((doctor) =>
-        (doctor.posters || []).map((poster, index) => ({
-          ...poster,
-          doctorName: doctor.name || 'Doctor',
-          sendDate: poster.createdAt || doctor.createdAt,
-          key: `${doctor.id || doctor._id || 'doctor'}-${poster.id || index}`,
-        }))
-      );
-      setPosterItems(items);
-    } catch (err) {
-      setPosterError(err.message || 'Could not load posters');
-      setPosterItems([]);
-    } finally {
-      setPostersLoading(false);
-    }
-  };
-
-  const visiblePosters = posterItems.filter((poster) => dateInRange(poster.sendDate, dateFrom, dateTo));
-
   const handleExport = async () => {
     try {
       const doctors = await apiRequest('/admin/collections/doctors');
@@ -511,139 +440,52 @@ export default function UserPanel({
     );
   }
 
-  return (
-    <div className={`${styles.shell} ${styles.shellFull}`}>
-      <div className={styles.main}>
-        <header className={styles.topbar}>
-          <div id="topbar-left" style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-            {onBack ? (
-              <button type="button" className={styles.secondaryBtn} onClick={onBack}>
-                ← Home
-              </button>
-            ) : onBrandClick ? (
-              <button type="button" className={styles.secondaryBtn} onClick={onBrandClick}>
-                ← Home
-              </button>
-            ) : null}
-            <h1 className={styles.pageTitle}>Doctors list</h1>
-          </div>
-          <div className={styles.topbarRight}>
-            <span className={styles.adminBadge}>
-              {auth.role === 'superadmin'
-                ? 'Superadmin'
-                : auth.role === 'admin'
-                  ? auth.username || 'Admin'
-                  : auth.empid ? `Employee ${auth.empid}` : 'User'}
-            </span>
-            <button type="button" className={styles.logoutBtn} onClick={handleLogout}>
-              Log out
-            </button>
-          </div>
-        </header>
+  const dateFilters = (
+    <div className={styles.dateFilter}>
+      <DatePicker
+        label="From"
+        value={dateFrom}
+        onChange={setDateFrom}
+        placeholder="From date"
+      />
+      <DatePicker
+        label="To"
+        value={dateTo}
+        onChange={setDateTo}
+        placeholder="To date"
+      />
+      {dateFrom || dateTo ? (
+        <button
+          type="button"
+          className={styles.secondaryBtn}
+          onClick={() => {
+            setDateFrom('');
+            setDateTo('');
+          }}
+        >
+          Clear dates
+        </button>
+      ) : null}
+    </div>
+  );
 
-        <section className={styles.panel}>
-          <div className={styles.toolbar}>
-            <div className={styles.dateFilter}>
-              <label>
-                From
-                <input
-                  type="date"
-                  value={dateFrom}
-                  onChange={(event) => setDateFrom(event.target.value)}
-                />
-              </label>
-              <label>
-                To
-                <input
-                  type="date"
-                  value={dateTo}
-                  onChange={(event) => setDateTo(event.target.value)}
-                />
-              </label>
-              {dateFrom || dateTo ? (
-                <button
-                  type="button"
-                  className={styles.secondaryBtn}
-                  onClick={() => {
-                    setDateFrom('');
-                    setDateTo('');
-                  }}
-                >
-                  Clear dates
-                </button>
-              ) : null}
-            </div>
-            <div className={styles.toolbarActions}>
-              <button type="button" className={styles.primaryBtn} onClick={openPosters}>
-                Show posters
-              </button>
-              <button type="button" className={styles.secondaryBtn} onClick={handleExport}>
-                Export
-              </button>
-              <button type="button" className={styles.primaryBtn} onClick={openCreate}>
-                + Add doctor
-              </button>
-            </div>
-          </div>
-          {exportError && <p className={styles.error} style={{ margin: '0 0 16px' }}>{exportError}</p>}
-          <div className={styles.tableCard}>
-            <div ref={hostRef} className={`${styles.dtHost} ${embedded ? styles.dtHostClickable : ''}`} />
-          </div>
-        </section>
+  const listActions = (
+    <>
+      <button type="button" className={styles.secondaryBtn} onClick={handleExport}>
+        Export
+      </button>
+      <button type="button" className={styles.primaryBtn} onClick={openCreate}>
+        + Add doctor
+      </button>
+    </>
+  );
+
+  const listBody = (
+    <>
+      {exportError && <p className={styles.error} style={{ margin: '0 0 16px' }}>{exportError}</p>}
+      <div className={styles.tableCard}>
+        <div ref={hostRef} className={`${styles.dtHost} ${embedded ? styles.dtHostClickable : ''}`} />
       </div>
-
-      {showPosters && (
-        <div className={styles.posterOverlay} role="dialog" aria-modal="true" aria-label="Doctor posters">
-          <div className={styles.posterOverlayHeader}>
-            <div>
-              <p className={styles.previewEyebrow}>Posters</p>
-              <h2>All posters</h2>
-              <p className={styles.previewMeta}>
-                {postersLoading
-                  ? 'Loading…'
-                  : `${visiblePosters.length} ${visiblePosters.length === 1 ? 'poster' : 'posters'}`}
-              </p>
-            </div>
-            <button type="button" className={styles.secondaryBtn} onClick={() => setShowPosters(false)}>
-              Close
-            </button>
-          </div>
-          <div className={styles.posterOverlayBody}>
-            {posterError ? (
-              <p className={styles.posterEmpty}>{posterError}</p>
-            ) : postersLoading ? (
-              <p className={styles.posterEmpty}>Loading posters…</p>
-            ) : visiblePosters.length === 0 ? (
-              <p className={styles.posterEmpty}>
-                {posterItems.length && (dateFrom || dateTo)
-                  ? 'No posters in this date range.'
-                  : 'No posters yet.'}
-              </p>
-            ) : (
-              <div className={styles.posterGallery} style={posterGalleryStyle(visiblePosters.length)}>
-                {visiblePosters.map((poster, index) => {
-                  const kind = inferPosterKind(poster);
-                  return (
-                    <div key={poster.key || poster.id || index} className={styles.posterOverlayItem}>
-                      {kind === 'video' ? (
-                        <video src={poster.image} controls playsInline preload="metadata" />
-                      ) : (
-                        <img src={poster.image} alt={poster.label || `Poster ${index + 1}`} />
-                      )}
-                      <em>{poster.label || `Poster ${index + 1}`}</em>
-                      <small>{kind}</small>
-                      <span className={styles.posterSendDate}>{formatPosterSendDate(poster.sendDate)}</span>
-                      {poster.doctorName ? (
-                        <span className={styles.posterDoctorName}>{poster.doctorName}</span>
-                      ) : null}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        </div>
-      )}
 
       {showModal && (
         <div className={`${styles.modalOverlay} ${closingModal ? styles.closing : ''}`} onClick={closeModal}>
@@ -653,7 +495,7 @@ export default function UserPanel({
               {doctorFields.filter(f => f.enabled).map((field) => {
                 const isDynamic = !field.isStandard;
                 const value = isDynamic ? (formData.dynamicFields?.[field.key] ?? '') : (formData[field.key] ?? '');
-                
+
                 return (
                   <label key={field.key} className={styles.field}>
                     <span>{field.label} {field.required ? '*' : ''}</span>
@@ -668,7 +510,7 @@ export default function UserPanel({
                         const next = field.key === 'contactnumber'
                           ? sanitizePhoneInput(event.target.value)
                           : event.target.value;
-                        
+
                         setFormData((prev) => {
                           if (isDynamic) {
                             return { ...prev, dynamicFields: { ...prev.dynamicFields, [field.key]: next } };
@@ -700,6 +542,57 @@ export default function UserPanel({
           </div>
         </div>
       )}
+    </>
+  );
+
+  if (embedded) {
+    return (
+      <StudioShell
+        user={auth}
+        onLogout={handleLogout}
+        onBrandClick={onBrandClick}
+        onBack={onBack}
+        backLabel="Home"
+        wide
+        subheaderExtra={dateFilters}
+      >
+        <div className={styles.toolbar}>
+          <h1 className={styles.pageTitle}>Doctors list</h1>
+          <div className={styles.toolbarActions}>{listActions}</div>
+        </div>
+        {listBody}
+      </StudioShell>
+    );
+  }
+
+  return (
+    <div className={`${styles.shell} ${styles.shellFull}`}>
+      <div className={styles.main}>
+        <header className={styles.topbar}>
+          <div id="topbar-left" style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+            <h1 className={styles.pageTitle}>Doctors list</h1>
+          </div>
+          <div className={styles.topbarRight}>
+            <span className={styles.adminBadge}>
+              {auth.role === 'superadmin'
+                ? 'Superadmin'
+                : auth.role === 'admin'
+                  ? auth.username || 'Admin'
+                  : auth.empid ? `Employee ${auth.empid}` : 'User'}
+            </span>
+            <button type="button" className={styles.logoutBtn} onClick={handleLogout}>
+              Log out
+            </button>
+          </div>
+        </header>
+        <section className={styles.panel}>
+          <div className={styles.toolbar}>
+            {dateFilters}
+            <div className={styles.toolbarActions}>{listActions}</div>
+          </div>
+          {listBody}
+        </section>
+      </div>
     </div>
   );
 }

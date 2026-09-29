@@ -4,10 +4,46 @@ import StudioShell from '../components/StudioShell';
 import LogoCanvas from '../components/LogoCanvas';
 import { sanitizePhoneInput, validatePhoneNumber } from '../features/auth/validators';
 import styles from './DoctorManagePage.module.css';
+import adminStyles from './AdminPortal.module.css';
 
 const EMPTY_FORM = {
   dynamicFields: {},
 };
+
+function inferPosterKind(poster) {
+  const raw = String(poster?.kind || '').toLowerCase();
+  if (raw === 'festival' || raw === 'video' || raw === 'education') return raw;
+  if (raw === 'gk') return 'education';
+  const src = String(poster?.image || '');
+  if (src.includes('.mp4') || src.includes('video') || src.startsWith('data:video')) {
+    return 'video';
+  }
+  return 'education';
+}
+
+function posterGalleryStyle(count) {
+  if (count <= 1) return { gridTemplateColumns: 'minmax(320px, 480px)', justifyContent: 'center' };
+  if (count <= 2) return { gridTemplateColumns: 'repeat(2, minmax(280px, 1fr))' };
+  if (count <= 4) return { gridTemplateColumns: 'repeat(2, minmax(260px, 1fr))' };
+  if (count <= 6) return { gridTemplateColumns: 'repeat(3, minmax(240px, 1fr))' };
+  return { gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))' };
+}
+
+function formatPosterSendDate(value) {
+  if (!value) return 'Send date not set';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return 'Send date not set';
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const compare = new Date(date);
+  compare.setHours(0, 0, 0, 0);
+  const label = date.toLocaleDateString('en-GB', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  });
+  return compare > today ? `Send ${label}` : `Sent ${label}`;
+}
 
 export default function DoctorManagePage({
   user,
@@ -34,9 +70,19 @@ export default function DoctorManagePage({
   const [croppedLogoData, setCroppedLogoData] = useState(null);
   const [logoCropState, setLogoCropState] = useState(null);
   const [tempLogoCropState, setTempLogoCropState] = useState(null);
-
+  const [showPosters, setShowPosters] = useState(false);
 
   const isInactive = doctor?.active === false;
+  const doctorPosters = doctor?.posters || [];
+
+  useEffect(() => {
+    if (!showPosters) return undefined;
+    const onKeyDown = (event) => {
+      if (event.key === 'Escape') setShowPosters(false);
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [showPosters]);
 
   const loadDoctor = async () => {
     setLoading(true);
@@ -284,9 +330,21 @@ export default function DoctorManagePage({
             <div className={styles.profileCopy}>
               <div className={styles.profileTop}>
                 <p className={styles.profileEyebrow}>Doctor profile</p>
-                <span className={isInactive ? styles.statusPillInactive : styles.statusPill}>
-                  {isInactive ? 'Inactive' : 'Active'}
-                </span>
+                <div className={styles.profileTopActions}>
+                  <button
+                    type="button"
+                    className={styles.showPostersBtn}
+                    onClick={() => setShowPosters(true)}
+                  >
+                    Show posters
+                    {doctor.postersMade ? (
+                      <span className={styles.showPostersCount}>{doctor.postersMade}</span>
+                    ) : null}
+                  </button>
+                  <span className={isInactive ? styles.statusPillInactive : styles.statusPill}>
+                    {isInactive ? 'Inactive' : 'Active'}
+                  </span>
+                </div>
               </div>
               <h1 className={styles.profileName}>{doctor.name || 'Doctor'}</h1>
               <p className={styles.profileMeta}>
@@ -418,6 +476,55 @@ export default function DoctorManagePage({
               </div>
             </div>
           </form>
+        </div>
+      )}
+
+      {showPosters && doctor && (
+        <div className={adminStyles.posterOverlay} role="dialog" aria-modal="true" aria-label="Doctor posters">
+          <div className={adminStyles.posterOverlayHeader}>
+            <div>
+              <p className={adminStyles.previewEyebrow}>Posters</p>
+              <h2>{doctor.name || 'Doctor'}</h2>
+              <p className={adminStyles.previewMeta}>
+                {doctorPosters.length} {doctorPosters.length === 1 ? 'poster' : 'posters'}
+              </p>
+            </div>
+            <button
+              type="button"
+              className={adminStyles.secondaryBtn}
+              onClick={() => setShowPosters(false)}
+            >
+              Close
+            </button>
+          </div>
+          <div className={adminStyles.posterOverlayBody}>
+            {doctorPosters.length === 0 ? (
+              <p className={adminStyles.posterEmpty}>No posters yet.</p>
+            ) : (
+              <div
+                className={adminStyles.posterGallery}
+                style={posterGalleryStyle(doctorPosters.length)}
+              >
+                {doctorPosters.map((poster, index) => {
+                  const kind = inferPosterKind(poster);
+                  return (
+                    <div key={poster.id || index} className={adminStyles.posterOverlayItem}>
+                      {kind === 'video' ? (
+                        <video src={poster.image} controls playsInline preload="metadata" />
+                      ) : (
+                        <img src={poster.image} alt={poster.label || `Poster ${index + 1}`} />
+                      )}
+                      <em>{poster.label || `Poster ${index + 1}`}</em>
+                      <small>{kind}</small>
+                      <span className={adminStyles.posterSendDate}>
+                        {formatPosterSendDate(poster.createdAt)}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         </div>
       )}
 
