@@ -1,0 +1,16 @@
+    const contentsArray = Array.isArray(obj.contents) ? obj.contents : [];
+    const monthlyDownloads = {};
+    const monthlyPosters = {};
+    contentsArray.forEach((p) => {
+      if (!p.createdAt) return;
+      let m = new Date(p.createdAt).getMonth();
+      if (p.month) {
+        const monthPrefix = String(p.month).trim().toLowerCase().slice(0, 3);
+        const mIndex = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'].indexOf(monthPrefix);
+        if (mIndex !== -1) {
+          m = mIndex;
+        }
+      }
+      monthlyDownloads[m] = (monthlyDownloads[m] || 0) + (Number(p.downloads) || 0);
+      monthlyPosters[m] = (monthlyPosters[m] || 0) + 1;
+    });

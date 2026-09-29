@@ -34,7 +34,7 @@ export default function DoctorManagePage({
   const [croppedLogoData, setCroppedLogoData] = useState(null);
   const [logoCropState, setLogoCropState] = useState(null);
   const [tempLogoCropState, setTempLogoCropState] = useState(null);
-  const [filterMonth, setFilterMonth] = useState('');
+
 
   const isInactive = doctor?.active === false;
 
@@ -284,21 +284,9 @@ export default function DoctorManagePage({
             <div className={styles.profileCopy}>
               <div className={styles.profileTop}>
                 <p className={styles.profileEyebrow}>Doctor profile</p>
-                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                  <select
-                    className={styles.monthSelect}
-                    value={filterMonth}
-                    onChange={(e) => setFilterMonth(e.target.value)}
-                  >
-                    <option value="">All Time</option>
-                    {['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'].map((m, i) => (
-                      <option key={i} value={i}>{m}</option>
-                    ))}
-                  </select>
-                  <span className={isInactive ? styles.statusPillInactive : styles.statusPill}>
-                    {isInactive ? 'Inactive' : 'Active'}
-                  </span>
-                </div>
+                <span className={isInactive ? styles.statusPillInactive : styles.statusPill}>
+                  {isInactive ? 'Inactive' : 'Active'}
+                </span>
               </div>
               <h1 className={styles.profileName}>{doctor.name || 'Doctor'}</h1>
               <p className={styles.profileMeta}>
@@ -309,19 +297,11 @@ export default function DoctorManagePage({
               </p>
               <div className={styles.metricRow}>
                 <div className={styles.metric}>
-                  <strong>
-                    {filterMonth === '' 
-                      ? (doctor.postersMade || 0) 
-                      : (doctor.monthlyPosters?.[filterMonth] || 0)}
-                  </strong>
+                  <strong>{doctor.postersMade || 0}</strong>
                   <span>Posters</span>
                 </div>
                 <div className={styles.metric}>
-                  <strong>
-                    {filterMonth === '' 
-                      ? (doctor.downloadCount || 0) 
-                      : (doctor.monthlyDownloads?.[filterMonth] || 0)}
-                  </strong>
+                  <strong>{doctor.downloadCount || 0}</strong>
                   <span>Downloads</span>
                 </div>
                 <div className={styles.metric}>

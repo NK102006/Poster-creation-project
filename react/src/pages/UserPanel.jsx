@@ -18,25 +18,97 @@ function formatLabel(key) {
   return key.charAt(0).toUpperCase() + key.slice(1);
 }
 
-export default function UserPanel() {
-  const [auth, setAuth] = useState(() => readAuth('userpanel'));
+function inferPosterKind(poster) {
+  const raw = String(poster?.kind || '').toLowerCase();
+  if (raw === 'festival' || raw === 'video' || raw === 'education') return raw;
+  if (raw === 'gk') return 'education';
+  const src = String(poster?.image || '');
+  if (src.includes('.mp4') || src.includes('video') || src.startsWith('data:video')) {
+    return 'video';
+  }
+  return 'education';
+}
+
+function posterGalleryStyle(count) {
+  if (count <= 1) return { gridTemplateColumns: 'minmax(320px, 480px)', justifyContent: 'center' };
+  if (count <= 2) return { gridTemplateColumns: 'repeat(2, minmax(280px, 1fr))' };
+  if (count <= 4) return { gridTemplateColumns: 'repeat(2, minmax(260px, 1fr))' };
+  if (count <= 6) return { gridTemplateColumns: 'repeat(3, minmax(240px, 1fr))' };
+  return { gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))' };
+}
+
+function formatPosterSendDate(value) {
+  if (!value) return 'Send date not set';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return 'Send date not set';
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const compare = new Date(date);
+  compare.setHours(0, 0, 0, 0);
+  const label = date.toLocaleDateString('en-GB', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  });
+  return compare > today ? `Send ${label}` : `Sent ${label}`;
+}
+
+function dateInRange(value, fromStr, toStr) {
+  if (!fromStr && !toStr) return true;
+  if (!value) return false;
+  const time = new Date(value).getTime();
+  if (Number.isNaN(time)) return false;
+  if (fromStr) {
+    const from = new Date(fromStr);
+    from.setHours(0, 0, 0, 0);
+    if (time < from.getTime()) return false;
+  }
+  if (toStr) {
+    const to = new Date(toStr);
+    to.setHours(23, 59, 59, 999);
+    if (time > to.getTime()) return false;
+  }
+  return true;
+}
+
+export default function UserPanel({
+  user = null,
+  onLogout,
+  onBack,
+  onBrandClick,
+  onSelectDoctor,
+  onAddNew,
+} = {}) {
+  const embedded = Boolean(user);
+  const [auth, setAuth] = useState(() => user || readAuth('userpanel'));
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [loginError, setLoginError] = useState('');
   const [loginFieldErrors, setLoginFieldErrors] = useState({});
   const [showModal, setShowModal] = useState(false);
   const [closingModal, setClosingModal] = useState(false);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
   const [formData, setFormData] = useState({ dynamicFields: {} });
   const [formFieldErrors, setFormFieldErrors] = useState({});
   const [doctorFields, setDoctorFields] = useState([]);
   const [saving, setSaving] = useState(false);
   const [exportError, setExportError] = useState('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+  const [showPosters, setShowPosters] = useState(false);
+  const [posterItems, setPosterItems] = useState([]);
+  const [postersLoading, setPostersLoading] = useState(false);
+  const [posterError, setPosterError] = useState('');
   const hostRef = useRef(null);
   const tableRef = useRef(null);
+  const dateFromRef = useRef('');
+  const dateToRef = useRef('');
 
-  const isLoggedIn = canAccessPage(auth, 'userpanel');
+  useEffect(() => {
+    if (user) setAuth(user);
+  }, [user]);
+
+  const isLoggedIn = embedded || canAccessPage(auth, 'userpanel');
 
   const handleLogin = async (event) => {
     event.preventDefault();
@@ -67,6 +139,10 @@ export default function UserPanel() {
   };
 
   const handleLogout = () => {
+    if (onLogout) {
+      onLogout();
+      return;
+    }
     clearAuth('userpanel');
     setAuth(null);
     setUsername('');
@@ -76,6 +152,13 @@ export default function UserPanel() {
     apiRequest('/logout', { method: 'POST' }).catch(() => {});
   };
 
+  const openDoctor = (item) => {
+    if (!onSelectDoctor) return false;
+    const id = getItemId(item);
+    onSelectDoctor({ ...item, id });
+    return true;
+  };
+
   const reloadTable = () => {
     tableRef.current?.ajax?.reload(null, false);
   };
@@ -83,19 +166,8 @@ export default function UserPanel() {
   useEffect(() => {
     if (!isLoggedIn) return undefined;
 
-    apiRequest('/doctor-fields').then(res => {
-      if (res && res.fields) {
-        setDoctorFields(res.fields);
-      }
-    }).catch(console.error);
-
-    const openEdit = async (item) => {
-      try {
-        const res = await apiRequest('/doctor-fields');
-        if (res && res.fields) setDoctorFields(res.fields);
-      } catch (err) {
-        console.error(err);
-      }
+    const openEdit = (item) => {
+      if (openDoctor(item)) return;
       setEditingItem(item);
       setFormData({ dynamicFields: {}, ...item });
       setShowModal(true);
@@ -112,11 +184,11 @@ export default function UserPanel() {
       }
     };
 
-    window.__userPanel = { openEdit, removeRow };
+    window.__userPanel = { openEdit, removeRow, openDoctor };
     return () => {
       delete window.__userPanel;
     };
-  }, [isLoggedIn]);
+  }, [isLoggedIn, onSelectDoctor]);
 
   useEffect(() => {
     if (!isLoggedIn || !hostRef.current) return undefined;
@@ -152,6 +224,8 @@ export default function UserPanel() {
         params.set('search[value]', request.search?.value || '');
         params.set('order[0][column]', request.order?.[0]?.column ?? 0);
         params.set('order[0][dir]', request.order?.[0]?.dir ?? 'desc');
+        if (dateFromRef.current) params.set('from', dateFromRef.current);
+        if (dateToRef.current) params.set('to', dateToRef.current);
         apiRequest(`/admin/datatables/doctors?${params}`)
           .then((result) => callback(result))
           .catch(() => callback({
@@ -163,10 +237,18 @@ export default function UserPanel() {
       },
       columns: [
         {
-          title: 'ID',
-          data: 'id',
+          title: 'Logo',
+          data: 'logo',
+          orderable: false,
+          searchable: false,
           className: styles.colId,
-          render: (data) => `<code class="${styles.idCell}" title="${data}">${data}</code>`,
+          render: (data, _type, row) => {
+            const initial = (row.name || 'D').charAt(0).toUpperCase();
+            if (data) {
+              return `<img src="${data}" alt="" style="width:36px;height:36px;border-radius:50%;object-fit:cover;border:2px solid #e8f0fe;" />`;
+            }
+            return `<div style="width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,#4285f4,#34a853);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:15px;">${initial}</div>`;
+          },
         },
         { title: 'Name', data: 'name', className: styles.nameCell },
         {
@@ -183,6 +265,15 @@ export default function UserPanel() {
           title: 'Degree',
           data: 'doctorDegree',
           render: (data) => data || '—',
+        },
+        {
+          title: 'Created',
+          data: 'createdAt',
+          render: (data) => {
+            if (!data) return '—';
+            const d = new Date(data);
+            return Number.isNaN(d.getTime()) ? '—' : d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+          },
         },
         {
           title: 'Edit',
@@ -226,6 +317,7 @@ export default function UserPanel() {
         window.__userPanel?.removeRow(getItemId(rowData));
         return;
       }
+      if (window.__userPanel?.openDoctor?.(rowData)) return;
       window.__userPanel?.openEdit(rowData);
     }
 
@@ -240,12 +332,25 @@ export default function UserPanel() {
     };
   }, [isLoggedIn]);
 
-  const openCreate = async () => {
-    try {
-      const res = await apiRequest('/doctor-fields');
-      if (res && res.fields) setDoctorFields(res.fields);
-    } catch (err) {
-      console.error(err);
+  useEffect(() => {
+    dateFromRef.current = dateFrom;
+    dateToRef.current = dateTo;
+    if (isLoggedIn) tableRef.current?.ajax?.reload(null, false);
+  }, [dateFrom, dateTo, isLoggedIn]);
+
+  useEffect(() => {
+    if (!showPosters) return undefined;
+    const onKeyDown = (event) => {
+      if (event.key === 'Escape') setShowPosters(false);
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [showPosters]);
+
+  const openCreate = () => {
+    if (onAddNew) {
+      onAddNew();
+      return;
     }
     setEditingItem(null);
     setFormData({ dynamicFields: {} });
@@ -316,17 +421,53 @@ export default function UserPanel() {
     }
   };
 
+  const doctorMatchesDateRange = (doctor) => {
+    if (!dateFrom && !dateTo) return true;
+    const dates = [
+      doctor.createdAt,
+      doctor.updatedAt,
+      ...(Array.isArray(doctor.posters) ? doctor.posters.map((poster) => poster.createdAt) : []),
+    ];
+    return dates.some((value) => dateInRange(value, dateFrom, dateTo));
+  };
+
+  const openPosters = async () => {
+    setShowPosters(true);
+    setPostersLoading(true);
+    setPosterError('');
+    try {
+      const doctors = await apiRequest('/admin/collections/doctors');
+      const items = (doctors || []).flatMap((doctor) =>
+        (doctor.posters || []).map((poster, index) => ({
+          ...poster,
+          doctorName: doctor.name || 'Doctor',
+          sendDate: poster.createdAt || doctor.createdAt,
+          key: `${doctor.id || doctor._id || 'doctor'}-${poster.id || index}`,
+        }))
+      );
+      setPosterItems(items);
+    } catch (err) {
+      setPosterError(err.message || 'Could not load posters');
+      setPosterItems([]);
+    } finally {
+      setPostersLoading(false);
+    }
+  };
+
+  const visiblePosters = posterItems.filter((poster) => dateInRange(poster.sendDate, dateFrom, dateTo));
+
   const handleExport = async () => {
     try {
       const doctors = await apiRequest('/admin/collections/doctors');
-      if (!doctors || doctors.length === 0) {
+      const filtered = (doctors || []).filter(doctorMatchesDateRange);
+      if (filtered.length === 0) {
         setExportError('No data available to export');
         setTimeout(() => setExportError(''), 3000);
         return;
       }
       const rows = [
         ['Name', 'Degree', 'Clinic / Hospital', 'Contact Number'],
-        ...doctors.map((doctor) => [
+        ...filtered.map((doctor) => [
           doctor.name || '',
           doctor.doctorDegree || '',
           doctor.clinicName || '',
@@ -371,55 +512,19 @@ export default function UserPanel() {
   }
 
   return (
-    <div className={styles.shell}>
-      <div 
-        className={`${styles.sidebarOverlay} ${sidebarOpen ? styles.open : ''} ${styles.mobileOnly}`} 
-        onClick={() => setSidebarOpen(false)}
-      />
-      <aside className={`${styles.sidebar} ${sidebarOpen ? styles.open : ''}`}>
-        <div className={styles.sidebarTop} onClick={() => { window.location.href = '/'; }} style={{ cursor: 'pointer' }}>
-          <div className={styles.brandMark}>U</div>
-          <div>
-            <div className={styles.brandName}>MedPortal</div>
-            <div className={styles.brandSub}>Userpanel</div>
-          </div>
-        </div>
-        <nav className={styles.nav}>
-          <p className={styles.navLabel}>Collections</p>
-          <button type="button" className={`${styles.navItem} ${styles.navActive}`}>
-            <span className={styles.navIcon}>D</span>
-            Doctors
-          </button>
-        </nav>
-
-        <div className={`${styles.sidebarMobileActions} ${styles.mobileOnly}`}>
-          <button type="button" className={styles.secondaryBtn} onClick={handleExport}>
-            Export
-          </button>
-          <button type="button" className={styles.primaryBtn} onClick={openCreate}>
-            + Add doctor
-          </button>
-          <button type="button" className={styles.sidebarLogout} onClick={handleLogout}>
-            Log out
-          </button>
-        </div>
-      </aside>
-
+    <div className={`${styles.shell} ${styles.shellFull}`}>
       <div className={styles.main}>
         <header className={styles.topbar}>
-          <button 
-            type="button" 
-            className={`${styles.hamburgerBtn} ${styles.mobileOnly}`} 
-            onClick={() => setSidebarOpen(true)}
-            aria-label="Open menu"
-          >
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <line x1="3" y1="12" x2="21" y2="12"></line>
-              <line x1="3" y1="6" x2="21" y2="6"></line>
-              <line x1="3" y1="18" x2="21" y2="18"></line>
-            </svg>
-          </button>
           <div id="topbar-left" style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+            {onBack ? (
+              <button type="button" className={styles.secondaryBtn} onClick={onBack}>
+                ← Home
+              </button>
+            ) : onBrandClick ? (
+              <button type="button" className={styles.secondaryBtn} onClick={onBrandClick}>
+                ← Home
+              </button>
+            ) : null}
             <h1 className={styles.pageTitle}>Doctors list</h1>
           </div>
           <div className={styles.topbarRight}>
@@ -428,18 +533,50 @@ export default function UserPanel() {
                 ? 'Superadmin'
                 : auth.role === 'admin'
                   ? auth.username || 'Admin'
-                  : auth.empid || 'User'}
+                  : auth.empid ? `Employee ${auth.empid}` : 'User'}
             </span>
-            <button type="button" className={`${styles.logoutBtn} ${styles.desktopOnly}`} onClick={handleLogout}>
+            <button type="button" className={styles.logoutBtn} onClick={handleLogout}>
               Log out
             </button>
           </div>
         </header>
 
         <section className={styles.panel}>
-          <div className={`${styles.toolbar} ${styles.desktopOnly}`}>
-            <div />
+          <div className={styles.toolbar}>
+            <div className={styles.dateFilter}>
+              <label>
+                From
+                <input
+                  type="date"
+                  value={dateFrom}
+                  onChange={(event) => setDateFrom(event.target.value)}
+                />
+              </label>
+              <label>
+                To
+                <input
+                  type="date"
+                  value={dateTo}
+                  onChange={(event) => setDateTo(event.target.value)}
+                />
+              </label>
+              {dateFrom || dateTo ? (
+                <button
+                  type="button"
+                  className={styles.secondaryBtn}
+                  onClick={() => {
+                    setDateFrom('');
+                    setDateTo('');
+                  }}
+                >
+                  Clear dates
+                </button>
+              ) : null}
+            </div>
             <div className={styles.toolbarActions}>
+              <button type="button" className={styles.primaryBtn} onClick={openPosters}>
+                Show posters
+              </button>
               <button type="button" className={styles.secondaryBtn} onClick={handleExport}>
                 Export
               </button>
@@ -448,12 +585,65 @@ export default function UserPanel() {
               </button>
             </div>
           </div>
-          {exportError && <p className={styles.error} style={{ margin: '0 24px 16px' }}>{exportError}</p>}
+          {exportError && <p className={styles.error} style={{ margin: '0 0 16px' }}>{exportError}</p>}
           <div className={styles.tableCard}>
-            <div ref={hostRef} className={styles.dtHost} />
+            <div ref={hostRef} className={`${styles.dtHost} ${embedded ? styles.dtHostClickable : ''}`} />
           </div>
         </section>
       </div>
+
+      {showPosters && (
+        <div className={styles.posterOverlay} role="dialog" aria-modal="true" aria-label="Doctor posters">
+          <div className={styles.posterOverlayHeader}>
+            <div>
+              <p className={styles.previewEyebrow}>Posters</p>
+              <h2>All posters</h2>
+              <p className={styles.previewMeta}>
+                {postersLoading
+                  ? 'Loading…'
+                  : `${visiblePosters.length} ${visiblePosters.length === 1 ? 'poster' : 'posters'}`}
+              </p>
+            </div>
+            <button type="button" className={styles.secondaryBtn} onClick={() => setShowPosters(false)}>
+              Close
+            </button>
+          </div>
+          <div className={styles.posterOverlayBody}>
+            {posterError ? (
+              <p className={styles.posterEmpty}>{posterError}</p>
+            ) : postersLoading ? (
+              <p className={styles.posterEmpty}>Loading posters…</p>
+            ) : visiblePosters.length === 0 ? (
+              <p className={styles.posterEmpty}>
+                {posterItems.length && (dateFrom || dateTo)
+                  ? 'No posters in this date range.'
+                  : 'No posters yet.'}
+              </p>
+            ) : (
+              <div className={styles.posterGallery} style={posterGalleryStyle(visiblePosters.length)}>
+                {visiblePosters.map((poster, index) => {
+                  const kind = inferPosterKind(poster);
+                  return (
+                    <div key={poster.key || poster.id || index} className={styles.posterOverlayItem}>
+                      {kind === 'video' ? (
+                        <video src={poster.image} controls playsInline preload="metadata" />
+                      ) : (
+                        <img src={poster.image} alt={poster.label || `Poster ${index + 1}`} />
+                      )}
+                      <em>{poster.label || `Poster ${index + 1}`}</em>
+                      <small>{kind}</small>
+                      <span className={styles.posterSendDate}>{formatPosterSendDate(poster.sendDate)}</span>
+                      {poster.doctorName ? (
+                        <span className={styles.posterDoctorName}>{poster.doctorName}</span>
+                      ) : null}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {showModal && (
         <div className={`${styles.modalOverlay} ${closingModal ? styles.closing : ''}`} onClick={closeModal}>

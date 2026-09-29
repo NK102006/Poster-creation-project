@@ -1,5 +1,4 @@
-// src/components/PosterGenerator.jsx
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import JSZip from 'jszip';
 import { POSTER_THEMES } from './Poster';
@@ -11,12 +10,13 @@ import {
   renderRiskFactorPosterBlob,
   renderMasterPosterBlob,
 } from '../lib/posterExport';
+import { apiRequest } from '../lib/apiClient';
 import styles from './PosterGenerator.module.css';
 import { sanitizePhoneInput, validatePhoneNumber } from '../features/auth/validators';
 
 const STEPS = [
   { id: 1, label: 'Doctor Details', short: 'Details' },
-  { id: 2, label: 'Design', short: 'Design' },
+  { id: 2, label: 'Preview', short: 'Preview' },
 ];
 
 export default function PosterGenerator({
@@ -34,7 +34,6 @@ export default function PosterGenerator({
 }) {
   const [currentStep, setCurrentStep] = useState(initialStep);
   const [isSavingInitial, setIsSavingInitial] = useState(false);
-  const [selectedThemeId, setSelectedThemeId] = useState('theme-warm-red');
   const [activePosterIndex, setActivePosterIndex] = useState(0);
   const [carouselSlides, setCarouselSlides] = useState([]);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -49,12 +48,49 @@ export default function PosterGenerator({
   const [logoCropState, setLogoCropState] = useState(null);
   const [tempLogoCropState, setTempLogoCropState] = useState(null);
 
+  const [selectedPosterIds, setSelectedPosterIds] = useState([]);
+  const [multiSelect, setMultiSelect] = useState(false);
   const [previewModalOpen, setPreviewModalOpen] = useState(false);
   const [closingModal, setClosingModal] = useState(false);
   const [modalOrigin, setModalOrigin] = useState({ x: window.innerWidth / 2, y: window.innerHeight / 2 });
 
+  const [selectedThemeId, setSelectedThemeId] = useState('theme-blue');
+  const [themes, setThemes] = useState(POSTER_THEMES);
+
+  useEffect(() => {
+    const fetchThemes = async () => {
+      try {
+        const res = await apiRequest('/themes');
+        if (res.themes && res.themes.length > 0) {
+          const merged = res.themes.map((t) => {
+            const fallback =
+              POSTER_THEMES.find(
+                (pt) => pt.id === t.slug || pt.name.toLowerCase() === t.name.toLowerCase()
+              ) || POSTER_THEMES[0];
+            return {
+              ...fallback,
+              ...t,
+              id: t.slug || t._id,
+              name: t.name,
+              headerBg: t.headerBg || fallback.headerBg,
+              footerBg: t.footerBg || fallback.footerBg,
+              accentColor: t.accentColor || fallback.accentColor,
+              cardGlow: t.cardGlow || fallback.cardGlow,
+            };
+          });
+          setThemes(merged);
+        }
+      } catch (err) {
+        console.error('Error fetching themes:', err);
+      }
+    };
+    fetchThemes();
+  }, []);
+
   const selectedTheme =
-    POSTER_THEMES.find((t) => t.id === selectedThemeId) || POSTER_THEMES[0];
+    themes.find((t) => t.id === selectedThemeId || t.name === selectedThemeId) ||
+    themes[0] ||
+    POSTER_THEMES[0];
   const isStepComplete = (step) => currentStep > step;
   const [modalPoster, setModalPoster] = useState(null);
 
@@ -111,9 +147,9 @@ export default function PosterGenerator({
         if (f.key === 'contactnumber') {
           const phoneError = validatePhoneNumber(val);
           if (phoneError) {
-             errors[f.key] = phoneError;
+            errors[f.key] = phoneError;
           } else if (f.required && !String(val).trim()) {
-             errors[f.key] = `${f.label} is required`;
+            errors[f.key] = `${f.label} is required`;
           }
           continue;
         }
@@ -195,11 +231,6 @@ export default function PosterGenerator({
       return false;
     }
 
-    if (targetStep > 2 && !selectedThemeId) {
-      setStepError('Please choose a theme before previewing.');
-      return false;
-    }
-
     setStepError(null);
     return true;
   };
@@ -225,9 +256,12 @@ export default function PosterGenerator({
   const carouselProps = {
     activeIndex: activePosterIndex,
     onIndexChange: setActivePosterIndex,
-    theme: selectedTheme,
     doctorFields,
+    theme: selectedTheme,
     onSlidesChange: setCarouselSlides,
+    selectedIds: selectedPosterIds,
+    onSelectedIdsChange: setSelectedPosterIds,
+    selectionEnabled: multiSelect,
     onPosterClick: (poster, originCoords) => {
       setModalPoster(poster);
       if (originCoords) setModalOrigin(originCoords);
@@ -277,7 +311,7 @@ export default function PosterGenerator({
         const videoBlob = await res.blob();
         const dataUrl = URL.createObjectURL(videoBlob);
         const fileName = `Video_${cleanDocName}_${posterLabel}.mp4`;
-        
+
         if (onAutoSave) {
           onAutoSave(formData, logoFile, videoBlob, saveMeta).catch((err) => {
             console.warn('Auto save notice:', err);
@@ -320,7 +354,28 @@ export default function PosterGenerator({
     }
   };
 
-  const handleDownloadZip = async () => {
+  const startMultiSelect = () => {
+    setMultiSelect(true);
+    setDownloadSuccess(false);
+  };
+
+  const cancelMultiSelect = () => {
+    setMultiSelect(false);
+    setSelectedPosterIds([]);
+  };
+
+  const handleDownloadZip = async (scope = 'all') => {
+    const pack =
+      scope === 'selected'
+        ? carouselSlides.filter((poster) => selectedPosterIds.includes(poster.id))
+        : carouselSlides;
+    if (pack.length === 0) {
+      setDownloadMessage(scope === 'selected' ? 'Select at least one poster.' : 'No posters to zip.');
+      setDownloadSuccess(true);
+      setTimeout(() => setDownloadSuccess(false), 4000);
+      return;
+    }
+
     try {
       setIsGenerating(true);
       setDownloadSuccess(false);
@@ -330,13 +385,12 @@ export default function PosterGenerator({
         .replace(/[^a-zA-Z0-9_-]/g, '_')
         .replace(/_+/g, '_');
 
-      const pack = carouselSlides;
       let generalCounter = 0;
       for (let i = 0; i < pack.length; i += 1) {
         const poster = pack[i];
         const label = poster.label || `Poster-${++generalCounter}`;
         const safeLabel = label.replace(/[^a-zA-Z0-9_-]/g, '_');
-        
+
         if (poster.kind === 'video') {
           const res = await fetch(poster.videoUrl);
           const videoBlob = await res.blob();
@@ -359,7 +413,7 @@ export default function PosterGenerator({
         } else {
           firstBlob = await renderPosterBlob(pack[0], firstLabel);
         }
-        onAutoSave(formData, logoFile, firstBlob, firstSaveMeta).catch(() => {});
+        onAutoSave(formData, logoFile, firstBlob, firstKind).catch(() => { });
       }
 
       const zipBlob = await zip.generateAsync({ type: 'blob' });
@@ -371,7 +425,7 @@ export default function PosterGenerator({
       URL.revokeObjectURL(url);
 
       setIsGenerating(false);
-      setDownloadMessage(`Zip ready!`);
+      setDownloadMessage(`Zip ready — ${pack.length} poster${pack.length === 1 ? '' : 's'}.`);
       setDownloadSuccess(true);
       setTimeout(() => setDownloadSuccess(false), 6000);
     } catch (err) {
@@ -604,29 +658,33 @@ export default function PosterGenerator({
 
         {currentStep === 2 && (
           <div className={styles.stepContent}>
-            <div className={styles.atelier}>
-              <div className={styles.atelierBlock}>
-                <div className={styles.atelierHeader}>
-                  <h3 className={styles.atelierTitle}>Colour theme</h3>
-                </div>
-
-                <div className={styles.themeJewels} role="listbox" aria-label="Colour theme">
-                  {POSTER_THEMES.map((theme) => {
-                    const isSelected = theme.id === selectedThemeId;
+            <div className={styles.designPreview}>
+              <div style={{
+                borderRadius: '16px',
+                padding: '24px',
+                marginBottom: '16px',
+                background: 'linear-gradient(to bottom right, rgba(255, 255, 255, 0.8), rgba(245, 250, 253, 0.6))',
+                boxShadow: '0 4px 12px rgba(31, 111, 159, 0.04)'
+              }}>
+                <h3 className={styles.previewHeading} style={{ marginTop: 0, marginBottom: 20 }}>Choose Theme</h3>
+                <div className={styles.themeJewels}>
+                  {themes.map((theme) => {
+                    const isSelected =
+                      theme.id === selectedThemeId ||
+                      theme.name === selectedThemeId ||
+                      theme.id === selectedTheme.id;
                     return (
                       <button
-                        key={theme.id}
+                        key={theme.id || theme._id}
                         type="button"
-                        role="option"
-                        aria-selected={isSelected}
                         className={`${styles.themeJewel} ${isSelected ? styles.themeJewelActive : ''}`}
-                        onClick={() => setSelectedThemeId(theme.id)}
+                        onClick={() => setSelectedThemeId(theme.id || theme._id)}
                       >
                         <span
                           className={styles.jewelFace}
                           style={{
-                            background: `linear-gradient(145deg, ${theme.headerBg}, ${theme.footerBg})`,
-                            boxShadow: `inset 0 0 0 1px rgba(255,255,255,0.18), 0 12px 28px ${theme.cardGlow}`,
+                            background: `linear-gradient(145deg, ${theme.headerBg || '#1a4f8b'}, ${theme.footerBg || '#143a66'})`,
+                            boxShadow: `inset 0 0 0 1px rgba(255,255,255,0.18), 0 12px 28px ${theme.cardGlow || 'rgba(0,0,0,0.12)'}`,
                           }}
                         />
                         <span className={styles.jewelMeta}>
@@ -638,32 +696,59 @@ export default function PosterGenerator({
                 </div>
               </div>
 
-              <div className={styles.selectionSummary}>
-                <p className={styles.summaryValue}>{selectedTheme.name}</p>
-              </div>
+              <h3 className={styles.previewHeading}>Preview</h3>
+              <PosterCarousel variant="grid" {...carouselProps} />
             </div>
 
-            <div className={styles.designPreview}>
-              <h3 className={styles.previewHeading}>Live preview</h3>
-              <PosterCarousel key={selectedThemeId} variant="grid" {...carouselProps} />
-            </div>
-
-            <div className={styles.navRow} style={{ justifyContent: 'flex-end' }}>
-              <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-                {downloadSuccess && (
-                  <span style={{ color: '#4caf50', fontSize: 14, fontWeight: 500 }}>
-                    {downloadMessage || 'Download complete.'}
-                  </span>
-                )}
-                <button
-                  type="button"
-                  className={styles.primaryBtn}
-                  onClick={handleDownloadZip}
-                  disabled={isGenerating}
-                >
-                  {isGenerating ? 'Preparing ZIP…' : 'Download all posters as ZIP'}
-                </button>
-              </div>
+            <div className={`${styles.navRow} ${styles.downloadRow}`}>
+              {downloadSuccess && (
+                <span className={styles.downloadStatus}>
+                  {downloadMessage || 'Download complete.'}
+                </span>
+              )}
+              {multiSelect ? (
+                <>
+                  <button
+                    type="button"
+                    className={styles.secondaryBtn}
+                    onClick={cancelMultiSelect}
+                    disabled={isGenerating}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    className={styles.primaryBtn}
+                    onClick={() => handleDownloadZip('selected')}
+                    disabled={isGenerating || selectedPosterIds.length === 0}
+                  >
+                    {isGenerating
+                      ? 'Preparing ZIP…'
+                      : selectedPosterIds.length === 0
+                        ? 'Download selected as ZIP'
+                        : `Download ${selectedPosterIds.length} selected as ZIP`}
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    className={styles.secondaryBtn}
+                    onClick={startMultiSelect}
+                    disabled={isGenerating}
+                  >
+                    Select multiple posters
+                  </button>
+                  <button
+                    type="button"
+                    className={styles.primaryBtn}
+                    onClick={() => handleDownloadZip('all')}
+                    disabled={isGenerating}
+                  >
+                    {isGenerating ? 'Preparing ZIP…' : 'Download all as ZIP'}
+                  </button>
+                </>
+              )}
             </div>
           </div>
         )}
@@ -672,7 +757,7 @@ export default function PosterGenerator({
       {showCropModal && originalLogoUrl && createPortal(
         <div
           style={{
-            position: 'fixed', inset: 0, 
+            position: 'fixed', inset: 0,
             background: 'rgba(255,255,255,0.05)',
             backdropFilter: 'blur(15px)',
             WebkitBackdropFilter: 'blur(15px)',
@@ -749,9 +834,9 @@ export default function PosterGenerator({
       {/* Poster Preview Modal */}
       {previewModalOpen && createPortal(
         <>
-          <div 
-            className={`${styles.previewModalBackdrop} ${closingModal ? styles.closing : ''}`} 
-            onClick={closePreview} 
+          <div
+            className={`${styles.previewModalBackdrop} ${closingModal ? styles.closing : ''}`}
+            onClick={closePreview}
           />
           <div
             className={`${styles.previewModalWrapper} ${closingModal ? styles.closing : ''}`}
@@ -759,36 +844,36 @@ export default function PosterGenerator({
             onClick={closePreview}
           >
             <div className={styles.previewModalContent} onClick={e => e.stopPropagation()}>
-            <button 
-              type="button"
-              className={styles.previewClose}
-              onClick={closePreview}
-              aria-label="Close poster preview"
-            >
-              ✕
-            </button>
-            
-            <div className={styles.previewPoster}>
-              <PosterPage
-                poster={modalPoster || carouselSlides[0] || { kind: 'master', image: '', template: 'blank' }}
-                label={modalPoster?.label || 'Poster'}
-                pageStyle={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}
-                isCaptureTarget={false}
-                theme={selectedTheme}
-                doctorFields={doctorFields}
-              />
-            </div>
+              <button
+                type="button"
+                className={styles.previewClose}
+                onClick={closePreview}
+                aria-label="Close poster preview"
+              >
+                ✕
+              </button>
 
-            <button
-              type="button"
-              className={styles.generateBtn}
-              onClick={handleGenerateAndDownload}
-              disabled={isGenerating}
-              style={{ padding: '16px 24px', fontSize: 16 }}
-            >
-              {isGenerating ? 'Preparing…' : 'Download this poster'}
-            </button>
-          </div>
+              <div className={styles.previewPoster}>
+                <PosterPage
+                  poster={modalPoster || carouselSlides[0] || { kind: 'master', image: '', template: 'blank' }}
+                  label={modalPoster?.label || 'Poster'}
+                  pageStyle={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}
+                  isCaptureTarget={false}
+                  theme={selectedTheme}
+                  doctorFields={doctorFields}
+                />
+              </div>
+
+              <button
+                type="button"
+                className={styles.generateBtn}
+                onClick={handleGenerateAndDownload}
+                disabled={isGenerating}
+                style={{ padding: '16px 24px', fontSize: 16 }}
+              >
+                {isGenerating ? 'Preparing…' : 'Download this poster'}
+              </button>
+            </div>
           </div>
         </>,
         document.body

@@ -3,6 +3,8 @@ import { createRoot } from 'react-dom/client';
 import { toJpeg } from 'html-to-image';
 import { createElement } from 'react';
 import RiskFactorPoster from '../components/RiskFactorPoster';
+import PosterFooterOverlay from '../components/PosterFooterOverlay';
+import { POSTER_CANVAS } from './posterFooterLayout';
 
 export function mapThemeToRiskFactor(themeId) {
   switch (themeId) {
@@ -38,7 +40,7 @@ function waitForImages(node) {
 export async function renderRiskFactorPosterBlob(fields) {
   const host = document.createElement('div');
   host.style.cssText =
-    'position:fixed;left:-10000px;top:0;width:736px;height:736px;pointer-events:none;opacity:0;';
+    `position:fixed;left:-10000px;top:0;width:${POSTER_CANVAS.width}px;height:${POSTER_CANVAS.height}px;pointer-events:none;opacity:0;`;
   document.body.appendChild(host);
 
   const root = createRoot(host);
@@ -84,43 +86,41 @@ export async function renderRiskFactorPosterBlob(fields) {
 export async function renderMasterPosterBlob(poster, fields) {
   const host = document.createElement('div');
   host.style.cssText =
-    'position:fixed;left:-10000px;top:0;width:736px;height:736px;pointer-events:none;opacity:0;';
+    `position:fixed;left:-10000px;top:0;width:${POSTER_CANVAS.width}px;height:${POSTER_CANVAS.height}px;pointer-events:none;opacity:0;`;
   document.body.appendChild(host);
 
   const root = createRoot(host);
-  const imgUrl = poster.image.startsWith('http') ? poster.image : '/' + poster.image;
+  const rawImage = poster.image || poster.src || poster.imageUrl || '';
+  const imgUrl =
+    /^(https?:|data:|blob:)/.test(rawImage) || rawImage.startsWith('/')
+      ? rawImage
+      : `/${rawImage}`;
 
   root.render(
     createElement('div', {
-      style: { width: '736px', height: '736px', position: 'relative', overflow: 'hidden', background: '#fff' },
-      className: 'master-export'
+      style: {
+        width: `${POSTER_CANVAS.width}px`,
+        height: `${POSTER_CANVAS.height}px`,
+        position: 'relative',
+        overflow: 'hidden',
+        background: '#fff',
+      },
+      className: 'master-export',
     }, [
       createElement('img', {
         key: 'bg',
         src: imgUrl,
         crossOrigin: 'anonymous',
-        style: { width: '100%', height: '100%', objectFit: 'cover' }
+        style: { width: '100%', height: '100%', objectFit: 'cover', display: 'block' },
       }),
-      createElement('div', {
+      createElement(PosterFooterOverlay, {
         key: 'overlay',
-        style: {
-          position: 'absolute', bottom: 0, left: 0, right: 0,
-          padding: '20px', background: 'rgba(255,255,255,0.85)',
-          display: 'flex', alignItems: 'center', gap: '20px'
-        }
-      }, [
-        fields.logo ? createElement('img', {
-          key: 'logo',
-          src: fields.logo,
-          crossOrigin: 'anonymous',
-          style: { width: '80px', height: '80px', borderRadius: '50%', objectFit: 'cover' }
-        }) : null,
-        createElement('div', { key: 'text' }, [
-          createElement('div', { key: 't1', style: { fontWeight: 'bold', fontSize: '28px', color: '#000' } }, fields.doctorName),
-          createElement('div', { key: 't2', style: { fontSize: '20px', color: '#555', marginTop: '4px' } }, `${fields.doctorDegree} | ${fields.clinicName}`),
-          createElement('div', { key: 't3', style: { fontSize: '20px', color: '#555', marginTop: '4px' } }, fields.phone)
-        ])
-      ])
+        logo: fields.logo,
+        doctorName: fields.doctorName,
+        doctorDegree: fields.doctorDegree,
+        clinicName: fields.clinicName,
+        phone: fields.phone,
+      }),
     ])
   );
 
@@ -184,8 +184,8 @@ function fillThemeBackground(ctx, width, height, theme) {
 }
 
 export function renderBlankPosterDataUrl(theme, label, options = {}) {
-  const width = options.width || 900;
-  const height = options.height || 1200;
+  const width = options.width || POSTER_CANVAS.width;
+  const height = options.height || POSTER_CANVAS.height;
   const canvas = document.createElement('canvas');
   canvas.width = width;
   canvas.height = height;

@@ -34,10 +34,24 @@ const columns = [
     className: styles.colActions,
     render: () => `<button type="button" class="${styles.deleteBtn}" data-action="delete">Delete</button>`,
   },
+  {
+    title: 'Enabled', 
+    data: 'enabled',
+    orderable: false,
+    className: styles.colActions,
+    render: (data) => `
+      <label class="${styles.switch}">
+        <input type="checkbox" data-action="toggle-status" ${data !== false ? 'checked' : ''} />
+        <span class="${styles.slider}"></span>
+      </label>
+    `
+  },
 ];
 
 export default function MasterPostersBoard({ onContextChange }) {
   const [posters, setPosters] = useState([]);
+  const [categories, setCategories] = useState([]);
+  const [themes, setThemes] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [showModal, setShowModal] = useState(false);
@@ -51,6 +65,7 @@ export default function MasterPostersBoard({ onContextChange }) {
     category: '',
     color: '',
     month: '',
+    enabled: true,
     uploaddate: new Date().toISOString().split('T')[0],
   });
   const [posterFile, setPosterFile] = useState(null);
@@ -76,8 +91,28 @@ export default function MasterPostersBoard({ onContextChange }) {
     }
   };
 
+  const loadCategories = async () => {
+    try {
+      const result = await apiRequest('/categories');
+      setCategories(result.categories || []);
+    } catch (err) {
+      console.error('Error loading categories:', err);
+    }
+  };
+
+  const loadThemes = async () => {
+    try {
+      const result = await apiRequest('/themes');
+      setThemes(result.themes || []);
+    } catch (err) {
+      console.error('Error loading themes:', err);
+    }
+  };
+
   useEffect(() => {
     loadPosters();
+    loadCategories();
+    loadThemes();
   }, []);
 
   actionRef.current = {
@@ -87,6 +122,7 @@ export default function MasterPostersBoard({ onContextChange }) {
         category: poster.category || '',
         color: poster.color || '',
         month: poster.month || '',
+        enabled: poster.enabled !== false,
         uploaddate: poster.uploaddate ? new Date(poster.uploaddate).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
       });
       setPosterFile(null);
@@ -94,6 +130,14 @@ export default function MasterPostersBoard({ onContextChange }) {
       setFormErrors({});
       setShowModal(true);
       setClosingModal(false);
+    },
+    toggleStatus: async (poster) => {
+      try {
+        await apiRequest(`/superadmin/posters/${poster._id}/toggle-status`, { method: 'PATCH' });
+        loadPosters();
+      } catch (err) {
+        setError(err.message || 'Could not update poster status');
+      }
     },
     remove: async (poster) => {
       if (!window.confirm('Delete this poster?')) return;
@@ -133,16 +177,23 @@ export default function MasterPostersBoard({ onContextChange }) {
     });
 
     function onClick(event) {
-      const button = event.target.closest('button[data-action]');
+      const actionEl = event.target.closest('[data-action]');
       const row = event.target.closest('tbody tr');
-      if (!row || !button) return;
+      if (!row || !actionEl) return;
       const poster = table.row(row).data();
       if (!poster) return;
-      event.preventDefault();
-      event.stopPropagation();
-      const action = button.getAttribute('data-action');
-      if (action === 'edit') actionRef.current.edit(poster);
-      if (action === 'delete') actionRef.current.remove(poster);
+      
+      const action = actionEl.getAttribute('data-action');
+      if (action === 'edit' || action === 'delete') {
+        event.preventDefault();
+        event.stopPropagation();
+        if (action === 'edit') actionRef.current.edit(poster);
+        if (action === 'delete') actionRef.current.remove(poster);
+      } else if (action === 'toggle-status') {
+        event.preventDefault();
+        event.stopPropagation();
+        actionRef.current.toggleStatus(poster);
+      }
     }
 
     host.addEventListener('click', onClick);
@@ -156,8 +207,10 @@ export default function MasterPostersBoard({ onContextChange }) {
   }, [posters]);
 
   const openCreate = () => {
+    loadCategories();
+    loadThemes();
     setEditingPoster(null);
-    setForm({ category: '', color: '', month: '', uploaddate: new Date().toISOString().split('T')[0] });
+    setForm({ category: '', color: '', month: '', enabled: true, uploaddate: new Date().toISOString().split('T')[0] });
     setPosterFile(null);
     setModalError('');
     setFormErrors({});
@@ -197,6 +250,7 @@ export default function MasterPostersBoard({ onContextChange }) {
     formData.append('category', form.category.trim());
     formData.append('color', form.color.trim());
     formData.append('month', form.month.trim());
+    formData.append('enabled', form.enabled);
     if (form.uploaddate) formData.append('uploaddate', form.uploaddate);
 
     try {
@@ -262,25 +316,45 @@ export default function MasterPostersBoard({ onContextChange }) {
               
               <label className={styles.field}>
                 <span>Category *</span>
-                <input 
+                <select 
                   value={form.category} 
                   onChange={e => {
                     setForm(p => ({ ...p, category: e.target.value }));
                     if (formErrors.category) setFormErrors(p => ({ ...p, category: null }));
                   }}
-                />
+                >
+                  <option value="">Select Category</option>
+                  {categories.map((cat) => (
+                    <option key={cat._id || cat.name} value={cat.name}>
+                      {cat.name}
+                    </option>
+                  ))}
+                  {form.category && !categories.some(c => c.name.toLowerCase() === form.category.toLowerCase()) && (
+                    <option value={form.category}>{form.category} (Current)</option>
+                  )}
+                </select>
                 {formErrors.category && <span className={styles.fieldError}>{formErrors.category}</span>}
               </label>
 
               <label className={styles.field}>
-                <span>Color *</span>
-                <input 
+                <span>Color / Theme *</span>
+                <select 
                   value={form.color} 
                   onChange={e => {
                     setForm(p => ({ ...p, color: e.target.value }));
                     if (formErrors.color) setFormErrors(p => ({ ...p, color: null }));
                   }}
-                />
+                >
+                  <option value="">Select Theme / Color</option>
+                  {themes.map((th) => (
+                    <option key={th._id || th.name} value={th.name}>
+                      {th.name}
+                    </option>
+                  ))}
+                  {form.color && !themes.some(t => t.name.toLowerCase() === form.color.toLowerCase()) && (
+                    <option value={form.color}>{form.color} (Current)</option>
+                  )}
+                </select>
                 {formErrors.color && <span className={styles.fieldError}>{formErrors.color}</span>}
               </label>
 
@@ -322,6 +396,20 @@ export default function MasterPostersBoard({ onContextChange }) {
                 />
                 {formErrors.uploaddate && <span className={styles.fieldError}>{formErrors.uploaddate}</span>}
               </label>
+
+              {editingPoster && (
+                <label className={styles.field} style={{ flexDirection: 'row', alignItems: 'center', gap: '8px', cursor: 'pointer', marginTop: '8px' }}>
+                  <label className={styles.switch}>
+                    <input 
+                      type="checkbox" 
+                      checked={form.enabled} 
+                      onChange={e => setForm(p => ({ ...p, enabled: e.target.checked }))}
+                    />
+                    <span className={styles.slider}></span>
+                  </label>
+                  <span style={{ marginBottom: 0 }}>Enable this poster? (Uncheck to remove from form)</span>
+                </label>
+              )}
 
               <div className={styles.modalActions}>
                 <button type="button" className={styles.secondaryBtn} onClick={closeModal}>

@@ -97,6 +97,7 @@ const templatePosterSchema = new mongoose.Schema({
   category: { type: String, default: '' },
   color: { type: String, default: '' },
   month: { type: String, default: '' },
+  enabled: { type: Boolean, default: true },
   uploaddate: { type: Date, default: Date.now }
 }, { timestamps: true });
 
@@ -190,6 +191,38 @@ export const Doctor = mongoose.model('Doctor', doctorSchema);
 export const User = mongoose.model('User', userSchema);
 export const Admin = mongoose.model('Admin', adminSchema);
 export const Poster = mongoose.model('Poster', templatePosterSchema);
+
+const categorySchema = new mongoose.Schema(
+  {
+    name: { type: String, required: true, unique: true, trim: true },
+    enabled: { type: Boolean, default: true },
+  },
+  { timestamps: true }
+);
+export const Category = mongoose.model('Category', categorySchema);
+
+const themeSchema = new mongoose.Schema(
+  {
+    name: { type: String, required: true, unique: true, trim: true },
+    slug: { type: String, trim: true },
+    headerBg: { type: String, default: '#1a4f8b' },
+    footerBg: { type: String, default: '#143a66' },
+    accentColor: { type: String, default: '#2b6cb0' },
+    description: { type: String, default: '' },
+    cardGlow: { type: String, default: 'rgba(26, 79, 139, 0.14)' },
+    enabled: { type: Boolean, default: true },
+  },
+  { timestamps: true }
+);
+export const Theme = mongoose.model('Theme', themeSchema);
+
+function slugifyTheme(name) {
+  const base = String(name || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '');
+  return base.startsWith('theme-') ? base : `theme-${base}`;
+}
 
 const SUPERADMIN_USERNAME = 'superadmin';
 const SUPERADMIN_PASSWORD = 'superadmin123';
@@ -1863,6 +1896,7 @@ app.get('/api/admin/datatables/:collection', requireAuth('superadmin', 'admin', 
     const sort = { [sortField === 'id' ? 'createdAt' : sortField]: orderDir };
 
     const filter = { ...scope };
+    const extras = [];
     if (searchValue) {
       if (collection === 'doctors') {
         const escapedSearch = escapeRegex(searchValue);
@@ -1883,7 +1917,7 @@ app.get('/api/admin/datatables/:collection', requireAuth('superadmin', 'admin', 
         if (/^[a-f\d]{24}$/i.test(searchValue)) {
           or.push({ _id: searchValue });
         }
-        filter.$or = or;
+        extras.push({ $or: or });
       } else {
         const or = [
           { empid: { $regex: searchValue, $options: 'i' } },
@@ -1893,8 +1927,43 @@ app.get('/api/admin/datatables/:collection', requireAuth('superadmin', 'admin', 
           or.push({ empid: asNumber });
           or.push({ id: asNumber });
         }
-        filter.$or = or;
+        extras.push({ $or: or });
       }
+    }
+
+    const fromStr = String(req.query.from ?? req.query.dateFrom ?? '').trim();
+    const toStr = String(req.query.to ?? req.query.dateTo ?? '').trim();
+    if (collection === 'doctors' && (fromStr || toStr)) {
+      const range = {};
+      if (fromStr) {
+        const from = new Date(fromStr);
+        if (!Number.isNaN(from.getTime())) {
+          from.setHours(0, 0, 0, 0);
+          range.$gte = from;
+        }
+      }
+      if (toStr) {
+        const to = new Date(toStr);
+        if (!Number.isNaN(to.getTime())) {
+          to.setHours(23, 59, 59, 999);
+          range.$lte = to;
+        }
+      }
+      if (Object.keys(range).length) {
+        extras.push({
+          $or: [
+            { createdAt: range },
+            { updatedAt: range },
+            { 'posters.createdAt': range },
+          ],
+        });
+      }
+    }
+
+    if (extras.length === 1) {
+      Object.assign(filter, extras[0]);
+    } else if (extras.length > 1) {
+      filter.$and = extras;
     }
 
     const recordsTotal = await Model.countDocuments(scope);
@@ -2186,8 +2255,10 @@ async function ensureMongoRunning() {
 // --- Superadmin Template Posters API ---
 app.get('/api/posters', requireAuth('superadmin', 'admin', 'user'), async (req, res) => {
   try {
-    const { month } = req.query;
-    const filter = month ? { month: { $regex: `^${String(month)}$`, $options: 'i' } } : {};
+    const { month, category } = req.query;
+    const filter = { enabled: { $ne: false } };
+    if (month) filter.month = { $regex: `^${escapeRegex(month)}$`, $options: 'i' };
+    if (category && category !== 'all') filter.category = { $regex: `^${escapeRegex(category)}$`, $options: 'i' };
     const posters = await Poster.find(filter).sort({ uploaddate: -1 });
     res.status(200).json({ posters });
   } catch (error) {
@@ -2220,11 +2291,13 @@ app.post('/api/superadmin/posters', requireAuth('superadmin'), upload.any(), asy
       return res.status(400).json({ message: 'Poster file or link is required' });
     }
 
+    const enabledVal = req.body.enabled === undefined ? true : String(req.body.enabled) === 'true' || req.body.enabled === true;
     const newPoster = new Poster({
       posterlink,
       category: category || '',
       color: color || '',
       month: month || '',
+      enabled: enabledVal,
       ...(uploaddate ? { uploaddate: new Date(uploaddate) } : {}),
     });
 
@@ -2252,6 +2325,9 @@ app.put('/api/superadmin/posters/:id', requireAuth('superadmin'), upload.any(), 
     if (category !== undefined) poster.category = category;
     if (color !== undefined) poster.color = color;
     if (month !== undefined) poster.month = month;
+    if (req.body.enabled !== undefined) {
+      poster.enabled = String(req.body.enabled) === 'true' || req.body.enabled === true;
+    }
     if (uploaddate) poster.uploaddate = new Date(uploaddate);
 
     await poster.save();
@@ -2259,6 +2335,19 @@ app.put('/api/superadmin/posters/:id', requireAuth('superadmin'), upload.any(), 
   } catch (error) {
     console.error('Error updating poster:', error);
     res.status(500).json({ message: 'Failed to update poster' });
+  }
+});
+
+app.patch('/api/superadmin/posters/:id/toggle-status', requireAuth('superadmin'), async (req, res) => {
+  try {
+    const poster = await Poster.findById(req.params.id);
+    if (!poster) return res.status(404).json({ message: 'Poster not found' });
+    poster.enabled = poster.enabled === false ? true : false;
+    await poster.save();
+    res.status(200).json({ success: true, poster });
+  } catch (error) {
+    console.error('Error toggling poster status:', error);
+    res.status(500).json({ message: 'Failed to toggle poster status' });
   }
 });
 
@@ -2270,6 +2359,283 @@ app.delete('/api/superadmin/posters/:id', requireAuth('superadmin'), async (req,
   } catch (error) {
     console.error('Error deleting poster:', error);
     res.status(500).json({ message: 'Failed to delete poster' });
+  }
+});
+
+// --- Poster Categories API ---
+app.get('/api/categories', requireAuth('superadmin', 'admin', 'user'), async (req, res) => {
+  try {
+    const filter = req.query.includeDisabled === 'true' ? {} : { enabled: { $ne: false } };
+    const categories = await Category.find(filter).sort({ name: 1 });
+    res.status(200).json({ categories });
+  } catch (error) {
+    console.error('Error fetching categories:', error);
+    res.status(500).json({ message: 'Failed to fetch categories' });
+  }
+});
+
+app.get('/api/superadmin/categories', requireAuth('superadmin'), async (req, res) => {
+  try {
+    const categories = await Category.find().sort({ createdAt: -1 });
+    const posterCounts = await Poster.aggregate([
+      { $group: { _id: { $toLower: '$category' }, count: { $sum: 1 } } },
+    ]);
+    const countMap = {};
+    posterCounts.forEach((p) => {
+      if (p._id) countMap[p._id] = p.count;
+    });
+    const formatted = categories.map((c) => ({
+      _id: c._id,
+      name: c.name,
+      enabled: c.enabled !== false,
+      createdAt: c.createdAt,
+      posterCount: countMap[c.name.toLowerCase()] || 0,
+    }));
+    res.status(200).json({ categories: formatted });
+  } catch (error) {
+    console.error('Error fetching superadmin categories:', error);
+    res.status(500).json({ message: 'Failed to fetch categories' });
+  }
+});
+
+app.post('/api/superadmin/categories', requireAuth('superadmin'), async (req, res) => {
+  try {
+    const name = String(req.body.name || '').trim();
+    if (!name) {
+      return res.status(400).json({ message: 'Category name is required' });
+    }
+    const existing = await Category.findOne({
+      name: { $regex: `^${escapeRegex(name)}$`, $options: 'i' },
+    });
+    if (existing) {
+      return res.status(400).json({ message: 'Category already exists' });
+    }
+    const enabled = req.body.enabled === undefined ? true : Boolean(req.body.enabled);
+    const category = new Category({ name, enabled });
+    await category.save();
+    res.status(201).json({ success: true, category });
+  } catch (error) {
+    console.error('Error creating category:', error);
+    res.status(500).json({ message: 'Failed to create category' });
+  }
+});
+
+app.put('/api/superadmin/categories/:id', requireAuth('superadmin'), async (req, res) => {
+  try {
+    const name = String(req.body.name || '').trim();
+    if (!name) {
+      return res.status(400).json({ message: 'Category name is required' });
+    }
+    const category = await Category.findById(req.params.id);
+    if (!category) {
+      return res.status(404).json({ message: 'Category not found' });
+    }
+    const existing = await Category.findOne({
+      _id: { $ne: category._id },
+      name: { $regex: `^${escapeRegex(name)}$`, $options: 'i' },
+    });
+    if (existing) {
+      return res.status(400).json({ message: 'Another category with this name already exists' });
+    }
+    const oldName = category.name;
+    category.name = name;
+    if (req.body.enabled !== undefined) {
+      category.enabled = Boolean(req.body.enabled);
+    }
+    await category.save();
+
+    if (oldName.toLowerCase() !== name.toLowerCase()) {
+      await Poster.updateMany(
+        { category: { $regex: `^${escapeRegex(oldName)}$`, $options: 'i' } },
+        { $set: { category: name } }
+      );
+    }
+
+    res.status(200).json({ success: true, category });
+  } catch (error) {
+    console.error('Error updating category:', error);
+    res.status(500).json({ message: 'Failed to update category' });
+  }
+});
+
+app.patch('/api/superadmin/categories/:id/toggle-status', requireAuth('superadmin'), async (req, res) => {
+  try {
+    const category = await Category.findById(req.params.id);
+    if (!category) return res.status(404).json({ message: 'Category not found' });
+    category.enabled = category.enabled === false ? true : false;
+    await category.save();
+    res.status(200).json({ success: true, category });
+  } catch (error) {
+    console.error('Error toggling category status:', error);
+    res.status(500).json({ message: 'Failed to toggle category status' });
+  }
+});
+
+app.delete('/api/superadmin/categories/:id', requireAuth('superadmin'), async (req, res) => {
+  try {
+    const category = await Category.findById(req.params.id);
+    if (!category) {
+      return res.status(404).json({ message: 'Category not found' });
+    }
+    await Category.findByIdAndDelete(req.params.id);
+    res.status(200).json({ success: true, message: 'Category deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting category:', error);
+    res.status(500).json({ message: 'Failed to delete category' });
+  }
+});
+
+// --- Poster Themes API ---
+app.get('/api/themes', requireAuth('superadmin', 'admin', 'user'), async (req, res) => {
+  try {
+    const filter = req.query.includeDisabled === 'true' ? {} : { enabled: { $ne: false } };
+    const themes = await Theme.find(filter).sort({ createdAt: 1 });
+    res.status(200).json({ themes });
+  } catch (error) {
+    console.error('Error fetching themes:', error);
+    res.status(500).json({ message: 'Failed to fetch themes' });
+  }
+});
+
+app.get('/api/superadmin/themes', requireAuth('superadmin'), async (req, res) => {
+  try {
+    const themes = await Theme.find().sort({ createdAt: -1 });
+    const posters = await Poster.find({}, 'color');
+    const formatted = themes.map((t) => {
+      const tName = t.name.toLowerCase();
+      const tSlug = (t.slug || '').toLowerCase();
+      const posterCount = posters.filter((p) => {
+        const c = (p.color || '').toLowerCase().trim();
+        return c && (tName.includes(c) || c.includes(tName) || tSlug.includes(c) || c.includes(tSlug));
+      }).length;
+      return {
+        _id: t._id,
+        name: t.name,
+        slug: t.slug,
+        headerBg: t.headerBg,
+        footerBg: t.footerBg,
+        accentColor: t.accentColor,
+        description: t.description,
+        cardGlow: t.cardGlow,
+        enabled: t.enabled !== false,
+        createdAt: t.createdAt,
+        posterCount,
+      };
+    });
+    res.status(200).json({ themes: formatted });
+  } catch (error) {
+    console.error('Error fetching superadmin themes:', error);
+    res.status(500).json({ message: 'Failed to fetch themes' });
+  }
+});
+
+app.post('/api/superadmin/themes', requireAuth('superadmin'), async (req, res) => {
+  try {
+    const { name, headerBg, footerBg, accentColor, description } = req.body;
+    const trimmed = String(name || '').trim();
+    if (!trimmed) {
+      return res.status(400).json({ message: 'Theme name is required' });
+    }
+    const existing = await Theme.findOne({
+      name: { $regex: `^${escapeRegex(trimmed)}$`, $options: 'i' },
+    });
+    if (existing) {
+      return res.status(400).json({ message: 'Theme with this name already exists' });
+    }
+
+    const hBg = String(headerBg || '#1a4f8b').trim();
+    const fBg = String(footerBg || '#143a66').trim();
+    const aColor = String(accentColor || '#2b6cb0').trim();
+    const enabled = req.body.enabled === undefined ? true : Boolean(req.body.enabled);
+
+    const theme = new Theme({
+      name: trimmed,
+      slug: slugifyTheme(trimmed),
+      headerBg: hBg,
+      footerBg: fBg,
+      accentColor: aColor,
+      description: String(description || '').trim(),
+      cardGlow: `${hBg}25`,
+      enabled,
+    });
+    await theme.save();
+    res.status(201).json({ success: true, theme });
+  } catch (error) {
+    console.error('Error creating theme:', error);
+    res.status(500).json({ message: 'Failed to create theme' });
+  }
+});
+
+app.put('/api/superadmin/themes/:id', requireAuth('superadmin'), async (req, res) => {
+  try {
+    const { name, headerBg, footerBg, accentColor, description } = req.body;
+    const trimmed = String(name || '').trim();
+    if (!trimmed) {
+      return res.status(400).json({ message: 'Theme name is required' });
+    }
+    const theme = await Theme.findById(req.params.id);
+    if (!theme) {
+      return res.status(404).json({ message: 'Theme not found' });
+    }
+    const existing = await Theme.findOne({
+      _id: { $ne: theme._id },
+      name: { $regex: `^${escapeRegex(trimmed)}$`, $options: 'i' },
+    });
+    if (existing) {
+      return res.status(400).json({ message: 'Another theme with this name already exists' });
+    }
+
+    const oldName = theme.name;
+    theme.name = trimmed;
+    theme.slug = slugifyTheme(trimmed);
+    if (headerBg) theme.headerBg = String(headerBg).trim();
+    if (footerBg) theme.footerBg = String(footerBg).trim();
+    if (accentColor) theme.accentColor = String(accentColor).trim();
+    if (description !== undefined) theme.description = String(description).trim();
+    if (req.body.enabled !== undefined) {
+      theme.enabled = Boolean(req.body.enabled);
+    }
+    theme.cardGlow = `${theme.headerBg}25`;
+    await theme.save();
+
+    if (oldName.toLowerCase() !== trimmed.toLowerCase()) {
+      await Poster.updateMany(
+        { color: { $regex: `^${escapeRegex(oldName)}$`, $options: 'i' } },
+        { $set: { color: trimmed } }
+      );
+    }
+
+    res.status(200).json({ success: true, theme });
+  } catch (error) {
+    console.error('Error updating theme:', error);
+    res.status(500).json({ message: 'Failed to update theme' });
+  }
+});
+
+app.patch('/api/superadmin/themes/:id/toggle-status', requireAuth('superadmin'), async (req, res) => {
+  try {
+    const theme = await Theme.findById(req.params.id);
+    if (!theme) return res.status(404).json({ message: 'Theme not found' });
+    theme.enabled = theme.enabled === false ? true : false;
+    await theme.save();
+    res.status(200).json({ success: true, theme });
+  } catch (error) {
+    console.error('Error toggling theme status:', error);
+    res.status(500).json({ message: 'Failed to toggle theme status' });
+  }
+});
+
+app.delete('/api/superadmin/themes/:id', requireAuth('superadmin'), async (req, res) => {
+  try {
+    const theme = await Theme.findById(req.params.id);
+    if (!theme) {
+      return res.status(404).json({ message: 'Theme not found' });
+    }
+    await Theme.findByIdAndDelete(req.params.id);
+    res.status(200).json({ success: true, message: 'Theme deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting theme:', error);
+    res.status(500).json({ message: 'Failed to delete theme' });
   }
 });
 
@@ -2333,6 +2699,70 @@ const startServer = async () => {
         console.log(`Removed ${removed.deletedCount} non-standard doctor fields to enforce strict 4-field limit.`);
       }
     }
+
+    const existingCategories = await Category.countDocuments();
+    if (existingCategories === 0) {
+      console.log('Seeding default poster categories...');
+      await Category.insertMany([
+        { name: 'Education' },
+        { name: 'Festivals' },
+        { name: 'Videos' },
+      ]);
+      await Poster.updateMany({ category: { $regex: /^education$/i } }, { $set: { category: 'Education' } });
+      await Poster.updateMany({ category: { $regex: /^festival(s)?$/i } }, { $set: { category: 'Festivals' } });
+      await Poster.updateMany({ category: { $regex: /^video(s)?$/i } }, { $set: { category: 'Videos' } });
+    }
+
+    const existingThemes = await Theme.countDocuments();
+    if (existingThemes === 0) {
+      console.log('Seeding default poster themes...');
+      await Theme.insertMany([
+        {
+          name: 'Cool Blue',
+          slug: 'theme-blue',
+          headerBg: '#1a4f8b',
+          footerBg: '#143a66',
+          accentColor: '#2b6cb0',
+          description: 'Professional medical blue',
+          cardGlow: 'rgba(26, 79, 139, 0.12)',
+        },
+        {
+          name: 'Warm Red',
+          slug: 'theme-warm-red',
+          headerBg: '#9c1c4a',
+          footerBg: '#7a1540',
+          accentColor: '#c0267a',
+          description: 'Warm crimson and rose',
+          cardGlow: 'rgba(198, 38, 122, 0.12)',
+        },
+        {
+          name: 'Emerald Green',
+          slug: 'theme-green',
+          headerBg: '#1b5c45',
+          footerBg: '#134435',
+          accentColor: '#218a62',
+          description: 'Natural emerald wellness',
+          cardGlow: 'rgba(27, 92, 69, 0.14)',
+        },
+        {
+          name: 'Royal Purple',
+          slug: 'theme-purple',
+          headerBg: '#4c1d95',
+          footerBg: '#2e1065',
+          accentColor: '#7c3aed',
+          description: 'Soft royal lilac',
+          cardGlow: 'rgba(124, 58, 237, 0.14)',
+        },
+      ]);
+      await Poster.updateMany({ color: { $regex: /^red$/i } }, { $set: { color: 'Warm Red' } });
+      await Poster.updateMany({ color: { $regex: /^purple$/i } }, { $set: { color: 'Royal Purple' } });
+      await Poster.updateMany({ color: { $regex: /^blue$/i } }, { $set: { color: 'Cool Blue' } });
+      await Poster.updateMany({ color: { $regex: /^green$/i } }, { $set: { color: 'Emerald Green' } });
+    }
+
+    await Poster.updateMany({ enabled: { $exists: false } }, { $set: { enabled: true } });
+    await Category.updateMany({ enabled: { $exists: false } }, { $set: { enabled: true } });
+    await Theme.updateMany({ enabled: { $exists: false } }, { $set: { enabled: true } });
 
     app.listen(PORT, () => {
       console.log(`Server is running on port ${PORT}`);

@@ -27,6 +27,22 @@ function escapeHtml(value) {
     .replaceAll('"', '&quot;');
 }
 
+function formatPosterSendDate(value) {
+  if (!value) return 'Send date not set';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return 'Send date not set';
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const compare = new Date(date);
+  compare.setHours(0, 0, 0, 0);
+  const label = date.toLocaleDateString('en-GB', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  });
+  return compare > today ? `Send ${label}` : `Sent ${label}`;
+}
+
 function inferPosterKind(poster) {
   const raw = String(poster?.kind || '').toLowerCase();
   if (raw === 'festival' || raw === 'video' || raw === 'education') return raw;
@@ -902,6 +918,7 @@ export default function UsersDoctorsBoard({
                       )}
                       <em>{poster.label || `Poster ${index + 1}`}</em>
                       <small>{kind}</small>
+                      <span className={styles.posterSendDate}>{formatPosterSendDate(poster.createdAt)}</span>
                     </div>
                   );
                 })}

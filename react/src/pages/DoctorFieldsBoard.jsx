@@ -10,13 +10,24 @@ const columns = [
   { title: 'Type', data: 'type' },
   { title: 'Required', data: 'required', render: data => data ? 'Yes' : 'No' },
   { title: 'Standard', data: 'isStandard', render: data => data ? 'Yes' : 'No' },
-  { title: 'Enabled', data: 'enabled', render: data => data ? 'Yes' : 'No' },
   {
     title: 'Edit',
     data: null,
     orderable: false,
     className: styles.colActions,
     render: () => `<button type="button" class="${styles.editBtn}" data-action="edit">Edit</button>`,
+  },
+  { 
+    title: 'Enabled', 
+    data: 'enabled',
+    orderable: false,
+    className: styles.colActions,
+    render: (data) => `
+      <label class="${styles.switch}">
+        <input type="checkbox" data-action="toggle-enable" ${data ? 'checked' : ''} />
+        <span class="${styles.slider}"></span>
+      </label>
+    `
   },
 ];
 
@@ -76,6 +87,19 @@ export default function DoctorFieldsBoard({ onContextChange }) {
       setShowModal(true);
       setClosingModal(false);
     },
+    toggleEnable: async (field) => {
+      try {
+        setLoading(true);
+        await apiRequest(`/superadmin/doctor-fields/${field._id}`, {
+          method: 'PUT',
+          body: { ...field, enabled: !field.enabled },
+        });
+        loadFields();
+      } catch (err) {
+        setError(err.message || 'Could not toggle field');
+        setLoading(false);
+      }
+    }
   };
 
   useEffect(() => {
@@ -96,15 +120,21 @@ export default function DoctorFieldsBoard({ onContextChange }) {
     });
 
     function onClick(event) {
-      const button = event.target.closest('button[data-action]');
+      const actionEl = event.target.closest('[data-action]');
       const row = event.target.closest('tbody tr');
-      if (!row || !button) return;
+      if (!row || !actionEl) return;
       const data = table.row(row).data();
       if (!data) return;
-      event.preventDefault();
-      event.stopPropagation();
-      const action = button.getAttribute('data-action');
-      if (action === 'edit') actionRef.current.edit(data);
+      const action = actionEl.getAttribute('data-action');
+      if (action === 'edit') {
+        event.preventDefault();
+        event.stopPropagation();
+        actionRef.current.edit(data);
+      } else if (action === 'toggle-enable') {
+        event.preventDefault();
+        event.stopPropagation();
+        actionRef.current.toggleEnable(data);
+      }
     }
     host.addEventListener('click', onClick);
     tableRef.current = table;
@@ -237,11 +267,14 @@ export default function DoctorFieldsBoard({ onContextChange }) {
 
               {editingField && (
                 <label className={styles.field} style={{ flexDirection: 'row', alignItems: 'center', gap: '8px', cursor: 'pointer', marginTop: '8px' }}>
-                  <input 
-                    type="checkbox" 
-                    checked={form.enabled} 
-                    onChange={e => setForm(p => ({ ...p, enabled: e.target.checked }))}
-                  />
+                  <label className={styles.switch}>
+                    <input 
+                      type="checkbox" 
+                      checked={form.enabled} 
+                      onChange={e => setForm(p => ({ ...p, enabled: e.target.checked }))}
+                    />
+                    <span className={styles.slider}></span>
+                  </label>
                   <span style={{ marginBottom: 0 }}>Enable this field? (Uncheck to remove from form)</span>
                 </label>
               )}

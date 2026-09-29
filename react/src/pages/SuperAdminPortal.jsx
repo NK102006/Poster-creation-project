@@ -8,6 +8,8 @@ import StaffLogin from './StaffLogin';
 import UsersDoctorsBoard from './UsersDoctorsBoard';
 import MasterPostersBoard from './MasterPostersBoard';
 import DoctorFieldsBoard from './DoctorFieldsBoard';
+import PosterCategoriesBoard from './PosterCategoriesBoard';
+import PosterThemesBoard from './PosterThemesBoard';
 import styles from './AdminPortal.module.css';
 
 function escapeHtml(value) {
@@ -345,6 +347,26 @@ export default function SuperAdminPortal() {
           </button>
           <button
             type="button"
+            className={`${styles.navItem} ${activeTab === 'categories' ? styles.navActive : ''}`}
+            onClick={() => {
+              setActiveTab('categories');
+              setSelectedAdmin(null);
+            }}
+          >
+            <span className={styles.navIcon}>C</span>Categories
+          </button>
+          <button
+            type="button"
+            className={`${styles.navItem} ${activeTab === 'themes' ? styles.navActive : ''}`}
+            onClick={() => {
+              setActiveTab('themes');
+              setSelectedAdmin(null);
+            }}
+          >
+            <span className={styles.navIcon}>T</span>Themes
+          </button>
+          <button
+            type="button"
             className={`${styles.navItem} ${activeTab === 'fields' ? styles.navActive : ''}`}
             onClick={() => {
               setActiveTab('fields');
@@ -385,6 +407,10 @@ export default function SuperAdminPortal() {
           <div id="topbar-left" style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
             {activeTab === 'posters' ? (
               <h1 className={styles.pageTitle}>Posters</h1>
+            ) : activeTab === 'categories' ? (
+              <h1 className={styles.pageTitle}>Categories</h1>
+            ) : activeTab === 'themes' ? (
+              <h1 className={styles.pageTitle}>Themes</h1>
             ) : activeTab === 'fields' ? (
               <h1 className={styles.pageTitle}>Doctor Fields</h1>
             ) : selectedAdmin ? (
@@ -419,6 +445,26 @@ export default function SuperAdminPortal() {
 
           {activeTab === 'posters' && (
             <MasterPostersBoard onContextChange={setBoardContext} />
+          )}
+
+          {activeTab === 'categories' && (
+            <PosterCategoriesBoard
+              onContextChange={setBoardContext}
+              onNavigateToPosters={() => {
+                setActiveTab('posters');
+                setSelectedAdmin(null);
+              }}
+            />
+          )}
+
+          {activeTab === 'themes' && (
+            <PosterThemesBoard
+              onContextChange={setBoardContext}
+              onNavigateToPosters={() => {
+                setActiveTab('posters');
+                setSelectedAdmin(null);
+              }}
+            />
           )}
 
           {activeTab === 'fields' && (
