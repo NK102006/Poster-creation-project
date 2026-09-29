@@ -31,7 +31,10 @@ export default function StudioShell({
         <div className={styles.userNav}>
           {headerActions}
           <div className={styles.userBadge}>
-            <span className={styles.statusDot} />
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: '16px', height: '16px' }}>
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+              <circle cx="12" cy="7" r="4"></circle>
+            </svg>
             <span>{userLabel}{user?.empid ? ` ${user.empid}` : ''}</span>
           </div>
           <button type="button" className={styles.logoutBtn} onClick={onLogout} id="logout-button">

@@ -216,13 +216,18 @@ export default function AdminPortal() {
         </div>
         <nav className={styles.nav}>
           <p className={styles.navLabel}>Collections</p>
-          <button type="button" className={`${styles.navItem} ${styles.navActive}`}>
-            <span className={styles.navIcon}>E</span>Employees
+          <button type="button" className={`${styles.navItem} ${styles.navActive}`} onClick={() => setSidebarOpen(false)}>
+            <span className={styles.navIcon}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: '18px', height: '18px' }}>
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                <circle cx="12" cy="7" r="4"></circle>
+              </svg>
+            </span>Employees
           </button>
+          <div id="topbar-actions-mobile" className={styles.mobileOnly} style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '16px', padding: '0 8px' }} />
         </nav>
 
         <div className={`${styles.sidebarMobileActions} ${styles.mobileOnly}`}>
-          <div id="topbar-actions-mobile" style={{ display: 'flex', flexDirection: 'column', gap: '10px' }} />
           <button type="button" className={styles.sidebarLogout} onClick={handleLogout}>
             Log out
           </button>

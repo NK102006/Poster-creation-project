@@ -295,9 +295,12 @@
 
 .toolbarActions {
   display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
   align-items: center;
   gap: 10px;
   flex-shrink: 0;
+  margin-left: auto;
 }
 
 .toolbarHint {
@@ -308,7 +311,7 @@
 
 .dateFilter {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: center;
   gap: 8px 12px;
 }
@@ -387,7 +390,8 @@
   border-radius: 16px;
   border: 1px solid rgba(31, 111, 159, 0.08);
   box-shadow: 0 10px 30px -18px rgba(31, 111, 159, 0.25);
-  overflow: hidden;
+  overflow-x: auto;
+  overflow-y: hidden;
   padding: 16px 18px 12px;
   width: 100%;
   max-width: 100%;
@@ -1120,8 +1124,18 @@
   }
 
   .shellFull .topbar {
-    grid-template-columns: 1fr auto;
+    display: flex !important;
+    flex-wrap: wrap !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    justify-content: space-between !important;
     padding-left: 18px;
+    padding-right: 18px;
+  }
+
+  .shellFull .topbar > :not(.topbarRight):not(.hamburgerBtn) {
+    grid-column: auto;
+    grid-row: auto;
   }
 
   .sidebar {
@@ -1271,6 +1285,37 @@
 
   .detailGrid {
     grid-template-columns: 1fr;
+  }
+
+  .dtHost :global(.dt-layout-row:not(.dt-layout-table)) {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+  }
+  .dtHost :global(.dt-layout-end) {
+    justify-content: flex-end !important;
+    text-align: right !important;
+    min-width: 0;
+    flex: 1;
+  }
+  .dtHost :global(.dt-search) {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    min-width: 0;
+    width: 100%;
+  }
+  .dtHost :global(.dt-search label) {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    justify-content: flex-end;
+    width: 100%;
+  }
+  .dtHost :global(.dt-search input) {
+    width: 100%;
+    max-width: 220px;
+    min-width: 60px;
+    flex: 1;
   }
 }
 

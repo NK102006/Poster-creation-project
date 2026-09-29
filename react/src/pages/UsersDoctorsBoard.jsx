@@ -711,6 +711,77 @@ export default function UsersDoctorsBoard({
     </>
   );
 
+  const mobileActionsContent = (
+    <>
+      {!selectedUser && (
+        <>
+          {adminId && (
+            <button
+              type="button"
+              className={styles.navItem}
+              onClick={() => userImportRef.current?.click()}
+              disabled={importing}
+            >
+              <span className={styles.navIcon}>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: '18px', height: '18px' }}>
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                  <polyline points="17 8 12 3 7 8"></polyline>
+                  <line x1="12" y1="3" x2="12" y2="15"></line>
+                </svg>
+              </span>
+              {importing ? 'Importing…' : 'Import employee'}
+            </button>
+          )}
+          <button type="button" className={styles.navItem} onClick={exportUsers}>
+            <span className={styles.navIcon}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: '18px', height: '18px' }}>
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                <polyline points="7 10 12 15 17 10"></polyline>
+                <line x1="12" y1="15" x2="12" y2="3"></line>
+              </svg>
+            </span>
+            Export employees
+          </button>
+          <button type="button" className={styles.navItem} onClick={openCreateUser}>
+            <span className={styles.navIcon}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: '18px', height: '18px' }}>
+                <line x1="12" y1="5" x2="12" y2="19"></line>
+                <line x1="5" y1="12" x2="19" y2="12"></line>
+              </svg>
+            </span>
+            Add employee
+          </button>
+        </>
+      )}
+      {selectedUser && (
+        <>
+          {selectedDoctor && (
+            <button type="button" className={styles.navItem} onClick={() => setShowPosters(true)}>
+              <span className={styles.navIcon}>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: '18px', height: '18px' }}>
+                  <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                  <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                  <polyline points="21 15 16 10 5 21"></polyline>
+                </svg>
+              </span>
+              Show posters
+            </button>
+          )}
+          <button type="button" className={styles.navItem} onClick={exportDoctors}>
+            <span className={styles.navIcon}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: '18px', height: '18px' }}>
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                <polyline points="7 10 12 15 17 10"></polyline>
+                <line x1="12" y1="15" x2="12" y2="3"></line>
+              </svg>
+            </span>
+            Export doctors
+          </button>
+        </>
+      )}
+    </>
+  );
+
   const mobileActionsPortal = document.getElementById('topbar-actions-mobile');
 
   return (
@@ -719,7 +790,7 @@ export default function UsersDoctorsBoard({
         <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>{leftContent}</div>
         <div className={`${styles.toolbarActions} ${styles.desktopOnly}`}>{rightContent}</div>
       </div>
-      {mobileActionsPortal && createPortal(rightContent, mobileActionsPortal)}
+      {mobileActionsPortal && createPortal(mobileActionsContent, mobileActionsPortal)}
       {error && <p className={styles.error}>{error}</p>}
       {importSummary && !selectedDoctor && (
         <p className={styles.statusText}>{importSummary}</p>
@@ -805,7 +876,7 @@ export default function UsersDoctorsBoard({
             <div className={styles.detailGrid}>
             {[
               ['Doctor ID', selectedDoctor.id],
-              ...doctorFields.filter(f => f.enabled).map(f => [
+              ...doctorFields.filter(f => f.enabled && f.key !== 'logo').map(f => [
                 f.label, 
                 f.isStandard ? selectedDoctor[f.key] : selectedDoctor.dynamicFields?.[f.key]
               ]),

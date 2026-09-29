@@ -327,7 +327,7 @@ export default function DoctorManagePage({
             </div>
 
             <div className={styles.formGrid}>
-              {doctorFields.filter(f => f.enabled).map(field => {
+              {doctorFields.filter(f => f.enabled && f.key !== 'logo').map(field => {
                 const isDynamic = !field.isStandard;
                 const value = isDynamic ? (form.dynamicFields?.[field.key] ?? '') : (form[field.key] ?? '');
                 
@@ -363,29 +363,31 @@ export default function DoctorManagePage({
               })}
             </div>
 
-            <label className={styles.field}>
-              <span>Doctor photo / logo</span>
-              <div className={styles.logoBox}>
-                {logoPreview ? (
-                  <img 
-                    src={logoPreview} 
-                    alt="" 
-                    className={styles.logoThumb} 
-                    onClick={(e) => {
-                      e.preventDefault();
-                      handleAdjustClick();
-                    }} 
-                    style={{ cursor: 'pointer' }} 
-                    title="Click to adjust / reframe"
-                  />
-                ) : (
-                  <div className={styles.logoFallback}>No logo</div>
-                )}
-                <div style={{ flex: 1 }}>
-                  <input type="file" accept="image/*" onChange={handleLogoChange} className="bs-form-control" />
+            {doctorFields.some(f => f.key === 'logo' && f.enabled) && (
+              <label className={styles.field}>
+                <span>Doctor photo / logo</span>
+                <div className={styles.logoBox}>
+                  {logoPreview ? (
+                    <img 
+                      src={logoPreview} 
+                      alt="" 
+                      className={styles.logoThumb} 
+                      onClick={(e) => {
+                        e.preventDefault();
+                        handleAdjustClick();
+                      }} 
+                      style={{ cursor: 'pointer' }} 
+                      title="Click to adjust / reframe"
+                    />
+                  ) : (
+                    <div className={styles.logoFallback}>No logo</div>
+                  )}
+                  <div style={{ flex: 1 }}>
+                    <input type="file" accept="image/*" onChange={handleLogoChange} className="bs-form-control" />
+                  </div>
                 </div>
-              </div>
-            </label>
+              </label>
+            )}
 
             <div className={styles.footerActions}>
               <div className={styles.footerLeft}>

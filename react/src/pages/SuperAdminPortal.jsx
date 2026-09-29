@@ -325,6 +325,7 @@ export default function SuperAdminPortal() {
             onClick={() => {
               setActiveTab('admins');
               setSelectedAdmin(null);
+              setSidebarOpen(false);
             }}
           >
             <span className={styles.navIcon}>A</span>Admins
@@ -341,6 +342,7 @@ export default function SuperAdminPortal() {
             onClick={() => {
               setActiveTab('posters');
               setSelectedAdmin(null);
+              setSidebarOpen(false);
             }}
           >
             <span className={styles.navIcon}>P</span>Posters
@@ -351,6 +353,7 @@ export default function SuperAdminPortal() {
             onClick={() => {
               setActiveTab('categories');
               setSelectedAdmin(null);
+              setSidebarOpen(false);
             }}
           >
             <span className={styles.navIcon}>C</span>Categories
@@ -361,6 +364,7 @@ export default function SuperAdminPortal() {
             onClick={() => {
               setActiveTab('themes');
               setSelectedAdmin(null);
+              setSidebarOpen(false);
             }}
           >
             <span className={styles.navIcon}>T</span>Themes
@@ -371,6 +375,7 @@ export default function SuperAdminPortal() {
             onClick={() => {
               setActiveTab('fields');
               setSelectedAdmin(null);
+              setSidebarOpen(false);
             }}
           >
             <span className={styles.navIcon}>F</span>Doctor Fields

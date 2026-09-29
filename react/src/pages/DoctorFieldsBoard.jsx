@@ -9,7 +9,6 @@ const columns = [
   { title: 'Label', data: 'label' },
   { title: 'Type', data: 'type' },
   { title: 'Required', data: 'required', render: data => data ? 'Yes' : 'No' },
-  { title: 'Standard', data: 'isStandard', render: data => data ? 'Yes' : 'No' },
   {
     title: 'Edit',
     data: null,
@@ -153,6 +152,20 @@ export default function DoctorFieldsBoard({ onContextChange }) {
     }, 400);
   };
 
+  const openCreate = () => {
+    setEditingField(null);
+    setForm({
+      key: '',
+      label: '',
+      type: 'text',
+      required: false,
+      enabled: true,
+    });
+    setFormErrors({});
+    setShowModal(true);
+    setClosingModal(false);
+  };
+
   const handleSave = async (event) => {
     event.preventDefault();
     const errs = {};
@@ -192,6 +205,13 @@ export default function DoctorFieldsBoard({ onContextChange }) {
 
   return (
     <>
+      <div className={`${styles.toolbar} ${styles.desktopOnly}`}>
+        <div></div>
+        <button type="button" className={styles.primaryBtn} onClick={openCreate}>
+          + Add field
+        </button>
+      </div>
+
       {error && <p className={styles.error}>{error}</p>}
       {loading && <p className={styles.statusText}>Loading…</p>}
 

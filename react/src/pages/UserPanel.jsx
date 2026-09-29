@@ -98,6 +98,7 @@ export default function UserPanel({
   const [showPosters, setShowPosters] = useState(false);
   const [posterItems, setPosterItems] = useState([]);
   const [postersLoading, setPostersLoading] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [posterError, setPosterError] = useState('');
   const hostRef = useRef(null);
   const tableRef = useRef(null);
@@ -149,7 +150,7 @@ export default function UserPanel({
     setPassword('');
     setLoginError('');
     setLoginFieldErrors({});
-    apiRequest('/logout', { method: 'POST' }).catch(() => {});
+    apiRequest('/logout', { method: 'POST' }).catch(() => { });
   };
 
   const openDoctor = (item) => {
@@ -380,9 +381,9 @@ export default function UserPanel({
       if (f.key === 'contactnumber') {
         const phoneError = validatePhoneNumber(val);
         if (phoneError) {
-           errors[f.key] = phoneError;
+          errors[f.key] = phoneError;
         } else if (f.required && !String(val).trim()) {
-           errors[f.key] = `${f.label} is required`;
+          errors[f.key] = `${f.label} is required`;
         }
         continue;
       }
@@ -513,35 +514,102 @@ export default function UserPanel({
 
   return (
     <div className={`${styles.shell} ${styles.shellFull}`}>
+      <div 
+        className={`${styles.sidebarOverlay} ${sidebarOpen ? styles.open : ''} ${styles.mobileOnly}`} 
+        onClick={() => setSidebarOpen(false)}
+      />
+      <aside className={`${styles.sidebar} ${sidebarOpen ? styles.open : ''} ${styles.mobileOnly}`}>
+        <div className={styles.sidebarTop} onClick={onBrandClick || undefined} style={{ cursor: 'pointer' }}>
+          <div className={styles.brandMark}>M</div>
+          <div>
+            <div className={styles.brandName}>MedPortal</div>
+            <div className={styles.brandSub}>User</div>
+          </div>
+        </div>
+        
+        <nav className={styles.nav}>
+          <p className={styles.navLabel}>Actions</p>
+          <button type="button" className={styles.navItem} onClick={() => { openPosters(); setSidebarOpen(false); }}>
+            <span className={styles.navIcon}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: '18px', height: '18px' }}>
+                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                <polyline points="21 15 16 10 5 21"></polyline>
+              </svg>
+            </span>
+            Show posters
+          </button>
+          <button type="button" className={styles.navItem} onClick={() => { handleExport(); setSidebarOpen(false); }}>
+            <span className={styles.navIcon}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: '18px', height: '18px' }}>
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                <polyline points="7 10 12 15 17 10"></polyline>
+                <line x1="12" y1="15" x2="12" y2="3"></line>
+              </svg>
+            </span>
+            Export
+          </button>
+          <button type="button" className={`${styles.navItem} ${styles.navActive}`} onClick={() => { openCreate(); setSidebarOpen(false); }}>
+            <span className={styles.navIcon}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: '18px', height: '18px' }}>
+                <line x1="12" y1="5" x2="12" y2="19"></line>
+                <line x1="5" y1="12" x2="19" y2="12"></line>
+              </svg>
+            </span>
+            Add doctor
+          </button>
+        </nav>
+
+        <button type="button" className={styles.sidebarLogout} onClick={handleLogout}>
+          Log out
+        </button>
+      </aside>
+
       <div className={styles.main}>
-        <header className={styles.topbar}>
+        <header className={styles.topbar} style={{ paddingBottom: '8px' }}>
+          <button 
+            type="button" 
+            className={`${styles.hamburgerBtn} ${styles.mobileOnly}`} 
+            onClick={() => setSidebarOpen(true)}
+            aria-label="Open menu"
+          >
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="3" y1="12" x2="21" y2="12"></line>
+              <line x1="3" y1="6" x2="21" y2="6"></line>
+              <line x1="3" y1="18" x2="21" y2="18"></line>
+            </svg>
+          </button>
           <div id="topbar-left" style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
             {onBack ? (
-              <button type="button" className={styles.secondaryBtn} onClick={onBack}>
+              <button type="button" className={`${styles.secondaryBtn} ${styles.desktopOnly}`} onClick={onBack}>
                 ← Home
               </button>
             ) : onBrandClick ? (
-              <button type="button" className={styles.secondaryBtn} onClick={onBrandClick}>
+              <button type="button" className={`${styles.secondaryBtn} ${styles.desktopOnly}`} onClick={onBrandClick}>
                 ← Home
               </button>
             ) : null}
-            <h1 className={styles.pageTitle}>Doctors list</h1>
           </div>
           <div className={styles.topbarRight}>
-            <span className={styles.adminBadge}>
+            <span className={styles.adminBadge} style={{ gap: '6px' }}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: '16px', height: '16px' }}>
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                <circle cx="12" cy="7" r="4"></circle>
+              </svg>
               {auth.role === 'superadmin'
                 ? 'Superadmin'
                 : auth.role === 'admin'
                   ? auth.username || 'Admin'
                   : auth.empid ? `Employee ${auth.empid}` : 'User'}
             </span>
-            <button type="button" className={styles.logoutBtn} onClick={handleLogout}>
+            <button type="button" className={`${styles.logoutBtn} ${styles.desktopOnly}`} onClick={handleLogout}>
               Log out
             </button>
           </div>
         </header>
 
-        <section className={styles.panel}>
+        <section className={styles.panel} style={{ paddingTop: '8px' }}>
+          <h1 className={styles.pageTitle} style={{ margin: '0 0 16px' }}>Doctors list</h1>
           <div className={styles.toolbar}>
             <div className={styles.dateFilter}>
               <label>
@@ -573,7 +641,7 @@ export default function UserPanel({
                 </button>
               ) : null}
             </div>
-            <div className={styles.toolbarActions}>
+            <div className={`${styles.toolbarActions} ${styles.desktopOnly}`}>
               <button type="button" className={styles.primaryBtn} onClick={openPosters}>
                 Show posters
               </button>
@@ -650,10 +718,10 @@ export default function UserPanel({
           <div className={styles.modal} role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()}>
             <h2 className={styles.modalTitle}>{editingItem ? 'Edit doctor' : 'Add doctor'}</h2>
             <form onSubmit={handleSave} className={styles.form}>
-              {doctorFields.filter(f => f.enabled).map((field) => {
+              {doctorFields.filter(f => f.enabled && f.key !== 'logo').map((field) => {
                 const isDynamic = !field.isStandard;
                 const value = isDynamic ? (formData.dynamicFields?.[field.key] ?? '') : (formData[field.key] ?? '');
-                
+
                 return (
                   <label key={field.key} className={styles.field}>
                     <span>{field.label} {field.required ? '*' : ''}</span>
@@ -668,7 +736,7 @@ export default function UserPanel({
                         const next = field.key === 'contactnumber'
                           ? sanitizePhoneInput(event.target.value)
                           : event.target.value;
-                        
+
                         setFormData((prev) => {
                           if (isDynamic) {
                             return { ...prev, dynamicFields: { ...prev.dynamicFields, [field.key]: next } };

@@ -2692,11 +2692,17 @@ const startServer = async () => {
         { key: 'clinicName', label: 'Clinic Name', type: 'text', required: true, isStandard: true, enabled: true, order: 2 },
         { key: 'doctorDegree', label: 'Degree', type: 'text', required: false, isStandard: true, enabled: true, order: 3 },
         { key: 'contactnumber', label: 'Contact Number', type: 'tel', required: true, isStandard: true, enabled: true, order: 4 },
+        { key: 'logo', label: 'Doctor Photo / Logo', type: 'file', required: false, isStandard: true, enabled: true, order: 5 },
       ]);
     } else {
+      const logoFieldExists = await DoctorField.findOne({ key: 'logo' });
+      if (!logoFieldExists) {
+        await DoctorField.create({ key: 'logo', label: 'Doctor Photo / Logo', type: 'file', required: false, isStandard: true, enabled: true, order: 5 });
+      }
+      
       const removed = await DoctorField.deleteMany({ isStandard: false });
       if (removed.deletedCount > 0) {
-        console.log(`Removed ${removed.deletedCount} non-standard doctor fields to enforce strict 4-field limit.`);
+        console.log(`Removed ${removed.deletedCount} non-standard doctor fields to enforce strict standard fields limit.`);
       }
     }
 
