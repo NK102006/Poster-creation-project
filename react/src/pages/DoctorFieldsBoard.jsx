@@ -16,8 +16,8 @@ const columns = [
     className: styles.colActions,
     render: () => `<button type="button" class="${styles.editBtn}" data-action="edit">Edit</button>`,
   },
-  { 
-    title: 'Enabled', 
+  {
+    title: 'Enabled',
     data: 'enabled',
     orderable: false,
     className: styles.colActions,
@@ -169,7 +169,7 @@ export default function DoctorFieldsBoard({ onContextChange }) {
 
     setSaving(true);
     setFormErrors({});
-    
+
     try {
       if (editingField) {
         await apiRequest(`/superadmin/doctor-fields/${editingField._id}`, {
@@ -207,15 +207,15 @@ export default function DoctorFieldsBoard({ onContextChange }) {
         <div className={`${styles.modalOverlay} ${closingModal ? styles.closing : ''}`} onClick={closeModal}>
           <div className={styles.modal} style={{ maxWidth: '500px' }} role="dialog" aria-modal="true" onClick={e => e.stopPropagation()}>
             <h2 className={styles.modalTitle}>{editingField ? 'Edit Field' : 'Add Field'}</h2>
-            
+
             {formErrors.root && <p className={styles.error} style={{ marginBottom: '16px' }}>{formErrors.root}</p>}
-            
+
             <form onSubmit={handleSave} className={styles.form} noValidate>
               <label className={styles.field}>
                 <span>Internal Key * (e.g. 'years_experience')</span>
-                <input 
+                <input
                   className={styles.inputField}
-                  value={form.key} 
+                  value={form.key}
                   disabled={true}
                   onChange={e => {
                     setForm(p => ({ ...p, key: e.target.value }));
@@ -227,9 +227,9 @@ export default function DoctorFieldsBoard({ onContextChange }) {
 
               <label className={styles.field}>
                 <span>Display Label * (e.g. 'Years of Experience')</span>
-                <input 
+                <input
                   className={styles.inputField}
-                  value={form.label} 
+                  value={form.label}
                   onChange={e => {
                     setForm(p => ({ ...p, label: e.target.value }));
                     if (formErrors.label) setFormErrors(p => ({ ...p, label: null }));
@@ -240,9 +240,9 @@ export default function DoctorFieldsBoard({ onContextChange }) {
 
               <label className={styles.field}>
                 <span>Input Type *</span>
-                <select 
+                <select
                   className={styles.inputField}
-                  value={form.type} 
+                  value={form.type}
                   onChange={e => {
                     setForm(p => ({ ...p, type: e.target.value }));
                     if (formErrors.type) setFormErrors(p => ({ ...p, type: null }));
@@ -258,9 +258,9 @@ export default function DoctorFieldsBoard({ onContextChange }) {
               </label>
 
               <label className={styles.field} style={{ flexDirection: 'row', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
-                <input 
-                  type="checkbox" 
-                  checked={form.required} 
+                <input
+                  type="checkbox"
+                  checked={form.required}
                   onChange={e => setForm(p => ({ ...p, required: e.target.checked }))}
                 />
                 <span style={{ marginBottom: 0 }}>Compulsory Field?</span>
@@ -269,9 +269,9 @@ export default function DoctorFieldsBoard({ onContextChange }) {
               {editingField && (
                 <label className={styles.field} style={{ flexDirection: 'row', alignItems: 'center', gap: '8px', cursor: 'pointer', marginTop: '8px' }}>
                   <label className={styles.switch}>
-                    <input 
-                      type="checkbox" 
-                      checked={form.enabled} 
+                    <input
+                      type="checkbox"
+                      checked={form.enabled}
                       onChange={e => setForm(p => ({ ...p, enabled: e.target.checked }))}
                     />
                     <span className={styles.slider}></span>

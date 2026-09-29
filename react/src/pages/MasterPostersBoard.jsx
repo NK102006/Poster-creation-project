@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import DataTable from 'datatables.net-dt';
 import 'datatables.net-dt/css/dataTables.dataTables.css';
 import { apiRequest } from '../lib/apiClient';
+import BottomSheetSelect from '../components/BottomSheetSelect';
 import styles from './AdminPortal.module.css';
 
 const columns = [
@@ -35,7 +36,7 @@ const columns = [
     render: () => `<button type="button" class="${styles.deleteBtn}" data-action="delete">Delete</button>`,
   },
   {
-    title: 'Enabled', 
+    title: 'Enabled',
     data: 'enabled',
     orderable: false,
     className: styles.colActions,
@@ -60,7 +61,7 @@ export default function MasterPostersBoard({ onContextChange }) {
   const [saving, setSaving] = useState(false);
   const [modalError, setModalError] = useState('');
   const [formErrors, setFormErrors] = useState({});
-  
+
   const [form, setForm] = useState({
     category: '',
     color: '',
@@ -182,7 +183,7 @@ export default function MasterPostersBoard({ onContextChange }) {
       if (!row || !actionEl) return;
       const poster = table.row(row).data();
       if (!poster) return;
-      
+
       const action = actionEl.getAttribute('data-action');
       if (action === 'edit' || action === 'delete') {
         event.preventDefault();
@@ -228,7 +229,7 @@ export default function MasterPostersBoard({ onContextChange }) {
 
   const handleSave = async (event) => {
     event.preventDefault();
-    
+
     const errs = {};
     if (!editingPoster && !posterFile) errs.posterFile = 'Please select a poster image to upload.';
     if (!form.category.trim()) errs.category = 'Category is required.';
@@ -297,14 +298,14 @@ export default function MasterPostersBoard({ onContextChange }) {
         <div className={`${styles.modalOverlay} ${closingModal ? styles.closing : ''}`} onClick={closeModal}>
           <div className={styles.modal} style={{ maxWidth: '500px' }} role="dialog" aria-modal="true" onClick={e => e.stopPropagation()}>
             <h2 className={styles.modalTitle}>{editingPoster ? 'Edit poster' : 'Add poster'}</h2>
-            
+
             {modalError && <p className={styles.error} style={{ marginBottom: '16px' }}>{modalError}</p>}
-            
+
             <form onSubmit={handleSave} className={styles.form} noValidate>
               <label className={styles.field}>
                 <span>Poster Image {editingPoster ? '(Leave blank to keep)' : '*'}</span>
-                <input 
-                  type="file" 
+                <input
+                  type="file"
                   accept="image/*"
                   onChange={e => {
                     setPosterFile(e.target.files?.[0]);
@@ -313,82 +314,71 @@ export default function MasterPostersBoard({ onContextChange }) {
                 />
                 {formErrors.posterFile && <span className={styles.fieldError}>{formErrors.posterFile}</span>}
               </label>
-              
+
               <label className={styles.field}>
                 <span>Category *</span>
-                <select 
+                <BottomSheetSelect 
                   value={form.category} 
                   onChange={e => {
                     setForm(p => ({ ...p, category: e.target.value }));
                     if (formErrors.category) setFormErrors(p => ({ ...p, category: null }));
                   }}
-                >
-                  <option value="">Select Category</option>
-                  {categories.map((cat) => (
-                    <option key={cat._id || cat.name} value={cat.name}>
-                      {cat.name}
-                    </option>
-                  ))}
-                  {form.category && !categories.some(c => c.name.toLowerCase() === form.category.toLowerCase()) && (
-                    <option value={form.category}>{form.category} (Current)</option>
-                  )}
-                </select>
+                  placeholder="Select Category"
+                  options={[
+                    ...categories.map(cat => ({ label: cat.name, value: cat.name })),
+                    ...(form.category && !categories.some(c => c.name.toLowerCase() === form.category.toLowerCase()) 
+                      ? [{ label: `${form.category} (Current)`, value: form.category }] 
+                      : [])
+                  ]}
+                />
                 {formErrors.category && <span className={styles.fieldError}>{formErrors.category}</span>}
               </label>
 
               <label className={styles.field}>
                 <span>Color / Theme *</span>
-                <select 
+                <BottomSheetSelect 
                   value={form.color} 
                   onChange={e => {
                     setForm(p => ({ ...p, color: e.target.value }));
                     if (formErrors.color) setFormErrors(p => ({ ...p, color: null }));
                   }}
-                >
-                  <option value="">Select Theme / Color</option>
-                  {themes.map((th) => (
-                    <option key={th._id || th.name} value={th.name}>
-                      {th.name}
-                    </option>
-                  ))}
-                  {form.color && !themes.some(t => t.name.toLowerCase() === form.color.toLowerCase()) && (
-                    <option value={form.color}>{form.color} (Current)</option>
-                  )}
-                </select>
+                  placeholder="Select Theme / Color"
+                  options={[
+                    ...themes.map(th => ({ 
+                      label: th.name, 
+                      value: th.name, 
+                      colorDot: th.accentColor || th.headerBg 
+                    })),
+                    ...(form.color && !themes.some(t => t.name.toLowerCase() === form.color.toLowerCase())
+                      ? [{ label: `${form.color} (Current)`, value: form.color }]
+                      : [])
+                  ]}
+                />
                 {formErrors.color && <span className={styles.fieldError}>{formErrors.color}</span>}
               </label>
 
               <label className={styles.field}>
                 <span>Month *</span>
-                <select 
+                <BottomSheetSelect 
                   value={form.month} 
                   onChange={e => {
                     setForm(p => ({ ...p, month: e.target.value }));
                     if (formErrors.month) setFormErrors(p => ({ ...p, month: null }));
                   }}
-                >
-                  <option value="">Select Month</option>
-                  <option value="January">January</option>
-                  <option value="February">February</option>
-                  <option value="March">March</option>
-                  <option value="April">April</option>
-                  <option value="May">May</option>
-                  <option value="June">June</option>
-                  <option value="July">July</option>
-                  <option value="August">August</option>
-                  <option value="September">September</option>
-                  <option value="October">October</option>
-                  <option value="November">November</option>
-                  <option value="December">December</option>
-                </select>
+                  placeholder="Select Month"
+                  options={['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'].map(m => ({
+                    label: m,
+                    value: m
+                  }))}
+                />
                 {formErrors.month && <span className={styles.fieldError}>{formErrors.month}</span>}
               </label>
 
               <label className={styles.field}>
                 <span>Upload Date *</span>
-                <input 
+                <input
                   type="date"
-                  value={form.uploaddate} 
+                  value={form.uploaddate}
                   onChange={e => {
                     setForm(p => ({ ...p, uploaddate: e.target.value }));
                     if (formErrors.uploaddate) setFormErrors(p => ({ ...p, uploaddate: null }));
@@ -400,9 +390,9 @@ export default function MasterPostersBoard({ onContextChange }) {
               {editingPoster && (
                 <label className={styles.field} style={{ flexDirection: 'row', alignItems: 'center', gap: '8px', cursor: 'pointer', marginTop: '8px' }}>
                   <label className={styles.switch}>
-                    <input 
-                      type="checkbox" 
-                      checked={form.enabled} 
+                    <input
+                      type="checkbox"
+                      checked={form.enabled}
                       onChange={e => setForm(p => ({ ...p, enabled: e.target.checked }))}
                     />
                     <span className={styles.slider}></span>

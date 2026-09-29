@@ -531,9 +531,9 @@ export default function PosterCarousel({
           );
         })}
       </div>
-      
+
       <div className={styles.categoryRow} style={{ justifyContent: 'flex-end' }}>
-        <select 
+        <select
           className={`${styles.categoryBtn} ${styles.monthSelect}`}
           value={selectedMonth}
           onChange={(e) => {
@@ -572,50 +572,50 @@ export default function PosterCarousel({
             const isActive = index === safeIndex;
             const isSelected = selectedSet.has(poster.id);
 
-              return (
-                <div
-                  key={poster.id}
-                  className={`${styles.gridCard} ${isActive ? styles.gridCardActive : ''} ${isSelected ? styles.gridCardSelected : ''}`}
-                >
-                  {canSelect ? (
-                    <label className={styles.selectCheck}>
-                      <input
-                        type="checkbox"
-                        checked={isSelected}
-                        onChange={() => toggleSelected(poster.id)}
-                        aria-label={`Select ${label}`}
-                      />
-                    </label>
-                  ) : null}
-                  <button
-                    type="button"
-                    className={styles.gridCardHit}
-                    onClick={(e) => {
-                      goTo(index);
-                      if (onPosterClick) {
-                        const rect = e.currentTarget.getBoundingClientRect();
-                        onPosterClick(poster, { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 });
-                      }
-                    }}
-                    aria-label={label}
-                    aria-current={isActive ? 'true' : undefined}
-                  >
-                    <PosterPage
-                      poster={poster}
-                      label={label}
-                      pageStyle={pageStyle}
-                      isCaptureTarget={isActive}
-                      theme={theme}
-                      doctorFields={doctorFields}
+            return (
+              <div
+                key={poster.id}
+                className={`${styles.gridCard} ${isActive ? styles.gridCardActive : ''} ${isSelected ? styles.gridCardSelected : ''}`}
+              >
+                {canSelect ? (
+                  <label className={styles.selectCheck}>
+                    <input
+                      type="checkbox"
+                      checked={isSelected}
+                      onChange={() => toggleSelected(poster.id)}
+                      aria-label={`Select ${label}`}
                     />
-                    <p className={styles.sendDate}>
-                      Send <strong>{sendLabel}</strong>
-                    </p>
-                  </button>
-                </div>
-              );
-            })}
-          </div>
+                  </label>
+                ) : null}
+                <button
+                  type="button"
+                  className={styles.gridCardHit}
+                  onClick={(e) => {
+                    goTo(index);
+                    if (onPosterClick) {
+                      const rect = e.currentTarget.getBoundingClientRect();
+                      onPosterClick(poster, { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 });
+                    }
+                  }}
+                  aria-label={label}
+                  aria-current={isActive ? 'true' : undefined}
+                >
+                  <PosterPage
+                    poster={poster}
+                    label={label}
+                    pageStyle={pageStyle}
+                    isCaptureTarget={isActive}
+                    theme={theme}
+                    doctorFields={doctorFields}
+                  />
+                  <p className={styles.sendDate}>
+                    Send <strong>{sendLabel}</strong>
+                  </p>
+                </button>
+              </div>
+            );
+          })}
+        </div>
       )}
     </div>
   );

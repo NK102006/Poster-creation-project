@@ -608,7 +608,7 @@ app.get('/api/doctors', async (req, res) => {
     const page = Math.max(1, parseInt(req.query.page) || 1);
     const limit = Math.max(1, parseInt(req.query.limit) || 10);
     const skip = (page - 1) * limit;
-    
+
     const scopeQuery = await doctorQueryForAuth(auth);
     if (scopeQuery._id === null) {
       return res.status(200).json({ total: 0, totalFiltered: 0, count: 0, page: 1, totalPages: 0, doctors: [] });
@@ -707,7 +707,7 @@ app.put('/api/doctors/:id', upload.any(), async (req, res) => {
       doctor.contactnumber = assertContactNumber(contactnumber);
     }
     if (active != null) doctor.active = String(active) !== 'false' && active !== false;
-    
+
     if (logoBuffer) {
       doctor.logo = await saveFile(logoBuffer, originalName, 'logos');
     }
@@ -829,7 +829,7 @@ app.post('/api/doctors', requireAuth('superadmin', 'admin', 'user'), upload.any(
     if (cleanedContact) {
       const existingDoc = await Doctor.findOne({ contactnumber: cleanedContact });
       if (existingDoc && (!doctorId || String(existingDoc._id) !== String(doctorId))) {
-         return res.status(400).json({ success: false, message: 'This mobile number already exists' });
+        return res.status(400).json({ success: false, message: 'This mobile number already exists' });
       }
     }
 
@@ -880,7 +880,7 @@ app.post('/api/doctors', requireAuth('superadmin', 'admin', 'user'), upload.any(
     if (!logoBuffer) {
       return res.status(400).json({ success: false, message: 'Doctor logo is required.' });
     }
-    
+
     const logoPath = await saveFile(logoBuffer, logoName, 'logos');
 
     let ownerUser = mongoose.isValidObjectId(ownerUserId) ? ownerUserId : null;
@@ -1844,7 +1844,7 @@ app.get('/api/admin/collections/:collection', requireAuth('superadmin', 'admin',
     }
     const Model = models[req.params.collection];
     if (!Model) return res.status(404).json({ message: 'Collection not found' });
-    
+
     const scope = await scopedCollectionFilter(req.auth, req.params.collection);
     const docs = await Model.find(scope).sort({ createdAt: -1 });
     if (req.params.collection === 'doctors') {
@@ -1885,7 +1885,7 @@ app.get('/api/admin/datatables/:collection', requireAuth('superadmin', 'admin', 
     );
     const orderDir =
       String(req.query.order?.[0]?.dir ?? req.query['order[0][dir]'] ?? 'asc').toLowerCase() ===
-      'desc'
+        'desc'
         ? -1
         : 1;
 
@@ -2006,16 +2006,16 @@ app.post('/api/admin/collections/:collection', requireAuth('superadmin', 'admin'
     }
     const Model = models[req.params.collection];
     if (!Model) return res.status(404).json({ message: 'Collection not found' });
-    
+
     const createData = { ...req.body };
     if (req.params.collection === 'doctors') {
       if (createData.contactnumber) {
-         const cleanedContact = assertContactNumber(createData.contactnumber);
-         createData.contactnumber = cleanedContact;
-         const existingDoc = await Doctor.findOne({ contactnumber: cleanedContact });
-         if (existingDoc) {
-           return res.status(400).json({ message: 'This mobile number already exists for another doctor.' });
-         }
+        const cleanedContact = assertContactNumber(createData.contactnumber);
+        createData.contactnumber = cleanedContact;
+        const existingDoc = await Doctor.findOne({ contactnumber: cleanedContact });
+        if (existingDoc) {
+          return res.status(400).json({ message: 'This mobile number already exists for another doctor.' });
+        }
       }
 
       if (!createData.logo) {
@@ -2064,16 +2064,16 @@ app.put('/api/admin/collections/:collection/:id', requireAuth('superadmin', 'adm
     }
     const Model = models[req.params.collection];
     if (!Model) return res.status(404).json({ message: 'Collection not found' });
-    
+
     const updateData = { ...req.body };
     if (req.params.collection === 'doctors') {
       if (updateData.contactnumber) {
-         const cleanedContact = assertContactNumber(updateData.contactnumber);
-         updateData.contactnumber = cleanedContact;
-         const existingDoc = await Doctor.findOne({ contactnumber: cleanedContact });
-         if (existingDoc && String(existingDoc._id) !== String(req.params.id)) {
-           return res.status(400).json({ message: 'This mobile number already exists for another doctor.' });
-         }
+        const cleanedContact = assertContactNumber(updateData.contactnumber);
+        updateData.contactnumber = cleanedContact;
+        const existingDoc = await Doctor.findOne({ contactnumber: cleanedContact });
+        if (existingDoc && String(existingDoc._id) !== String(req.params.id)) {
+          return res.status(400).json({ message: 'This mobile number already exists for another doctor.' });
+        }
       }
 
       if (updateData.hasOwnProperty('logo') && !updateData.logo) {
@@ -2101,7 +2101,7 @@ app.put('/api/admin/collections/:collection/:id', requireAuth('superadmin', 'adm
 
     const doc = await Model.findByIdAndUpdate(req.params.id, updateData, { new: true });
     if (!doc) return res.status(404).json({ message: 'Document not found' });
-    
+
     res.status(200).json({ success: true, data: req.params.collection === 'doctors' ? formatDoctor(doc) : doc });
   } catch (err) {
     res.status(err.status || 500).json({ message: err.message || 'Error updating document' });
@@ -2120,7 +2120,7 @@ app.delete('/api/admin/collections/:collection/:id', requireAuth('superadmin', '
     }
     const Model = models[req.params.collection];
     if (!Model) return res.status(404).json({ message: 'Collection not found' });
-    
+
     const existing = await Model.findById(req.params.id);
     if (!existing) return res.status(404).json({ message: 'Document not found' });
     if (req.params.collection === 'doctors' && !(await canAccessDoctor(req.auth, existing))) {
@@ -2132,7 +2132,7 @@ app.delete('/api/admin/collections/:collection/:id', requireAuth('superadmin', '
 
     const doc = await Model.findByIdAndDelete(req.params.id);
     if (!doc) return res.status(404).json({ message: 'Document not found' });
-    
+
     res.status(200).json({ success: true, message: 'Document deleted' });
   } catch (err) {
     res.status(500).json({ message: 'Error deleting document', error: err.message });
@@ -2699,7 +2699,7 @@ const startServer = async () => {
       if (!logoFieldExists) {
         await DoctorField.create({ key: 'logo', label: 'Doctor Photo / Logo', type: 'file', required: false, isStandard: true, enabled: true, order: 5 });
       }
-      
+
       const removed = await DoctorField.deleteMany({ isStandard: false });
       if (removed.deletedCount > 0) {
         console.log(`Removed ${removed.deletedCount} non-standard doctor fields to enforce strict standard fields limit.`);

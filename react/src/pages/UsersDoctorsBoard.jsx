@@ -142,10 +142,10 @@ function userColumns({ showAdmin }) {
     },
     ...(showAdmin
       ? [{
-          title: 'Admin',
-          data: 'adminUsername',
-          render: (data) => escapeHtml(data || '—'),
-        }]
+        title: 'Admin',
+        data: 'adminUsername',
+        render: (data) => escapeHtml(data || '—'),
+      }]
       : []),
     {
       title: 'Total doctors',
@@ -288,7 +288,7 @@ export default function UsersDoctorsBoard({
   const [doctorFields, setDoctorFields] = useState([]);
   const [filterMonth, setFilterMonth] = useState('');
   const userImportRef = useRef(null);
-  const navigateBackRef = useRef(() => {});
+  const navigateBackRef = useRef(() => { });
   const needsAdminPick = showAdminColumn && !adminId;
 
   const usersPath = adminId ? `/superadmin/admins/${adminId}/users` : '/admin/users';
@@ -347,7 +347,7 @@ export default function UsersDoctorsBoard({
   useEffect(() => {
     apiRequest('/doctor-fields').then(res => {
       if (res?.fields) setDoctorFields(res.fields);
-    }).catch(() => {});
+    }).catch(() => { });
   }, []);
 
   useEffect(() => {
@@ -874,25 +874,25 @@ export default function UsersDoctorsBoard({
               )}
             </div>
             <div className={styles.detailGrid}>
-            {[
-              ['Doctor ID', selectedDoctor.id],
-              ...doctorFields.filter(f => f.enabled && f.key !== 'logo').map(f => [
-                f.label, 
-                f.isStandard ? selectedDoctor[f.key] : selectedDoctor.dynamicFields?.[f.key]
-              ]),
-              ['Status', selectedDoctor.active ? 'Active' : 'Inactive'],
-              ['Posters made', filterMonth === '' ? selectedDoctor.postersMade : selectedDoctor.monthlyPosters?.[filterMonth] || 0],
-              ['Downloads', filterMonth === '' ? selectedDoctor.downloadCount : selectedDoctor.monthlyDownloads?.[filterMonth] || 0],
-              ['Created', selectedDoctor.createdAt ? new Date(selectedDoctor.createdAt).toLocaleString() : '—'],
-              ['Last updated', selectedDoctor.updatedAt ? new Date(selectedDoctor.updatedAt).toLocaleString() : '—'],
-            ].map(([label, value]) => (
-              <div key={label} className={styles.detailField}>
-                <span>{label}</span>
-                <strong>{value || '—'}</strong>
-              </div>
-            ))}
+              {[
+                ['Doctor ID', selectedDoctor.id],
+                ...doctorFields.filter(f => f.enabled && f.key !== 'logo').map(f => [
+                  f.label,
+                  f.isStandard ? selectedDoctor[f.key] : selectedDoctor.dynamicFields?.[f.key]
+                ]),
+                ['Status', selectedDoctor.active ? 'Active' : 'Inactive'],
+                ['Posters made', filterMonth === '' ? selectedDoctor.postersMade : selectedDoctor.monthlyPosters?.[filterMonth] || 0],
+                ['Downloads', filterMonth === '' ? selectedDoctor.downloadCount : selectedDoctor.monthlyDownloads?.[filterMonth] || 0],
+                ['Created', selectedDoctor.createdAt ? new Date(selectedDoctor.createdAt).toLocaleString() : '—'],
+                ['Last updated', selectedDoctor.updatedAt ? new Date(selectedDoctor.updatedAt).toLocaleString() : '—'],
+              ].map(([label, value]) => (
+                <div key={label} className={styles.detailField}>
+                  <span>{label}</span>
+                  <strong>{value || '—'}</strong>
+                </div>
+              ))}
+            </div>
           </div>
-        </div>
         </div>
       )}
 
