@@ -5,10 +5,56 @@ import 'datatables.net-dt/css/dataTables.dataTables.css';
 import JSZip from 'jszip';
 import { apiRequest } from '../lib/apiClient';
 import { sanitizePasswordInput, sanitizeUsernameInput, validateNewPassword } from '../features/auth/validators';
+import Datepicker from '../components/DatePicker';
 import styles from './AdminPortal.module.css';
 
 const csvCell = (value) => `"${String(value ?? '').replaceAll('"', '""')}"`;
 const POSTER_FOLDERS = ['education', 'festival', 'video'];
+
+function statsForDateRange(doctor, fromStr, toStr) {
+  if (!fromStr && !toStr) {
+    return {
+      postersMade: doctor.postersMade || 0,
+      downloadCount: doctor.downloadCount || 0,
+    };
+  }
+  const activity = Array.isArray(doctor.posterActivity) ? doctor.posterActivity : [];
+  const from = fromStr ? new Date(fromStr) : null;
+  const to = toStr ? new Date(toStr) : null;
+  if (from) from.setHours(0, 0, 0, 0);
+  if (to) to.setHours(23, 59, 59, 999);
+
+  let postersMade = 0;
+  let downloadCount = 0;
+  for (const entry of activity) {
+    if (!entry?.createdAt) continue;
+    const time = new Date(entry.createdAt).getTime();
+    if (Number.isNaN(time)) continue;
+    if (from && time < from.getTime()) continue;
+    if (to && time > to.getTime()) continue;
+    postersMade += 1;
+    downloadCount += Number(entry.downloads) || 0;
+  }
+  return { postersMade, downloadCount };
+}
+
+function dateInRangePoster(value, fromStr, toStr) {
+  if (!fromStr && !toStr) return true;
+  if (!value) return false;
+  const time = new Date(value).getTime();
+  if (Number.isNaN(time)) return false;
+  if (fromStr) {
+    const from = new Date(fromStr);
+    from.setHours(0, 0, 0, 0);
+    if (time < from.getTime()) return false;
+  }
+  if (toStr) {
+    const to = new Date(toStr);
+    to.setHours(23, 59, 59, 999);
+    if (time > to.getTime()) return false;
+  }
+  return true;
+}
 
 function downloadFile(blob, filename) {
   const url = URL.createObjectURL(blob);
@@ -205,11 +251,15 @@ const doctorColumns = [
   {
     title: 'Posters made',
     data: 'postersMade',
+    className: styles.statsCell,
+    width: '110px',
     render: (data) => String(data ?? 0),
   },
   {
     title: 'Downloads',
     data: 'downloadCount',
+    className: styles.statsCell,
+    width: '100px',
     render: (data) => String(data ?? 0),
   },
 ];
@@ -286,7 +336,17 @@ export default function UsersDoctorsBoard({
   const [importing, setImporting] = useState(false);
   const [importSummary, setImportSummary] = useState('');
   const [doctorFields, setDoctorFields] = useState([]);
-  const [filterMonth, setFilterMonth] = useState('');
+  const [filterFrom, setFilterFrom] = useState('');
+  const [filterTo, setFilterTo] = useState('');
+
+  const inputProps = useMemo(
+    () => ({
+      className: 'md-mobile-picker-input',
+      placeholder: 'Choose date',
+    }),
+    []
+  );
+
   const userImportRef = useRef(null);
   const navigateBackRef = useRef(() => {});
   const needsAdminPick = showAdminColumn && !adminId;
@@ -554,13 +614,47 @@ export default function UsersDoctorsBoard({
   });
 
   const displayedDoctors = useMemo(() => {
-    if (filterMonth === '') return doctors;
-    return doctors.map(doc => ({
+    if (!filterFrom && !filterTo) return doctors;
+    return doctors.map((doc) => ({
       ...doc,
-      postersMade: doc.monthlyPosters?.[filterMonth] || 0,
-      downloadCount: doc.monthlyDownloads?.[filterMonth] || 0,
+      ...statsForDateRange(doc, filterFrom, filterTo),
     }));
-  }, [doctors, filterMonth]);
+  }, [doctors, filterFrom, filterTo]);
+
+  const selectedDoctorStats = useMemo(() => {
+    if (!selectedDoctor) return { postersMade: 0, downloadCount: 0 };
+    return statsForDateRange(selectedDoctor, filterFrom, filterTo);
+  }, [selectedDoctor, filterFrom, filterTo]);
+
+  const statsDateFilter = (
+    <div className={styles.statsDateFilter}>
+      <span className={styles.statsDateLabel}>Filter stats by date:</span>
+      <Datepicker
+        controls={['calendar']}
+        select="range"
+        inputComponent="input"
+        inputProps={inputProps}
+        value={[filterFrom, filterTo]}
+        onChange={(args) => {
+          const [from, to] = Array.isArray(args?.value) ? args.value : ['', ''];
+          setFilterFrom(from || '');
+          setFilterTo(to || '');
+        }}
+      />
+      <button
+        type="button"
+        className={`${styles.statsDateClear} ${!(filterFrom || filterTo) ? styles.clearDatesBtnHidden : ''}`}
+        onClick={() => {
+          setFilterFrom('');
+          setFilterTo('');
+        }}
+        disabled={!(filterFrom || filterTo)}
+        aria-hidden={!(filterFrom || filterTo)}
+      >
+        Clear
+      </button>
+    </div>
+  );
 
   const doctorsHostRef = useDataTable({
     enabled: Boolean(selectedUser) && !selectedDoctor,
@@ -610,17 +704,33 @@ export default function UsersDoctorsBoard({
       POSTER_FOLDERS.forEach((folder) => zip.folder(folder));
       zip.folder('logos');
 
+      const dateSuffix = (filterFrom || filterTo)
+        ? `_${filterFrom || 'start'}_${filterTo || 'end'}`
+        : '';
       const rows = [[
         'ID', 'Name', 'Degree', 'Clinic / Hospital', 'Contact Number', 'Active',
         'Posters Made', 'Downloads', 'Logo File', 'Education Files', 'Festival Files', 'Video Files',
+        ...(filterFrom || filterTo ? ['Date From', 'Date To'] : []),
       ]];
 
+      let exportedAny = false;
       for (const doctor of details) {
+        const stats = statsForDateRange(doctor, filterFrom, filterTo);
+        const posters = (doctor.posters || []).filter((poster) => {
+          if (!filterFrom && !filterTo) return true;
+          return dateInRangePoster(poster.createdAt, filterFrom, filterTo);
+        });
+
+        if ((filterFrom || filterTo) && posters.length === 0 && stats.postersMade === 0) {
+          continue;
+        }
+        exportedAny = true;
+
         const safeName = `${doctor.id}-${safeFilePart(doctor.name, 'doctor')}`;
         const filesByKind = { education: [], festival: [], video: [] };
         const counts = { education: 0, festival: 0, video: 0 };
 
-        for (const poster of doctor.posters || []) {
+        for (const poster of posters) {
           const kind = inferPosterKind(poster);
           counts[kind] += 1;
           const ext = posterExtension(poster, kind);
@@ -635,13 +745,23 @@ export default function UsersDoctorsBoard({
 
         rows.push([
           doctor.id, doctor.name, doctor.doctorDegree, doctor.clinicName, doctor.contactnumber,
-          doctor.active ? 'Active' : 'Inactive', doctor.postersMade, doctor.downloadCount,
+          doctor.active ? 'Active' : 'Inactive', stats.postersMade, stats.downloadCount,
           logoFile, filesByKind.education.join('\n'), filesByKind.festival.join('\n'), filesByKind.video.join('\n'),
+          ...(filterFrom || filterTo ? [filterFrom || '', filterTo || ''] : []),
         ]);
       }
 
+      if (!exportedAny) {
+        setError('No data available to export for the selected dates');
+        setTimeout(() => setError(''), 3000);
+        return;
+      }
+
       zip.file('doctors.csv', '\ufeff' + rows.map((row) => row.map(csvCell).join(',')).join('\r\n'));
-      downloadFile(await zip.generateAsync({ type: 'blob' }), `${selectedUser.empid || 'user'}-doctors.zip`);
+      downloadFile(
+        await zip.generateAsync({ type: 'blob' }),
+        `${selectedUser.empid || 'user'}-doctors${dateSuffix}.zip`
+      );
     } catch (err) {
       setError(err.message || 'Could not export doctors');
     } finally {
@@ -805,65 +925,23 @@ export default function UsersDoctorsBoard({
       )}
 
       {selectedUser && !selectedDoctor && (
-        <div className={styles.tableCard}>
-          <div style={{ padding: '16px 16px 0', display: 'flex', justifyContent: 'flex-end', gap: '8px', alignItems: 'center' }}>
-            <span style={{ fontSize: '14px', color: 'var(--color-text-muted)' }}>Filter stats by month:</span>
-            <select
-              className={styles.monthSelect}
-              value={filterMonth}
-              onChange={(e) => setFilterMonth(e.target.value)}
-              style={{
-                padding: '4px 8px',
-                borderRadius: '6px',
-                border: '1px solid rgba(31,111,159,0.2)',
-                fontSize: '12px',
-                fontWeight: 600,
-                color: 'var(--color-primary)',
-                background: '#fff',
-                cursor: 'pointer',
-                fontFamily: 'inherit',
-                outline: 'none',
-              }}
-            >
-              <option value="">All Time</option>
-              {['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'].map((m, i) => (
-                <option key={i} value={i}>{m}</option>
-              ))}
-            </select>
+        <>
+          <div className={styles.statsDateBar}>
+            {statsDateFilter}
           </div>
-          <div ref={doctorsHostRef} className={styles.dtHost} />
-          {!loading && doctors.length === 0 && (
-            <p className={styles.emptyState}>This employee has not created any doctors yet.</p>
-          )}
-        </div>
+          <div className={styles.tableCard}>
+            <div ref={doctorsHostRef} className={styles.dtHost} />
+            {!loading && doctors.length === 0 && (
+              <p className={styles.emptyState}>This employee has not created any doctors yet.</p>
+            )}
+          </div>
+        </>
       )}
 
       {selectedDoctor && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', alignItems: 'center' }}>
-            <span style={{ fontSize: '14px', color: 'var(--color-text-muted)' }}>Filter stats by month:</span>
-            <select
-              className={styles.monthSelect}
-              value={filterMonth}
-              onChange={(e) => setFilterMonth(e.target.value)}
-              style={{
-                padding: '4px 8px',
-                borderRadius: '6px',
-                border: '1px solid rgba(31,111,159,0.2)',
-                fontSize: '12px',
-                fontWeight: 600,
-                color: 'var(--color-primary)',
-                background: '#fff',
-                cursor: 'pointer',
-                fontFamily: 'inherit',
-                outline: 'none',
-              }}
-            >
-              <option value="">All Time</option>
-              {['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'].map((m, i) => (
-                <option key={i} value={i}>{m}</option>
-              ))}
-            </select>
+          <div className={styles.statsDateBar}>
+            {statsDateFilter}
           </div>
           <div className={styles.detailCard}>
             <div className={styles.detailLogo}>
@@ -881,8 +959,8 @@ export default function UsersDoctorsBoard({
                 f.isStandard ? selectedDoctor[f.key] : selectedDoctor.dynamicFields?.[f.key]
               ]),
               ['Status', selectedDoctor.active ? 'Active' : 'Inactive'],
-              ['Posters made', filterMonth === '' ? selectedDoctor.postersMade : selectedDoctor.monthlyPosters?.[filterMonth] || 0],
-              ['Downloads', filterMonth === '' ? selectedDoctor.downloadCount : selectedDoctor.monthlyDownloads?.[filterMonth] || 0],
+              ['Posters made', selectedDoctorStats.postersMade],
+              ['Downloads', selectedDoctorStats.downloadCount],
               ['Created', selectedDoctor.createdAt ? new Date(selectedDoctor.createdAt).toLocaleString() : '—'],
               ['Last updated', selectedDoctor.updatedAt ? new Date(selectedDoctor.updatedAt).toLocaleString() : '—'],
             ].map(([label, value]) => (
@@ -891,8 +969,8 @@ export default function UsersDoctorsBoard({
                 <strong>{value || '—'}</strong>
               </div>
             ))}
+            </div>
           </div>
-        </div>
         </div>
       )}
 

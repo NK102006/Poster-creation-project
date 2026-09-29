@@ -422,6 +422,7 @@ function formatDoctor(doc, { includePosters = false, light = false } = {}) {
   const postersArray = Array.isArray(obj.posters) ? obj.posters : [];
   const monthlyDownloads = {};
   const monthlyPosters = {};
+  const posterActivity = [];
   postersArray.forEach((p) => {
     if (!p.createdAt) return;
     let m = new Date(p.createdAt).getMonth(); // fallback: 0 = Jan, 11 = Dec
@@ -432,8 +433,13 @@ function formatDoctor(doc, { includePosters = false, light = false } = {}) {
         m = mIndex;
       }
     }
-    monthlyDownloads[m] = (monthlyDownloads[m] || 0) + (Number(p.downloads) || 0);
+    const downloads = Number(p.downloads) || 0;
+    monthlyDownloads[m] = (monthlyDownloads[m] || 0) + downloads;
     monthlyPosters[m] = (monthlyPosters[m] || 0) + 1;
+    posterActivity.push({
+      createdAt: p.createdAt,
+      downloads,
+    });
   });
 
   const base = {
@@ -451,6 +457,7 @@ function formatDoctor(doc, { includePosters = false, light = false } = {}) {
     dynamicFields: obj.dynamicFields || {},
     monthlyDownloads,
     monthlyPosters,
+    posterActivity,
   };
 
   if (light) {

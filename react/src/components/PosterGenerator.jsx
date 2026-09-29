@@ -54,7 +54,7 @@ export default function PosterGenerator({
   const [closingModal, setClosingModal] = useState(false);
   const [modalOrigin, setModalOrigin] = useState({ x: window.innerWidth / 2, y: window.innerHeight / 2 });
 
-  const [selectedThemeId, setSelectedThemeId] = useState('theme-blue');
+  const [selectedThemeId, setSelectedThemeId] = useState('all');
   const [themes, setThemes] = useState(POSTER_THEMES);
 
   useEffect(() => {
@@ -87,10 +87,23 @@ export default function PosterGenerator({
     fetchThemes();
   }, []);
 
-  const selectedTheme =
-    themes.find((t) => t.id === selectedThemeId || t.name === selectedThemeId) ||
-    themes[0] ||
-    POSTER_THEMES[0];
+  const showAllThemes = selectedThemeId === 'all';
+  const fallbackTheme = themes[0] || POSTER_THEMES[0];
+  const selectedTheme = showAllThemes
+    ? null
+    : themes.find((t) => t.id === selectedThemeId || t.name === selectedThemeId) || fallbackTheme;
+
+  const resolveThemeForPoster = (poster) => {
+    if (selectedTheme) return selectedTheme;
+    const color = String(poster?.color || '').toLowerCase().trim();
+    if (!color) return fallbackTheme;
+    return (
+      themes.find((t) => {
+        const themeStr = `${t.id} ${t.name}`.toLowerCase();
+        return themeStr.includes(color) || color.includes(String(t.name).toLowerCase());
+      }) || fallbackTheme
+    );
+  };
   const isStepComplete = (step) => currentStep > step;
   const [modalPoster, setModalPoster] = useState(null);
 
@@ -271,16 +284,17 @@ export default function PosterGenerator({
   };
 
   const renderPosterBlob = async (poster, label) => {
+    const themeForPoster = resolveThemeForPoster(poster);
     if (poster?.kind === 'master') {
       return renderMasterPosterBlob(poster, doctorFields);
     }
     if (poster?.template === 'risk-factor') {
       return renderRiskFactorPosterBlob({
         ...doctorFields,
-        theme: mapThemeToRiskFactor(selectedTheme?.id),
+        theme: mapThemeToRiskFactor(themeForPoster?.id),
       });
     }
-    return renderBlankPosterBlob(selectedTheme, label);
+    return renderBlankPosterBlob(themeForPoster, label);
   };
 
   const handleGenerateAndDownload = async () => {
@@ -659,32 +673,47 @@ export default function PosterGenerator({
         {currentStep === 2 && (
           <div className={styles.stepContent}>
             <div className={styles.designPreview}>
-              <div style={{
-                borderRadius: '16px',
-                padding: '24px',
-                marginBottom: '16px',
-                background: 'linear-gradient(to bottom right, rgba(255, 255, 255, 0.8), rgba(245, 250, 253, 0.6))',
-                boxShadow: '0 4px 12px rgba(31, 111, 159, 0.04)'
-              }}>
-                <h3 className={styles.previewHeading} style={{ marginTop: 0, marginBottom: 20 }}>Choose Theme</h3>
-                <div className={styles.themeJewels}>
+              <div className={styles.themeBox}>
+                <div className={styles.themeBoxHeader}>
+                  <button
+                    type="button"
+                    className={`${styles.allThemesBtn} ${showAllThemes ? styles.allThemesBtnActive : ''}`}
+                    onClick={() => {
+                      setSelectedThemeId('all');
+                      setActivePosterIndex(0);
+                    }}
+                  >
+                    All themes
+                  </button>
+                  <h3 className={styles.themeBoxTitle}>Choose Theme</h3>
+                </div>
+                <div
+                  className={styles.themeJewels}
+                  style={{
+                    gridTemplateColumns: `repeat(${Math.max(themes.length, 1)}, minmax(68px, 1fr))`,
+                  }}
+                >
                   {themes.map((theme) => {
                     const isSelected =
-                      theme.id === selectedThemeId ||
-                      theme.name === selectedThemeId ||
-                      theme.id === selectedTheme.id;
+                      !showAllThemes &&
+                      (theme.id === selectedThemeId ||
+                        theme.name === selectedThemeId ||
+                        theme.id === selectedTheme?.id);
                     return (
                       <button
                         key={theme.id || theme._id}
                         type="button"
                         className={`${styles.themeJewel} ${isSelected ? styles.themeJewelActive : ''}`}
-                        onClick={() => setSelectedThemeId(theme.id || theme._id)}
+                        onClick={() => {
+                          setSelectedThemeId(theme.id || theme._id);
+                          setActivePosterIndex(0);
+                        }}
                       >
                         <span
                           className={styles.jewelFace}
                           style={{
                             background: `linear-gradient(145deg, ${theme.headerBg || '#1a4f8b'}, ${theme.footerBg || '#143a66'})`,
-                            boxShadow: `inset 0 0 0 1px rgba(255,255,255,0.18), 0 12px 28px ${theme.cardGlow || 'rgba(0,0,0,0.12)'}`,
+                            boxShadow: `inset 0 0 0 1px rgba(255,255,255,0.18), 0 8px 18px ${theme.cardGlow || 'rgba(0,0,0,0.12)'}`,
                           }}
                         />
                         <span className={styles.jewelMeta}>
@@ -859,7 +888,7 @@ export default function PosterGenerator({
                   label={modalPoster?.label || 'Poster'}
                   pageStyle={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}
                   isCaptureTarget={false}
-                  theme={selectedTheme}
+                  theme={resolveThemeForPoster(modalPoster || carouselSlides[0])}
                   doctorFields={doctorFields}
                 />
               </div>

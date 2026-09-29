@@ -278,8 +278,8 @@
 .toolbar {
   display: flex;
   justify-content: space-between;
-  align-items: center;
-  gap: 14px;
+  align-items: flex-end;
+  gap: 12px;
   margin-bottom: 16px;
   flex-wrap: wrap;
 }
@@ -298,7 +298,7 @@
   flex-wrap: wrap;
   justify-content: flex-end;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   flex-shrink: 0;
   margin-left: auto;
 }
@@ -311,29 +311,100 @@
 
 .dateFilter {
   display: flex;
-  flex-wrap: nowrap;
-  align-items: center;
-  gap: 8px 12px;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 8px;
+  min-width: 0;
+  flex: 1 1 auto;
 }
 
-.dateFilter label {
-  display: flex;
-  align-items: center;
-  gap: 8px;
+.clearDatesBtn {
+  border: 1px solid rgba(31, 111, 159, 0.16);
+  border-radius: 9px;
+  background: #eef2f0;
+  color: var(--color-text-muted);
+  font-family: inherit;
   font-size: 12px;
   font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--color-text-muted);
+  cursor: pointer;
+  padding: 7px 10px;
+  min-height: 34px;
+  white-space: nowrap;
+  align-self: flex-end;
+  transition: all 0.2s ease;
 }
 
-.dateFilter input[type="date"] {
-  border: 1px solid rgba(31, 111, 159, 0.18);
-  border-radius: 10px;
-  padding: 8px 10px;
-  font: inherit;
-  color: var(--color-text);
-  background: #fff;
+.clearDatesBtn:hover {
+  background: var(--color-primary);
+  color: #ffffff;
+}
+
+.clearDatesBtnHidden {
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.statsDateBar {
+  padding: 0 0 12px;
+  display: flex;
+  justify-content: flex-end;
+  align-items: flex-end;
+  min-height: 58px;
+  box-sizing: border-box;
+}
+
+.statsDateFilter {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.statsDateLabel {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  align-self: center;
+  margin-right: 2px;
+  white-space: nowrap;
+}
+
+.statsDateClear {
+  border: 1px solid rgba(31, 111, 159, 0.16);
+  border-radius: 9px;
+  background: #eef2f0;
+  color: var(--color-text-muted);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 7px 10px;
+  min-height: 34px;
+  min-width: 64px;
+  white-space: nowrap;
+}
+
+.statsDateClear:hover:not(:disabled) {
+  background: var(--color-primary);
+  color: #fff;
+}
+
+.statsCell {
+  text-align: center !important;
+  white-space: nowrap;
+  width: 110px;
+}
+
+.toolbarBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 12px;
+  font-size: 12.5px;
+  min-height: 34px;
+  border-radius: 9px;
+  white-space: nowrap;
 }
 
 .posterSendDate {
@@ -1273,6 +1344,63 @@
   .topbar {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .toolbar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+
+  .dateFilter {
+    width: 100%;
+    gap: 6px 8px;
+  }
+
+  .toolbarActions {
+    width: 100%;
+    margin-left: 0;
+    justify-content: stretch;
+  }
+
+  .toolbarActions .toolbarBtn,
+  .toolbarActions .primaryBtn,
+  .toolbarActions .secondaryBtn {
+    flex: 1 1 calc(50% - 4px);
+    justify-content: center;
+    text-align: center;
+  }
+
+  .clearDatesBtn {
+    padding: 6px 9px;
+    font-size: 11px;
+    min-height: 32px;
+  }
+
+  .toolbarBtn {
+    padding: 7px 10px;
+    font-size: 12px;
+    min-height: 32px;
+  }
+
+  .statsDateBar {
+    padding: 12px 12px 0;
+    justify-content: stretch;
+  }
+
+  .statsDateFilter {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .statsDateLabel {
+    width: 100%;
+    margin-bottom: 2px;
+  }
+
+  .pageTitle,
+  .sectionTitle {
+    font-size: 24px;
   }
 
   .superTable {
