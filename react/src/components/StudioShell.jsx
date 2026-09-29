@@ -9,7 +9,12 @@ export default function StudioShell({
   onBack = null,
   backLabel = 'Back',
   headerActions = null,
+  subheaderActions = null,
+  subheaderExtra = null,
+  wide = false,
 }) {
+  const showSubheader = Boolean(onBack || subheaderActions || subheaderExtra);
+
   return (
     <div className={styles.page}>
       <header className={styles.header}>
@@ -42,14 +47,22 @@ export default function StudioShell({
           </button>
         </div>
       </header>
-      {onBack && (
-        <div className={styles.subheader}>
-          <button type="button" className={styles.headerBack} onClick={onBack}>
-            ← {backLabel}
-          </button>
+      {showSubheader ? (
+        <div className={`${styles.subheader} ${wide ? styles.subheaderWide : ''}`}>
+          <div className={styles.subheaderLeft}>
+            {onBack ? (
+              <button type="button" className={styles.headerBack} onClick={onBack}>
+                ← {backLabel}
+              </button>
+            ) : null}
+            {subheaderExtra}
+          </div>
+          {subheaderActions ? (
+            <div className={styles.subheaderRight}>{subheaderActions}</div>
+          ) : null}
         </div>
-      )}
-      <main className={styles.main}>{children}</main>
+      ) : null}
+      <main className={`${styles.main} ${wide ? styles.mainWide : ''}`}>{children}</main>
     </div>
   );
 }
