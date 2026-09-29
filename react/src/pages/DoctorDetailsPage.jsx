@@ -89,10 +89,10 @@ export default function DoctorDetailsPage({
     if (!doctor?.id && user?.id) data.append('ownerUserId', user.id);
     data.append('countDownload', 'true');
 
-    if (file) {
-      data.append('logo', file);
-    } else if (logoPreview && typeof logoPreview === 'string' && logoPreview.startsWith('data:')) {
+    if (logoPreview && typeof logoPreview === 'string' && logoPreview.startsWith('data:')) {
       data.append('logo', logoPreview);
+    } else if (file) {
+      data.append('logo', file);
     }
     if (posterBlob) {
       const ext = posterBlob.type && posterBlob.type.includes('video') ? 'mp4' : 'jpg';
@@ -141,10 +141,10 @@ export default function DoctorDetailsPage({
     if (doctorDegree) data.append('doctorDegree', doctorDegree);
     if (user?.id) data.append('ownerUserId', user.id);
 
-    if (logoFile) {
-      data.append('logo', logoFile);
-    } else if (logoPreview && typeof logoPreview === 'string' && logoPreview.startsWith('data:')) {
+    if (logoPreview && typeof logoPreview === 'string' && logoPreview.startsWith('data:')) {
       data.append('logo', logoPreview);
+    } else if (logoFile) {
+      data.append('logo', logoFile);
     }
 
     try {

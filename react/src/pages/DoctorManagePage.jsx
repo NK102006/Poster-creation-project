@@ -149,8 +149,8 @@ export default function DoctorManagePage({
         if (f.isStandard) data.append(f.key, (form[f.key] || '').trim());
       }
       data.append('dynamicFields', JSON.stringify(form.dynamicFields || {}));
-      if (logoFile) data.append('logo', logoFile);
-      else if (logoPreview?.startsWith('data:')) data.append('logo', logoPreview);
+      if (logoPreview?.startsWith('data:')) data.append('logo', logoPreview);
+      else if (logoFile) data.append('logo', logoFile);
 
       const res = await apiRequest(`/doctors/${doctorId}`, {
         method: 'PUT',

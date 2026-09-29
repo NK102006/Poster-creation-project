@@ -133,13 +133,16 @@ export default function PosterGenerator({
   };
 
   const handleContinueToDesign = () => {
+    const logoField = formFieldConfig?.find(f => f.key === 'logo' || f.key === 'photo' || f.type === 'file');
+    const isLogoEnabled = !formFieldConfig || formFieldConfig.length === 0 || (logoField && logoField.enabled);
+    const isLogoRequired = !formFieldConfig || formFieldConfig.length === 0 || (logoField && logoField.required);
     const hasLogo = Boolean(logoFile || logoPreview);
     const errors = {};
 
-    if (!hasLogo) errors.logo = 'Doctor photo or clinic logo is required.';
+    if (isLogoEnabled && isLogoRequired && !hasLogo) errors.logo = 'Doctor photo or clinic logo is required.';
 
     if (formFieldConfig && formFieldConfig.length > 0) {
-      const enabledFields = formFieldConfig.filter(f => f.enabled);
+      const enabledFields = formFieldConfig.filter(f => f.enabled && f.key !== 'logo' && f.key !== 'photo' && f.type !== 'file');
       for (const f of enabledFields) {
         const isDynamic = !f.isStandard;
         const val = isDynamic ? (formData.dynamicFields?.[f.key] || '') : (formData[f.key] || '');
@@ -199,11 +202,14 @@ export default function PosterGenerator({
 
   const checkCanNavigate = (targetStep) => {
     if (targetStep <= 1) return true;
+    const logoField = formFieldConfig?.find(f => f.key === 'logo' || f.key === 'photo' || f.type === 'file');
+    const isLogoEnabled = !formFieldConfig || formFieldConfig.length === 0 || (logoField && logoField.enabled);
+    const isLogoRequired = !formFieldConfig || formFieldConfig.length === 0 || (logoField && logoField.required);
     const hasLogo = Boolean(logoFile || logoPreview);
-    let allValid = hasLogo;
+    let allValid = (isLogoEnabled && isLogoRequired) ? hasLogo : true;
 
     if (formFieldConfig && formFieldConfig.length > 0) {
-      const enabledFields = formFieldConfig.filter(f => f.enabled && f.required);
+      const enabledFields = formFieldConfig.filter(f => f.enabled && f.required && f.key !== 'logo' && f.key !== 'photo' && f.type !== 'file');
       for (const f of enabledFields) {
         const isDynamic = !f.isStandard;
         const val = isDynamic ? (formData.dynamicFields?.[f.key] || '') : (formData[f.key] || '');
