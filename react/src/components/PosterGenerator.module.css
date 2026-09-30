@@ -173,12 +173,21 @@
   padding: 32px;
   box-shadow: var(--shadow-card), var(--shadow-glow);
   color: var(--color-text);
+  overflow: visible;
+  height: auto;
+  min-height: auto;
 }
 
 .formGrid {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 20px;
+  align-items: start;
+  grid-auto-flow: dense;
+}
+
+.fieldFull {
+  grid-column: 1 / -1;
 }
 
 .fieldError {

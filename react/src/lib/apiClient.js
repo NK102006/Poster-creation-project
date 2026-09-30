@@ -1,4 +1,4 @@
-import { authHeaders } from './authSession';
+import { authHeaders, clearAuth } from './authSession';
 
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api').replace(/\/$/, '');
 
@@ -34,6 +34,17 @@ export async function apiRequest(path, { method = 'GET', body, signal } = {}) {
     data = await response.json();
   } catch {
     // Response had no JSON body
+  }
+
+  if (response.status === 401 && !/\/login$/.test(path) && path !== '/logout') {
+    // The server session is gone or now belongs to a different account: sign this scope out.
+    clearAuth();
+    try {
+      sessionStorage.removeItem('app_view_state');
+    } catch {
+      // ignore
+    }
+    window.location.reload();
   }
 
   if (!response.ok) {

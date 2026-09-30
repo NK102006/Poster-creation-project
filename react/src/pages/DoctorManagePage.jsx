@@ -3,6 +3,7 @@ import { apiRequest } from '../lib/apiClient';
 import StudioShell from '../components/StudioShell';
 import LogoCanvas from '../components/LogoCanvas';
 import { sanitizePhoneInput, validatePhoneNumber } from '../features/auth/validators';
+import { enabledFormFields, isFullWidthDoctorField } from '../lib/doctorFields';
 import styles from './DoctorManagePage.module.css';
 import adminStyles from './AdminPortal.module.css';
 
@@ -385,12 +386,16 @@ export default function DoctorManagePage({
             </div>
 
             <div className={styles.formGrid}>
-              {doctorFields.filter(f => f.enabled && f.key !== 'logo').map(field => {
+              {enabledFormFields(doctorFields).map((field) => {
                 const isDynamic = !field.isStandard;
                 const value = isDynamic ? (form.dynamicFields?.[field.key] ?? '') : (form[field.key] ?? '');
-                
+                const fullWidth = isFullWidthDoctorField(field);
+
                 return (
-                  <label key={field.key} className={styles.field}>
+                  <label
+                    key={field.key}
+                    className={`${styles.field} ${fullWidth ? styles.fieldFull : ''}`}
+                  >
                     <span>{field.label} {field.required ? '*' : ''}</span>
                     <input
                       type={field.type || 'text'}
@@ -402,16 +407,16 @@ export default function DoctorManagePage({
                       placeholder={field.key === 'doctorDegree' ? 'e.g. MBBS, MD (Medicine)' : ''}
                       onChange={(e) => {
                         const next = field.key === 'contactnumber' ? sanitizePhoneInput(e.target.value) : e.target.value;
-                        setForm(p => {
+                        setForm((p) => {
                           if (isDynamic) return { ...p, dynamicFields: { ...p.dynamicFields, [field.key]: next } };
                           return { ...p, [field.key]: next };
                         });
-                        if (formFieldErrors[field.key]) setFormFieldErrors(p => ({ ...p, [field.key]: null }));
+                        if (formFieldErrors[field.key]) setFormFieldErrors((p) => ({ ...p, [field.key]: null }));
                       }}
                       onBlur={(e) => {
                         if (field.key === 'contactnumber') {
                           const err = validatePhoneNumber(e.target.value);
-                          if (err) setFormFieldErrors(p => ({ ...p, contactnumber: err }));
+                          if (err) setFormFieldErrors((p) => ({ ...p, contactnumber: err }));
                         }
                       }}
                     />

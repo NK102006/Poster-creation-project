@@ -13,6 +13,7 @@ import {
 import { apiRequest } from '../lib/apiClient';
 import styles from './PosterGenerator.module.css';
 import { sanitizePhoneInput, validatePhoneNumber } from '../features/auth/validators';
+import { enabledFormFields, isFullWidthDoctorField } from '../lib/doctorFields';
 
 const STEPS = [
   { id: 1, label: 'Doctor Details', short: 'Details' },
@@ -494,11 +495,15 @@ export default function PosterGenerator({
 
             <div className={styles.docFormCard}>
               <div className={styles.formGrid}>
-                {formFieldConfig && formFieldConfig.length > 0 ? formFieldConfig.filter(f => f.enabled && f.key !== 'logo' && f.key !== 'photo' && f.type !== 'file').map((field) => {
+                {formFieldConfig && formFieldConfig.length > 0 ? enabledFormFields(formFieldConfig).map((field) => {
                   const isDynamic = !field.isStandard;
                   const value = isDynamic ? (formData.dynamicFields?.[field.key] ?? '') : (formData[field.key] ?? '');
+                  const fullWidth = isFullWidthDoctorField(field);
                   return (
-                    <div key={field.key} className={styles.formGroup}>
+                    <div
+                      key={field.key}
+                      className={`${styles.formGroup} ${fullWidth ? styles.fieldFull : ''}`}
+                    >
                       <label className={styles.formLabel} htmlFor={`step-doc-${field.key}`}>
                         {field.key === 'contactnumber' ? 'Whatsapp number' : field.label} {field.required ? <span className={styles.requiredStar}>*</span> : ''}
                       </label>
@@ -520,12 +525,12 @@ export default function PosterGenerator({
                             }
                             return { ...prev, [field.key]: next };
                           });
-                          if (fieldErrors[field.key]) setFieldErrors(prev => ({ ...prev, [field.key]: null }));
+                          if (fieldErrors[field.key]) setFieldErrors((prev) => ({ ...prev, [field.key]: null }));
                         }}
                         onBlur={(e) => {
                           if (field.key === 'contactnumber') {
                             const err = validatePhoneNumber(e.target.value);
-                            if (err) setFieldErrors(prev => ({ ...prev, contactnumber: err }));
+                            if (err) setFieldErrors((prev) => ({ ...prev, contactnumber: err }));
                           }
                         }}
                       />

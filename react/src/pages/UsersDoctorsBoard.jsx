@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useMemo } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import DataTable from 'datatables.net-dt';
 import 'datatables.net-dt/css/dataTables.dataTables.css';
@@ -6,6 +6,7 @@ import JSZip from 'jszip';
 import { apiRequest } from '../lib/apiClient';
 import { sanitizePasswordInput, sanitizeUsernameInput, validateNewPassword } from '../features/auth/validators';
 import Datepicker from '../components/DatePicker';
+import { isFullWidthDoctorField, sortDoctorFields } from '../lib/doctorFields';
 import styles from './AdminPortal.module.css';
 
 const csvCell = (value) => `"${String(value ?? '').replaceAll('"', '""')}"`;
@@ -919,17 +920,23 @@ export default function UsersDoctorsBoard({
             </div>
             <div className={styles.detailGrid}>
             {[
-              ['Doctor ID', selectedDoctor.id],
-              ...doctorFields.filter(f => f.enabled && f.key !== 'logo').map(f => [
-                f.label, 
-                f.isStandard ? selectedDoctor[f.key] : selectedDoctor.dynamicFields?.[f.key]
-              ]),
-              ['Status', selectedDoctor.active ? 'Active' : 'Inactive'],
-              ['Posters made', doctorPosters.length],
-              ['Created', selectedDoctor.createdAt ? new Date(selectedDoctor.createdAt).toLocaleString() : '—'],
-              ['Last updated', selectedDoctor.updatedAt ? new Date(selectedDoctor.updatedAt).toLocaleString() : '—'],
-            ].map(([label, value]) => (
-              <div key={label} className={styles.detailField}>
+              ['Doctor ID', selectedDoctor.id, true],
+              ...sortDoctorFields(doctorFields)
+                .filter((f) => f.enabled && f.key !== 'logo' && f.type !== 'file')
+                .map((f) => [
+                  f.label,
+                  f.isStandard ? selectedDoctor[f.key] : selectedDoctor.dynamicFields?.[f.key],
+                  isFullWidthDoctorField(f),
+                ]),
+              ['Status', selectedDoctor.active ? 'Active' : 'Inactive', false],
+              ['Posters made', doctorPosters.length, false],
+              ['Created', selectedDoctor.createdAt ? new Date(selectedDoctor.createdAt).toLocaleString() : '—', false],
+              ['Last updated', selectedDoctor.updatedAt ? new Date(selectedDoctor.updatedAt).toLocaleString() : '—', false],
+            ].map(([label, value, fullWidth]) => (
+              <div
+                key={label}
+                className={`${styles.detailField} ${fullWidth ? styles.detailFieldFull : ''}`}
+              >
                 <span>{label}</span>
                 <strong>{value || '—'}</strong>
               </div>

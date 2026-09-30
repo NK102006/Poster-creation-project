@@ -231,30 +231,92 @@ function escapeRegex(value) {
   return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
+// Identity comes ONLY from the server-side session. The X-Auth-Role header just
+// selects which of the session's logins to use, and X-Auth-Id is a consistency
+// check: if the session now belongs to a different account than the one the
+// client thinks it is (e.g. another login in the same browser), reject the request.
 function getAuthFromRequest(req) {
   const headerRole = String(req.headers['x-auth-role'] || '').trim();
   const headerId = String(req.headers['x-auth-id'] || '').trim();
+  const auths = req.session?.auths;
+  if (!auths) return null;
 
-  // 1. Best case: session has an auths map — look up the exact requested role
-  if (req.session?.auths && headerRole) {
-    if (req.session.auths[headerRole]) {
-      return req.session.auths[headerRole];
+  const auth = headerRole ? auths[headerRole] : req.session.auth;
+  if (!auth?.role) return null;
+  if (headerId && String(auth.id) !== headerId) return null;
+  return auth;
+}
+
+// --- Login throttling (in-memory, per process) ---
+const LOGIN_WINDOW_MS = 15 * 60 * 1000;
+const LOGIN_LIMITS = { ip: 30, accountAndIp: 5, account: 20 };
+const loginFailures = new Map();
+// Unknown accounts still pay for one bcrypt compare so response time doesn't reveal which IDs exist.
+const DUMMY_PASSWORD_HASH = bcrypt.hashSync('not-a-real-password', 10);
+
+function loginKeys(req, account) {
+  const ip = req.ip || req.socket?.remoteAddress || 'unknown';
+  const acct = String(account || '').trim().toLowerCase().slice(0, 100);
+  return [
+    [`ip:${ip}`, LOGIN_LIMITS.ip],
+    [`acct-ip:${acct}|${ip}`, LOGIN_LIMITS.accountAndIp],
+    [`acct:${acct}`, LOGIN_LIMITS.account],
+  ];
+}
+
+/**
+ * Returns true (and sends 429) when this request is over a login limit. Otherwise it counts
+ * this attempt immediately (so parallel bursts can't slip past); a successful login refunds it.
+ */
+function loginBlocked(req, res, account) {
+  const now = Date.now();
+  const keys = loginKeys(req, account);
+  let retryAfter = 0;
+  for (const [key, limit] of keys) {
+    const entry = loginFailures.get(key);
+    if (entry && entry.resetAt > now && entry.count >= limit) {
+      retryAfter = Math.max(retryAfter, Math.ceil((entry.resetAt - now) / 1000));
     }
   }
-
-  // 2. Session has a single auth — only use it if the role matches
-  if (req.session?.auth?.role) {
-    if (!headerRole || req.session.auth.role === headerRole) {
-      return req.session.auth;
-    }
-    // Roles differ — fall through to the header-based fallback below
+  if (retryAfter) {
+    res.set('Retry-After', String(retryAfter));
+    res.status(429).json({
+      success: false,
+      code: 'RATE_LIMITED',
+      message: `Too many failed login attempts. Try again in ${Math.ceil(retryAfter / 60)} minute(s).`,
+    });
+    return true;
   }
-
-  // 3. No matching session: trust the header (supports multi-portal tabs)
-  if (headerRole === 'superadmin' || headerRole === 'admin' || headerRole === 'user') {
-    return { role: headerRole, id: headerId || null };
+  for (const [key] of keys) {
+    const entry = loginFailures.get(key);
+    if (!entry || entry.resetAt <= now) loginFailures.set(key, { count: 1, resetAt: now + LOGIN_WINDOW_MS });
+    else entry.count += 1;
   }
-  return null;
+  return false;
+}
+
+/** A successful login: forget this account+IP and give back the attempt counted on arrival. */
+function clearLoginFailures(req, account) {
+  const keys = loginKeys(req, account);
+  loginFailures.delete(keys[1][0]);
+  for (const i of [0, 2]) {
+    const entry = loginFailures.get(keys[i][0]);
+    if (entry) entry.count = Math.max(0, entry.count - 1);
+  }
+}
+
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, entry] of loginFailures) if (entry.resetAt <= now) loginFailures.delete(key);
+}, 60 * 1000).unref();
+
+/** Verify a password for a possibly-missing account; always spends a bcrypt compare. */
+async function verifyPasswordOrDummy(plain, account) {
+  if (!account) {
+    await bcrypt.compare(String(plain || ''), DUMMY_PASSWORD_HASH);
+    return false;
+  }
+  return verifyPassword(plain, account.password);
 }
 
 function requireAuth(...roles) {
@@ -557,13 +619,19 @@ async function findUserByLoginId(id) {
   return User.findOne({ $or: queryOr });
 }
 
+// Issues a fresh session id on every login (session-fixation defence) while keeping
+// the other roles already signed in from this browser.
 function setAuthSession(req, auth) {
-  if (req.session) {
-    if (!req.session.auths) req.session.auths = {};
-    req.session.auths[auth.role] = auth;
-    req.session.auth = auth;
-  }
-  return auth;
+  return new Promise((resolve, reject) => {
+    if (!req.session) return resolve(auth);
+    const previous = req.session.auths || {};
+    req.session.regenerate((err) => {
+      if (err) return reject(err);
+      req.session.auths = { ...previous, [auth.role]: auth };
+      req.session.auth = auth;
+      resolve(auth);
+    });
+  });
 }
 
 // Routes
@@ -576,17 +644,16 @@ app.post('/api/login', async (req, res) => {
     return res.status(400).json({ success: false, message: 'Employee ID / username and password are required' });
   }
 
+  if (loginBlocked(req, res, loginId)) return;
+
   try {
     const user = await findUserByLoginId(loginId);
-    if (!user) {
+    if (!(await verifyPasswordOrDummy(pass, user))) {
       return res.status(401).json({ success: false, message: 'Invalid employee ID or password' });
     }
 
-    if (!(await verifyPassword(pass, user.password))) {
-      return res.status(401).json({ success: false, message: 'Invalid employee ID or password' });
-    }
-
-    const auth = setAuthSession(req, buildAuthPayload('user', user));
+    clearLoginFailures(req, loginId);
+    const auth = await setAuthSession(req, buildAuthPayload('user', user));
     return res.status(200).json({
       success: true,
       message: 'Login successful',
@@ -1202,34 +1269,37 @@ function applyDoctorImportFields(doctor, row, { ownerUser }) {
 }
 
 // --- Auth for staff pages ---
-app.post('/api/superadmin/login', (req, res) => {
+async function superadminLogin(req, res) {
   const { username, password } = req.body || {};
-  if (String(username || '').trim() === SUPERADMIN_USERNAME && String(password || '') === SUPERADMIN_PASSWORD) {
-    const auth = setAuthSession(req, buildAuthPayload('superadmin'));
-    return res.status(200).json({ success: true, message: 'Superadmin login successful', auth });
+  const loginId = String(username || '').trim();
+  if (loginBlocked(req, res, `superadmin:${loginId}`)) return;
+  try {
+    if (loginId === SUPERADMIN_USERNAME && String(password || '') === SUPERADMIN_PASSWORD) {
+      clearLoginFailures(req, `superadmin:${loginId}`);
+      const auth = await setAuthSession(req, buildAuthPayload('superadmin'));
+      return res.status(200).json({ success: true, message: 'Superadmin login successful', auth });
+    }
+    return res.status(401).json({ success: false, message: 'Invalid superadmin credentials' });
+  } catch (error) {
+    console.error('Superadmin login error:', error);
+    return res.status(500).json({ success: false, message: 'Server error during login' });
   }
-  return res.status(401).json({ success: false, message: 'Invalid superadmin credentials' });
-});
-
-app.post('/api/super-admin/login', (req, res) => {
-  const { username, password } = req.body || {};
-  if (String(username || '').trim() === SUPERADMIN_USERNAME && String(password || '') === SUPERADMIN_PASSWORD) {
-    const auth = setAuthSession(req, buildAuthPayload('superadmin'));
-    return res.status(200).json({ success: true, message: 'Superadmin login successful', auth });
-  }
-  return res.status(401).json({ success: false, message: 'Invalid superadmin credentials' });
-});
+}
+app.post('/api/superadmin/login', superadminLogin);
+app.post('/api/super-admin/login', superadminLogin);
 
 app.post('/api/admin/login', async (req, res) => {
   const { username, password } = req.body || {};
   const loginId = String(username || '').trim();
   const pass = String(password || '');
+  if (loginBlocked(req, res, `admin:${loginId}`)) return;
   try {
     const admin = await findAdminByUsername(loginId);
-    if (!admin || !(await verifyPassword(pass, admin.password))) {
+    if (!(await verifyPasswordOrDummy(pass, admin))) {
       return res.status(401).json({ success: false, message: 'Invalid admin credentials' });
     }
-    const auth = setAuthSession(req, buildAuthPayload('admin', admin));
+    clearLoginFailures(req, `admin:${loginId}`);
+    const auth = await setAuthSession(req, buildAuthPayload('admin', admin));
     return res.status(200).json({ success: true, message: 'Admin login successful', auth });
   } catch (error) {
     console.error('Admin login error:', error);
@@ -1244,10 +1314,12 @@ app.post('/api/userpanel/login', async (req, res) => {
   if (!loginId || !pass) {
     return res.status(400).json({ success: false, message: 'Username / employee ID and password are required' });
   }
+  if (loginBlocked(req, res, loginId)) return;
   try {
     const user = await findUserByLoginId(loginId);
-    if (user && await verifyPassword(pass, user.password)) {
-      const auth = setAuthSession(req, buildAuthPayload('user', user));
+    if (await verifyPasswordOrDummy(pass, user)) {
+      clearLoginFailures(req, loginId);
+      const auth = await setAuthSession(req, buildAuthPayload('user', user));
       return res.status(200).json({ success: true, message: 'Login successful', auth });
     }
     return res.status(401).json({ success: false, message: 'Invalid credentials' });
@@ -1268,7 +1340,59 @@ app.get('/api/doctor-fields', async (req, res) => {
 });
 
 app.post('/api/superadmin/doctor-fields', requireAuth('superadmin'), async (req, res) => {
-  res.status(403).json({ success: false, message: 'Adding new fields is disabled. You can only edit the standard fields.' });
+  try {
+    const key = String(req.body?.key || '').trim();
+    const label = String(req.body?.label || '').trim();
+    const type = String(req.body?.type || 'text').trim() || 'text';
+    const required = Boolean(req.body?.required);
+    const enabled = req.body?.enabled !== false;
+
+    if (!key) return res.status(400).json({ success: false, message: 'Key is required' });
+    if (!/^[a-zA-Z][a-zA-Z0-9_]*$/.test(key)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Key must start with a letter and only contain letters, numbers, or underscores',
+      });
+    }
+    if (!label) return res.status(400).json({ success: false, message: 'Label is required' });
+
+    const existing = await DoctorField.findOne({ key });
+    if (existing) {
+      return res.status(409).json({ success: false, message: 'A field with this key already exists' });
+    }
+
+    const logoField = await DoctorField.findOne({ key: 'logo' });
+    const maxBeforeLogo = await DoctorField.find({
+      key: { $nin: ['logo', 'photo'] },
+      type: { $ne: 'file' },
+    })
+      .sort({ order: -1 })
+      .limit(1);
+
+    const nextOrder = (maxBeforeLogo[0]?.order || 0) + 1;
+    if (logoField && Number(logoField.order) <= nextOrder) {
+      logoField.order = nextOrder + 1;
+      await logoField.save();
+    }
+
+    const field = await DoctorField.create({
+      key,
+      label,
+      type,
+      required,
+      enabled,
+      isStandard: false,
+      order: nextOrder,
+    });
+
+    return res.status(201).json({ success: true, field });
+  } catch (err) {
+    console.error('Error creating doctor field:', err);
+    if (err?.code === 11000) {
+      return res.status(409).json({ success: false, message: 'A field with this key already exists' });
+    }
+    return res.status(500).json({ success: false, message: err.message || 'Failed to create field' });
+  }
 });
 
 app.put('/api/superadmin/doctor-fields/:id', requireAuth('superadmin'), async (req, res) => {
@@ -1285,7 +1409,6 @@ app.delete('/api/superadmin/doctor-fields/:id', requireAuth('superadmin'), async
   try {
     const field = await DoctorField.findById(req.params.id);
     if (!field) return res.status(404).json({ success: false, message: 'Field not found' });
-    if (field.isStandard) return res.status(400).json({ success: false, message: 'Cannot delete a standard field, but you can disable it.' });
     await field.deleteOne();
     res.json({ success: true });
   } catch (err) {
@@ -2726,17 +2849,16 @@ const startServer = async () => {
         { key: 'clinicName', label: 'Clinic Name', type: 'text', required: true, isStandard: true, enabled: true, order: 2 },
         { key: 'doctorDegree', label: 'Degree', type: 'text', required: false, isStandard: true, enabled: true, order: 3 },
         { key: 'contactnumber', label: 'Contact Number', type: 'tel', required: true, isStandard: true, enabled: true, order: 4 },
-        { key: 'logo', label: 'Doctor Photo / Logo', type: 'file', required: false, isStandard: true, enabled: true, order: 5 },
+        { key: 'logo', label: 'Doctor Photo / Logo', type: 'file', required: false, isStandard: true, enabled: true, order: 100 },
       ]);
     } else {
       const logoFieldExists = await DoctorField.findOne({ key: 'logo' });
       if (!logoFieldExists) {
-        await DoctorField.create({ key: 'logo', label: 'Doctor Photo / Logo', type: 'file', required: false, isStandard: true, enabled: true, order: 5 });
-      }
-
-      const removed = await DoctorField.deleteMany({ isStandard: false });
-      if (removed.deletedCount > 0) {
-        console.log(`Removed ${removed.deletedCount} non-standard doctor fields to enforce strict standard fields limit.`);
+        await DoctorField.create({ key: 'logo', label: 'Doctor Photo / Logo', type: 'file', required: false, isStandard: true, enabled: true, order: 100 });
+      } else if (Number(logoFieldExists.order) < 50) {
+        // Keep logo after custom fields added between contact and logo
+        logoFieldExists.order = 100;
+        await logoFieldExists.save();
       }
     }
 
