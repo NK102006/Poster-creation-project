@@ -3,6 +3,7 @@ import DataTable from 'datatables.net-dt';
 import 'datatables.net-dt/css/dataTables.dataTables.css';
 import { apiRequest } from '../lib/apiClient';
 import BottomSheetSelect from '../components/BottomSheetSelect';
+import Datepicker from '../components/DatePicker';
 import styles from './AdminPortal.module.css';
 
 const columns = [
@@ -18,6 +19,11 @@ const columns = [
     title: 'Upload Date',
     data: 'uploaddate',
     render: (data) => data ? new Date(data).toLocaleDateString() : '—',
+  },
+  {
+    title: 'Created Date',
+    data: 'createdAt',
+    render: (data) => (data ? new Date(data).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }) : '-'),
   },
   {
     title: 'Edit',
@@ -36,7 +42,7 @@ const columns = [
     render: () => `<button type="button" class="${styles.deleteBtn}" data-action="delete">Delete</button>`,
   },
   {
-    title: 'Enabled',
+    title: 'Active',
     data: 'enabled',
     orderable: false,
     className: styles.colActions,
@@ -376,13 +382,15 @@ export default function MasterPostersBoard({ onContextChange }) {
 
               <label className={styles.field}>
                 <span>Upload Date *</span>
-                <input
-                  type="date"
+                <Datepicker
+                  select="date"
                   value={form.uploaddate}
-                  onChange={e => {
-                    setForm(p => ({ ...p, uploaddate: e.target.value }));
+                  onChange={args => {
+                    const dateVal = Array.isArray(args.value) ? args.value[0] : args.value;
+                    setForm(p => ({ ...p, uploaddate: dateVal }));
                     if (formErrors.uploaddate) setFormErrors(p => ({ ...p, uploaddate: null }));
                   }}
+                  inputProps={{ placeholder: "Select Date" }}
                 />
                 {formErrors.uploaddate && <span className={styles.fieldError}>{formErrors.uploaddate}</span>}
               </label>
@@ -397,7 +405,7 @@ export default function MasterPostersBoard({ onContextChange }) {
                     />
                     <span className={styles.slider}></span>
                   </label>
-                  <span style={{ marginBottom: 0 }}>Enable this poster? (Uncheck to remove from form)</span>
+                  <span style={{ marginBottom: 0 }}>Active? (Uncheck to remove from form)</span>
                 </label>
               )}
 

@@ -1,11 +1,11 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import DataTable from 'datatables.net-dt';
 import 'datatables.net-dt/css/dataTables.dataTables.css';
 import { apiRequest } from '../lib/apiClient';
 import { canAccessPage, clearAuth, readAuth, writeAuth } from '../lib/authSession';
 import StaffLogin from './StaffLogin';
 import StudioShell from '../components/StudioShell';
-import DatePicker from '../components/DatePicker';
+import Datepicker from '../components/DatePicker';
 import { sanitizePhoneInput, validatePassword, validatePhoneNumber } from '../features/auth/validators';
 import styles from './AdminPortal.module.css';
 
@@ -66,6 +66,14 @@ export default function UserPanel({
   const tableRef = useRef(null);
   const dateFromRef = useRef('');
   const dateToRef = useRef('');
+
+  const inputProps = useMemo(
+    () => ({
+      className: 'md-mobile-picker-input',
+      placeholder: 'Choose date',
+    }),
+    []
+  );
 
   useEffect(() => {
     if (user) setAuth(user);
@@ -220,6 +228,15 @@ export default function UserPanel({
           render: (data) => data || '—',
         },
         {
+          title: 'Created',
+          data: 'createdAt',
+          render: (data) => {
+            if (!data) return '—';
+            const d = new Date(data);
+            return Number.isNaN(d.getTime()) ? '—' : d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+          },
+        },
+        {
           title: 'Contact Number',
           data: 'contactnumber',
           render: (data) => data || '—',
@@ -228,15 +245,6 @@ export default function UserPanel({
           title: 'Degree',
           data: 'doctorDegree',
           render: (data) => data || '—',
-        },
-        {
-          title: 'Created',
-          data: 'createdAt',
-          render: (data) => {
-            if (!data) return '—';
-            const d = new Date(data);
-            return Number.isNaN(d.getTime()) ? '—' : d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
-          },
         },
         {
           title: 'Edit',
@@ -388,28 +396,54 @@ export default function UserPanel({
   const handleExport = async () => {
     try {
       const doctors = await apiRequest('/admin/collections/doctors');
-      const filtered = (doctors || []).filter(doctorMatchesDateRange);
-      if (filtered.length === 0) {
-        setExportError('No data available to export');
-        setTimeout(() => setExportError(''), 3000);
-        return;
-      }
+      const list = doctors || [];
       const rows = [
-        ['Name', 'Degree', 'Clinic / Hospital', 'Contact Number'],
-        ...filtered.map((doctor) => [
+        ['Name', 'Degree', 'Clinic / Hospital', 'Contact Number', 'Posters Made', 'Downloads'],
+      ];
+
+      for (const doctor of list) {
+        if (!doctorMatchesDateRange(doctor)) continue;
+        const activity = Array.isArray(doctor.posterActivity)
+          ? doctor.posterActivity
+          : (doctor.posters || []).map((p) => ({
+            createdAt: p.createdAt,
+            downloads: Number(p.downloads) || 0,
+          }));
+        let postersMade = doctor.postersMade || 0;
+        let downloadCount = doctor.downloadCount || 0;
+        if (dateFrom || dateTo) {
+          postersMade = 0;
+          downloadCount = 0;
+          for (const entry of activity) {
+            if (!dateInRange(entry.createdAt, dateFrom, dateTo)) continue;
+            postersMade += 1;
+            downloadCount += Number(entry.downloads) || 0;
+          }
+        }
+        rows.push([
           doctor.name || '',
           doctor.doctorDegree || '',
           doctor.clinicName || '',
           doctor.contactnumber || '',
-        ]),
-      ];
+          postersMade,
+          downloadCount,
+        ]);
+      }
+
+      if (rows.length === 1) {
+        setExportError('No data available to export');
+        setTimeout(() => setExportError(''), 3000);
+        return;
+      }
       const csv = rows
         .map((row) => row.map((value) => `"${String(value).replaceAll('"', '""')}"`).join(','))
         .join('\r\n');
       const url = URL.createObjectURL(new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' }));
       const link = document.createElement('a');
       link.href = url;
-      link.download = 'doctors.csv';
+      link.download = dateFrom || dateTo
+        ? `doctors_${dateFrom || 'start'}_${dateTo || 'end'}.csv`
+        : 'doctors.csv';
       link.click();
       URL.revokeObjectURL(url);
     } catch (err) {
@@ -441,40 +475,44 @@ export default function UserPanel({
   }
 
   const dateFilters = (
-    <div className={styles.dateFilter}>
-      <DatePicker
-        label="From"
-        value={dateFrom}
-        onChange={setDateFrom}
-        placeholder="From date"
-      />
-      <DatePicker
-        label="To"
-        value={dateTo}
-        onChange={setDateTo}
-        placeholder="To date"
-      />
-      {dateFrom || dateTo ? (
+    <div className={styles.dateFilter} style={{ alignItems: 'center', flexWrap: 'nowrap' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+        <div style={{ width: '230px' }}>
+          <Datepicker
+            controls={['calendar']}
+            select="range"
+            inputComponent="input"
+            inputProps={inputProps}
+            value={[dateFrom, dateTo]}
+            onChange={(args) => {
+              const [from, to] = Array.isArray(args?.value) ? args.value : ['', ''];
+              setDateFrom(from || '');
+              setDateTo(to || '');
+            }}
+          />
+        </div>
         <button
           type="button"
-          className={styles.secondaryBtn}
-          onClick={() => {
-            setDateFrom('');
-            setDateTo('');
-          }}
+          className={`${styles.clearDatesBtn} ${!(dateFrom || dateTo) ? styles.clearDatesBtnHidden : ''}`}
+        onClick={() => {
+          setDateFrom('');
+          setDateTo('');
+        }}
+          disabled={!(dateFrom || dateTo)}
+          aria-hidden={!(dateFrom || dateTo)}
         >
-          Clear dates
+          Clear
         </button>
-      ) : null}
+      </div>
     </div>
   );
 
   const listActions = (
     <>
-      <button type="button" className={styles.secondaryBtn} onClick={handleExport}>
+      <button type="button" className={`${styles.secondaryBtn} ${styles.toolbarBtn}`} onClick={handleExport}>
         Export
       </button>
-      <button type="button" className={styles.primaryBtn} onClick={openCreate}>
+      <button type="button" className={`${styles.primaryBtn} ${styles.toolbarBtn}`} onClick={openCreate}>
         + Add doctor
       </button>
     </>

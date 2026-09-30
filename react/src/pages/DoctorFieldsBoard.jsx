@@ -17,7 +17,7 @@ const columns = [
     render: () => `<button type="button" class="${styles.editBtn}" data-action="edit">Edit</button>`,
   },
   {
-    title: 'Enabled',
+    title: 'Active',
     data: 'enabled',
     orderable: false,
     className: styles.colActions,
@@ -27,6 +27,13 @@ const columns = [
         <span class="${styles.slider}"></span>
       </label>
     `
+  },
+  {
+    title: 'Delete',
+    data: null,
+    orderable: false,
+    className: styles.colActions,
+    render: () => `<button type="button" class="${styles.deleteBtn}" data-action="delete">Delete</button>`,
   },
 ];
 
@@ -98,6 +105,19 @@ export default function DoctorFieldsBoard({ onContextChange }) {
         setError(err.message || 'Could not toggle field');
         setLoading(false);
       }
+    },
+    delete: async (field) => {
+      if (!window.confirm(`Are you sure you want to delete the field "${field.label}"?`)) return;
+      try {
+        setLoading(true);
+        await apiRequest(`/superadmin/doctor-fields/${field._id}`, {
+          method: 'DELETE',
+        });
+        loadFields();
+      } catch (err) {
+        setError(err.message || 'Could not delete field');
+        setLoading(false);
+      }
     }
   };
 
@@ -133,6 +153,10 @@ export default function DoctorFieldsBoard({ onContextChange }) {
         event.preventDefault();
         event.stopPropagation();
         actionRef.current.toggleEnable(data);
+      } else if (action === 'delete') {
+        event.preventDefault();
+        event.stopPropagation();
+        actionRef.current.delete(data);
       }
     }
     host.addEventListener('click', onClick);
@@ -276,7 +300,7 @@ export default function DoctorFieldsBoard({ onContextChange }) {
                     />
                     <span className={styles.slider}></span>
                   </label>
-                  <span style={{ marginBottom: 0 }}>Enable this field? (Uncheck to remove from form)</span>
+                  <span style={{ marginBottom: 0 }}>Active? (Uncheck to remove from form)</span>
                 </label>
               )}
 

@@ -64,6 +64,11 @@ const columns = [
     render: (data) => `<span class="${styles.badge || ''}" style="display: inline-block; padding: 2px 10px; border-radius: 12px; background: rgba(31, 111, 159, 0.1); color: #1f6f9f; font-weight: 600; font-size: 13px;">${data ?? 0}</span>`,
   },
   {
+    title: 'Created Date',
+    data: 'createdAt',
+    render: (data) => (data ? new Date(data).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }) : '-'),
+  },
+  {
     title: 'Edit',
     data: null,
     orderable: false,
@@ -80,7 +85,7 @@ const columns = [
     render: () => `<button type="button" class="${styles.deleteBtn}" data-action="delete">Delete</button>`,
   },
   {
-    title: 'Enabled', 
+    title: 'Active', 
     data: 'enabled',
     orderable: false,
     className: styles.colActions,
@@ -508,7 +513,7 @@ export default function PosterThemesBoard({ onContextChange, onNavigateToPosters
                     />
                     <span className={styles.slider}></span>
                   </label>
-                  <span style={{ marginBottom: 0 }}>Enable this theme? (Uncheck to remove from form)</span>
+                  <span style={{ marginBottom: 0 }}>Active? (Uncheck to remove from form)</span>
                 </label>
               )}
 

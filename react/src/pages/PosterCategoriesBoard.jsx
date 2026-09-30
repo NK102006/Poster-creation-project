@@ -38,7 +38,7 @@ const columns = [
     render: () => `<button type="button" class="${styles.deleteBtn}" data-action="delete">Delete</button>`,
   },
   {
-    title: 'Enabled', 
+    title: 'Active', 
     data: 'enabled',
     orderable: false,
     className: styles.colActions,
@@ -323,7 +323,7 @@ export default function PosterCategoriesBoard({ onContextChange, onNavigateToPos
                     />
                     <span className={styles.slider}></span>
                   </label>
-                  <span style={{ marginBottom: 0 }}>Enable this category? (Uncheck to remove from form)</span>
+                  <span style={{ marginBottom: 0 }}>Active? (Uncheck to remove from form)</span>
                 </label>
               )}
 

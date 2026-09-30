@@ -259,6 +259,15 @@
   }
 
   .mainWide {
-    padding: 8px 16px 40px;
+    padding: 6px 12px 32px;
+  }
+
+  .subheaderWide {
+    padding: 10px 12px 6px;
+    gap: 8px;
+  }
+
+  .subheaderLeft {
+    gap: 8px;
   }
 }
