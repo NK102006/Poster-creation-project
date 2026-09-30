@@ -264,37 +264,45 @@ function loginKeys(req, account) {
   ];
 }
 
-/** Returns true (and sends 429) when this request is over a login-failure limit. */
+/**
+ * Returns true (and sends 429) when this request is over a login limit. Otherwise it counts
+ * this attempt immediately (so parallel bursts can't slip past); a successful login refunds it.
+ */
 function loginBlocked(req, res, account) {
   const now = Date.now();
+  const keys = loginKeys(req, account);
   let retryAfter = 0;
-  for (const [key, limit] of loginKeys(req, account)) {
+  for (const [key, limit] of keys) {
     const entry = loginFailures.get(key);
     if (entry && entry.resetAt > now && entry.count >= limit) {
       retryAfter = Math.max(retryAfter, Math.ceil((entry.resetAt - now) / 1000));
     }
   }
-  if (!retryAfter) return false;
-  res.set('Retry-After', String(retryAfter));
-  res.status(429).json({
-    success: false,
-    code: 'RATE_LIMITED',
-    message: `Too many failed login attempts. Try again in ${Math.ceil(retryAfter / 60)} minute(s).`,
-  });
-  return true;
-}
-
-function recordLoginFailure(req, account) {
-  const now = Date.now();
-  for (const [key] of loginKeys(req, account)) {
+  if (retryAfter) {
+    res.set('Retry-After', String(retryAfter));
+    res.status(429).json({
+      success: false,
+      code: 'RATE_LIMITED',
+      message: `Too many failed login attempts. Try again in ${Math.ceil(retryAfter / 60)} minute(s).`,
+    });
+    return true;
+  }
+  for (const [key] of keys) {
     const entry = loginFailures.get(key);
     if (!entry || entry.resetAt <= now) loginFailures.set(key, { count: 1, resetAt: now + LOGIN_WINDOW_MS });
     else entry.count += 1;
   }
+  return false;
 }
 
+/** A successful login: forget this account+IP and give back the attempt counted on arrival. */
 function clearLoginFailures(req, account) {
-  loginFailures.delete(loginKeys(req, account)[1][0]);
+  const keys = loginKeys(req, account);
+  loginFailures.delete(keys[1][0]);
+  for (const i of [0, 2]) {
+    const entry = loginFailures.get(keys[i][0]);
+    if (entry) entry.count = Math.max(0, entry.count - 1);
+  }
 }
 
 setInterval(() => {
@@ -615,7 +623,6 @@ app.post('/api/login', async (req, res) => {
   try {
     const user = await findUserByLoginId(loginId);
     if (!(await verifyPasswordOrDummy(pass, user))) {
-      recordLoginFailure(req, loginId);
       return res.status(401).json({ success: false, message: 'Invalid employee ID or password' });
     }
 
@@ -1248,7 +1255,6 @@ async function superadminLogin(req, res) {
       const auth = await setAuthSession(req, buildAuthPayload('superadmin'));
       return res.status(200).json({ success: true, message: 'Superadmin login successful', auth });
     }
-    recordLoginFailure(req, `superadmin:${loginId}`);
     return res.status(401).json({ success: false, message: 'Invalid superadmin credentials' });
   } catch (error) {
     console.error('Superadmin login error:', error);
@@ -1266,7 +1272,6 @@ app.post('/api/admin/login', async (req, res) => {
   try {
     const admin = await findAdminByUsername(loginId);
     if (!(await verifyPasswordOrDummy(pass, admin))) {
-      recordLoginFailure(req, `admin:${loginId}`);
       return res.status(401).json({ success: false, message: 'Invalid admin credentials' });
     }
     clearLoginFailures(req, `admin:${loginId}`);
@@ -1293,7 +1298,6 @@ app.post('/api/userpanel/login', async (req, res) => {
       const auth = await setAuthSession(req, buildAuthPayload('user', user));
       return res.status(200).json({ success: true, message: 'Login successful', auth });
     }
-    recordLoginFailure(req, loginId);
     return res.status(401).json({ success: false, message: 'Invalid credentials' });
   } catch (error) {
     console.error('Userpanel login error:', error);
