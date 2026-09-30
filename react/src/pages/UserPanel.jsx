@@ -7,6 +7,7 @@ import StaffLogin from './StaffLogin';
 import StudioShell from '../components/StudioShell';
 import Datepicker from '../components/DatePicker';
 import { sanitizePhoneInput, validatePassword, validatePhoneNumber } from '../features/auth/validators';
+import { enabledFormFields, isFullWidthDoctorField } from '../lib/doctorFields';
 import styles from './AdminPortal.module.css';
 
 function getItemId(item) {
@@ -529,13 +530,17 @@ export default function UserPanel({
         <div className={`${styles.modalOverlay} ${closingModal ? styles.closing : ''}`} onClick={closeModal}>
           <div className={styles.modal} role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()}>
             <h2 className={styles.modalTitle}>{editingItem ? 'Edit doctor' : 'Add doctor'}</h2>
-            <form onSubmit={handleSave} className={styles.form}>
-              {doctorFields.filter(f => f.enabled && f.key !== 'logo' && f.key !== 'photo' && f.type !== 'file').map((field) => {
+            <form onSubmit={handleSave} className={`${styles.form} ${styles.doctorFormGrid}`}>
+              {enabledFormFields(doctorFields).map((field) => {
                 const isDynamic = !field.isStandard;
                 const value = isDynamic ? (formData.dynamicFields?.[field.key] ?? '') : (formData[field.key] ?? '');
+                const fullWidth = isFullWidthDoctorField(field);
 
                 return (
-                  <label key={field.key} className={styles.field}>
+                  <label
+                    key={field.key}
+                    className={`${styles.field} ${fullWidth ? styles.detailFieldFull : ''}`}
+                  >
                     <span>{field.label} {field.required ? '*' : ''}</span>
                     <input
                       type={field.type || 'text'}
@@ -568,7 +573,7 @@ export default function UserPanel({
                   </label>
                 );
               })}
-              <div className={styles.modalActions}>
+              <div className={`${styles.modalActions} ${styles.detailFieldFull}`}>
                 <button type="button" className={styles.secondaryBtn} onClick={closeModal}>
                   Cancel
                 </button>

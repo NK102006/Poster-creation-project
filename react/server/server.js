@@ -1241,7 +1241,59 @@ app.get('/api/doctor-fields', async (req, res) => {
 });
 
 app.post('/api/superadmin/doctor-fields', requireAuth('superadmin'), async (req, res) => {
-  res.status(403).json({ success: false, message: 'Adding new fields is disabled. You can only edit the standard fields.' });
+  try {
+    const key = String(req.body?.key || '').trim();
+    const label = String(req.body?.label || '').trim();
+    const type = String(req.body?.type || 'text').trim() || 'text';
+    const required = Boolean(req.body?.required);
+    const enabled = req.body?.enabled !== false;
+
+    if (!key) return res.status(400).json({ success: false, message: 'Key is required' });
+    if (!/^[a-zA-Z][a-zA-Z0-9_]*$/.test(key)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Key must start with a letter and only contain letters, numbers, or underscores',
+      });
+    }
+    if (!label) return res.status(400).json({ success: false, message: 'Label is required' });
+
+    const existing = await DoctorField.findOne({ key });
+    if (existing) {
+      return res.status(409).json({ success: false, message: 'A field with this key already exists' });
+    }
+
+    const logoField = await DoctorField.findOne({ key: 'logo' });
+    const maxBeforeLogo = await DoctorField.find({
+      key: { $nin: ['logo', 'photo'] },
+      type: { $ne: 'file' },
+    })
+      .sort({ order: -1 })
+      .limit(1);
+
+    const nextOrder = (maxBeforeLogo[0]?.order || 0) + 1;
+    if (logoField && Number(logoField.order) <= nextOrder) {
+      logoField.order = nextOrder + 1;
+      await logoField.save();
+    }
+
+    const field = await DoctorField.create({
+      key,
+      label,
+      type,
+      required,
+      enabled,
+      isStandard: false,
+      order: nextOrder,
+    });
+
+    return res.status(201).json({ success: true, field });
+  } catch (err) {
+    console.error('Error creating doctor field:', err);
+    if (err?.code === 11000) {
+      return res.status(409).json({ success: false, message: 'A field with this key already exists' });
+    }
+    return res.status(500).json({ success: false, message: err.message || 'Failed to create field' });
+  }
 });
 
 app.put('/api/superadmin/doctor-fields/:id', requireAuth('superadmin'), async (req, res) => {
@@ -1258,7 +1310,6 @@ app.delete('/api/superadmin/doctor-fields/:id', requireAuth('superadmin'), async
   try {
     const field = await DoctorField.findById(req.params.id);
     if (!field) return res.status(404).json({ success: false, message: 'Field not found' });
-    if (field.isStandard) return res.status(400).json({ success: false, message: 'Cannot delete a standard field, but you can disable it.' });
     await field.deleteOne();
     res.json({ success: true });
   } catch (err) {
@@ -2699,17 +2750,16 @@ const startServer = async () => {
         { key: 'clinicName', label: 'Clinic Name', type: 'text', required: true, isStandard: true, enabled: true, order: 2 },
         { key: 'doctorDegree', label: 'Degree', type: 'text', required: false, isStandard: true, enabled: true, order: 3 },
         { key: 'contactnumber', label: 'Contact Number', type: 'tel', required: true, isStandard: true, enabled: true, order: 4 },
-        { key: 'logo', label: 'Doctor Photo / Logo', type: 'file', required: false, isStandard: true, enabled: true, order: 5 },
+        { key: 'logo', label: 'Doctor Photo / Logo', type: 'file', required: false, isStandard: true, enabled: true, order: 100 },
       ]);
     } else {
       const logoFieldExists = await DoctorField.findOne({ key: 'logo' });
       if (!logoFieldExists) {
-        await DoctorField.create({ key: 'logo', label: 'Doctor Photo / Logo', type: 'file', required: false, isStandard: true, enabled: true, order: 5 });
-      }
-
-      const removed = await DoctorField.deleteMany({ isStandard: false });
-      if (removed.deletedCount > 0) {
-        console.log(`Removed ${removed.deletedCount} non-standard doctor fields to enforce strict standard fields limit.`);
+        await DoctorField.create({ key: 'logo', label: 'Doctor Photo / Logo', type: 'file', required: false, isStandard: true, enabled: true, order: 100 });
+      } else if (Number(logoFieldExists.order) < 50) {
+        // Keep logo after custom fields added between contact and logo
+        logoFieldExists.order = 100;
+        await logoFieldExists.save();
       }
     }
 
