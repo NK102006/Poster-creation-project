@@ -210,9 +210,14 @@ const doctorColumns = [
   },
   createdAtColumn,
   {
-    title: 'Contact Number',
+    title: 'Whatsapp number',
     data: 'contactnumber',
     render: (data) => escapeHtml(data || '—'),
+  },
+  {
+    title: 'Status',
+    data: 'active',
+    render: (data) => escapeHtml(data === false ? 'Inactive' : 'Active'),
   },
   {
     title: 'Posters made',
@@ -297,6 +302,11 @@ export default function UsersDoctorsBoard({
   const [doctorFields, setDoctorFields] = useState([]);
   const [filterFrom, setFilterFrom] = useState('');
   const [filterTo, setFilterTo] = useState('');
+
+  useEffect(() => {
+    setFilterFrom('');
+    setFilterTo('');
+  }, [selectedUser, selectedDoctor]);
 
   const inputProps = useMemo(
     () => ({

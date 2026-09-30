@@ -500,7 +500,7 @@ export default function PosterGenerator({
                   return (
                     <div key={field.key} className={styles.formGroup}>
                       <label className={styles.formLabel} htmlFor={`step-doc-${field.key}`}>
-                        {field.label} {field.required ? <span className={styles.requiredStar}>*</span> : ''}
+                        {field.key === 'contactnumber' ? 'Whatsapp number' : field.label} {field.required ? <span className={styles.requiredStar}>*</span> : ''}
                       </label>
                       <input
                         id={`step-doc-${field.key}`}

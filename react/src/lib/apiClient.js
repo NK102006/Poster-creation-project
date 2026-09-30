@@ -37,6 +37,7 @@ export async function apiRequest(path, { method = 'GET', body, signal } = {}) {
   }
 
   if (!response.ok) {
+    // Let 401s throw ApiError as usual so components can show the error
     throw new ApiError(data?.message || 'Something went wrong. Please try again.', {
       status: response.status,
       code: data?.code,

@@ -235,19 +235,22 @@ function getAuthFromRequest(req) {
   const headerRole = String(req.headers['x-auth-role'] || '').trim();
   const headerId = String(req.headers['x-auth-id'] || '').trim();
 
+  // 1. Best case: session has an auths map — look up the exact requested role
   if (req.session?.auths && headerRole) {
     if (req.session.auths[headerRole]) {
       return req.session.auths[headerRole];
     }
   }
 
+  // 2. Session has a single auth — only use it if the role matches
   if (req.session?.auth?.role) {
-    if (headerRole && req.session.auth.role !== headerRole) {
-      return null;
+    if (!headerRole || req.session.auth.role === headerRole) {
+      return req.session.auth;
     }
-    return req.session.auth;
+    // Roles differ — fall through to the header-based fallback below
   }
 
+  // 3. No matching session: trust the header (supports multi-portal tabs)
   if (headerRole === 'superadmin' || headerRole === 'admin' || headerRole === 'user') {
     return { role: headerRole, id: headerId || null };
   }
@@ -255,13 +258,39 @@ function getAuthFromRequest(req) {
 }
 
 function requireAuth(...roles) {
-  return (req, res, next) => {
-    const auth = getAuthFromRequest(req);
-    if (!auth || (roles.length && !roles.includes(auth.role))) {
-      return res.status(401).json({ success: false, message: 'Unauthorized' });
+  return async (req, res, next) => {
+    try {
+      const auth = getAuthFromRequest(req);
+      if (!auth || (roles.length && !roles.includes(auth.role))) {
+        return res.status(401).json({ success: false, message: 'Unauthorized' });
+      }
+
+      if (auth.role === 'admin' && auth.id) {
+        const admin = await Admin.findById(auth.id);
+        if (!admin) {
+          if (req.session) {
+            if (req.session.auths) delete req.session.auths.admin;
+            if (req.session.auth?.role === 'admin') delete req.session.auth;
+          }
+          return res.status(401).json({ success: false, message: 'Unauthorized - Admin not found' });
+        }
+      } else if (auth.role === 'user' && auth.id) {
+        const user = await User.findById(auth.id);
+        if (!user) {
+          if (req.session) {
+            if (req.session.auths) delete req.session.auths.user;
+            if (req.session.auth?.role === 'user') delete req.session.auth;
+          }
+          return res.status(401).json({ success: false, message: 'Unauthorized - User not found' });
+        }
+      }
+
+      req.auth = auth;
+      next();
+    } catch (error) {
+      console.error('Auth check error:', error);
+      return res.status(500).json({ success: false, message: 'Server error during authentication' });
     }
-    req.auth = auth;
-    next();
   };
 }
 
@@ -605,10 +634,9 @@ app.get('/api/doctors/current', async (req, res) => {
 });
 
 // Get all doctors (searchable list)
-app.get('/api/doctors', async (req, res) => {
+app.get('/api/doctors', requireAuth('superadmin', 'admin', 'user'), async (req, res) => {
   try {
-    const auth = getAuthFromRequest(req);
-    if (!auth) return res.status(401).json({ message: 'Unauthorized' });
+    const auth = req.auth;
 
     const q = String(req.query.q || '').trim();
     const includeInactive = String(req.query.includeInactive || '') === 'true';
@@ -665,10 +693,9 @@ app.get('/api/doctors', async (req, res) => {
 });
 
 // Get one doctor with posters
-app.get('/api/doctors/:id', async (req, res) => {
+app.get('/api/doctors/:id', requireAuth('superadmin', 'admin', 'user'), async (req, res) => {
   try {
-    const auth = getAuthFromRequest(req);
-    if (!auth) return res.status(401).json({ message: 'Unauthorized' });
+    const auth = req.auth;
     const doctor = await Doctor.findById(req.params.id);
     if (!doctor || !(await canAccessDoctor(auth, doctor))) {
       return res.status(404).json({ message: 'Doctor not found' });

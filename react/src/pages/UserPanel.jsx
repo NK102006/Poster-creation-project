@@ -14,7 +14,7 @@ function getItemId(item) {
 }
 
 function formatLabel(key) {
-  if (key === 'contactnumber') return 'Contact Number';
+  if (key === 'contactnumber') return 'Whatsapp number';
   if (key === 'clinicName') return 'Clinic / Hospital';
   if (key === 'doctorDegree') return 'Degree';
   return key.charAt(0).toUpperCase() + key.slice(1);
@@ -59,7 +59,7 @@ export default function UserPanel({
   const [formFieldErrors, setFormFieldErrors] = useState({});
   const [doctorFields, setDoctorFields] = useState([]);
   const [saving, setSaving] = useState(false);
-  const [exportError, setExportError] = useState('');
+  const [listError, setListError] = useState('');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const hostRef = useRef(null);
@@ -125,6 +125,11 @@ export default function UserPanel({
 
   const openDoctor = (item) => {
     if (!onSelectDoctor) return false;
+    if (item.active === false) {
+      setListError('This doctor is inactive and cannot create new posters.');
+      setTimeout(() => setListError(''), 5000);
+      return true;
+    }
     const id = getItemId(item);
     onSelectDoctor({ ...item, id });
     return true;
@@ -148,10 +153,11 @@ export default function UserPanel({
     const removeRow = async (id) => {
       if (!window.confirm('Delete this record? This cannot be undone.')) return;
       try {
-        await apiRequest(`/admin/collections/doctors/${id}`, { method: 'DELETE' });
+        await apiRequest(`/userpanel/collections/doctors/${id}`, { method: 'DELETE' });
         reloadTable();
       } catch (err) {
-        alert('Delete failed: ' + err.message);
+        setListError('Delete failed: ' + err.message);
+        setTimeout(() => setListError(''), 5000);
       }
     };
 
@@ -197,7 +203,7 @@ export default function UserPanel({
         params.set('order[0][dir]', request.order?.[0]?.dir ?? 'desc');
         if (dateFromRef.current) params.set('from', dateFromRef.current);
         if (dateToRef.current) params.set('to', dateToRef.current);
-        apiRequest(`/admin/datatables/doctors?${params}`)
+        apiRequest(`/userpanel/datatables/doctors?${params}`)
           .then((result) => callback(result))
           .catch(() => callback({
             draw: request.draw,
@@ -247,6 +253,11 @@ export default function UserPanel({
           render: (data) => data || '—',
         },
         {
+          title: 'Status',
+          data: 'active',
+          render: (data) => (data === false ? 'Inactive' : 'Active'),
+        },
+        {
           title: 'Edit',
           data: null,
           orderable: false,
@@ -286,6 +297,10 @@ export default function UserPanel({
       event.stopPropagation();
       if (button?.getAttribute('data-action') === 'delete') {
         window.__userPanel?.removeRow(getItemId(rowData));
+        return;
+      }
+      if (button?.getAttribute('data-action') === 'edit') {
+        window.__userPanel?.openEdit(rowData);
         return;
       }
       if (window.__userPanel?.openDoctor?.(rowData)) return;
@@ -364,12 +379,12 @@ export default function UserPanel({
     try {
       const id = getItemId(editingItem);
       if (editingItem && id) {
-        await apiRequest(`/admin/collections/doctors/${id}`, {
+        await apiRequest(`/userpanel/collections/doctors/${id}`, {
           method: 'PUT',
           body: formData,
         });
       } else {
-        await apiRequest('/admin/collections/doctors', {
+        await apiRequest('/userpanel/collections/doctors', {
           method: 'POST',
           body: formData,
         });
@@ -377,7 +392,8 @@ export default function UserPanel({
       closeModal();
       reloadTable();
     } catch (err) {
-      alert('Save failed: ' + err.message);
+      setListError('Save failed: ' + err.message);
+      setTimeout(() => setListError(''), 5000);
     } finally {
       setSaving(false);
     }
@@ -395,7 +411,7 @@ export default function UserPanel({
 
   const handleExport = async () => {
     try {
-      const doctors = await apiRequest('/admin/collections/doctors');
+      const doctors = await apiRequest('/userpanel/collections/doctors');
       const list = doctors || [];
       const rows = [
         ['Name', 'Degree', 'Clinic / Hospital', 'Contact Number', 'Posters Made', 'Downloads'],
@@ -431,8 +447,8 @@ export default function UserPanel({
       }
 
       if (rows.length === 1) {
-        setExportError('No data available to export');
-        setTimeout(() => setExportError(''), 3000);
+        setListError('No data available to export');
+        setTimeout(() => setListError(''), 3000);
         return;
       }
       const csv = rows
@@ -447,7 +463,8 @@ export default function UserPanel({
       link.click();
       URL.revokeObjectURL(url);
     } catch (err) {
-      alert('Export failed: ' + err.message);
+      setListError('Export failed: ' + err.message);
+      setTimeout(() => setListError(''), 5000);
     }
   };
 
@@ -520,7 +537,7 @@ export default function UserPanel({
 
   const listBody = (
     <>
-      {exportError && <p className={styles.error} style={{ margin: '0 0 16px' }}>{exportError}</p>}
+      {listError && <p className={styles.error} style={{ margin: '0 0 16px' }}>{listError}</p>}
       <div className={styles.tableCard}>
         <div ref={hostRef} className={`${styles.dtHost} ${embedded ? styles.dtHostClickable : ''}`} />
       </div>
@@ -536,7 +553,7 @@ export default function UserPanel({
 
                 return (
                   <label key={field.key} className={styles.field}>
-                    <span>{field.label} {field.required ? '*' : ''}</span>
+                    <span>{field.key === 'contactnumber' ? 'Whatsapp number' : field.label} {field.required ? '*' : ''}</span>
                     <input
                       type={field.type || 'text'}
                       inputMode={field.key === 'contactnumber' ? 'numeric' : undefined}
