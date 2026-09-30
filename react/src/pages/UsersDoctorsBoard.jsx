@@ -11,34 +11,7 @@ import styles from './AdminPortal.module.css';
 const csvCell = (value) => `"${String(value ?? '').replaceAll('"', '""')}"`;
 const POSTER_FOLDERS = ['education', 'festival', 'video'];
 
-function statsForDateRange(doctor, fromStr, toStr) {
-  if (!fromStr && !toStr) {
-    return {
-      postersMade: doctor.postersMade || 0,
-      downloadCount: doctor.downloadCount || 0,
-    };
-  }
-  const activity = Array.isArray(doctor.posterActivity) ? doctor.posterActivity : [];
-  const from = fromStr ? new Date(fromStr) : null;
-  const to = toStr ? new Date(toStr) : null;
-  if (from) from.setHours(0, 0, 0, 0);
-  if (to) to.setHours(23, 59, 59, 999);
-
-  let postersMade = 0;
-  let downloadCount = 0;
-  for (const entry of activity) {
-    if (!entry?.createdAt) continue;
-    const time = new Date(entry.createdAt).getTime();
-    if (Number.isNaN(time)) continue;
-    if (from && time < from.getTime()) continue;
-    if (to && time > to.getTime()) continue;
-    postersMade += 1;
-    downloadCount += Number(entry.downloads) || 0;
-  }
-  return { postersMade, downloadCount };
-}
-
-function dateInRangePoster(value, fromStr, toStr) {
+function dateInRange(value, fromStr, toStr) {
   if (!fromStr && !toStr) return true;
   if (!value) return false;
   const time = new Date(value).getTime();
@@ -246,13 +219,6 @@ const doctorColumns = [
     data: 'postersMade',
     className: styles.statsCell,
     width: '110px',
-    render: (data) => String(data ?? 0),
-  },
-  {
-    title: 'Downloads',
-    data: 'downloadCount',
-    className: styles.statsCell,
-    width: '100px',
     render: (data) => String(data ?? 0),
   },
 ];
@@ -608,20 +574,14 @@ export default function UsersDoctorsBoard({
 
   const displayedDoctors = useMemo(() => {
     if (!filterFrom && !filterTo) return doctors;
-    return doctors.map((doc) => ({
-      ...doc,
-      ...statsForDateRange(doc, filterFrom, filterTo),
-    }));
+    return doctors.filter((doc) => dateInRange(doc.createdAt, filterFrom, filterTo));
   }, [doctors, filterFrom, filterTo]);
-
-  const selectedDoctorStats = useMemo(() => {
-    if (!selectedDoctor) return { postersMade: 0, downloadCount: 0 };
-    return statsForDateRange(selectedDoctor, filterFrom, filterTo);
-  }, [selectedDoctor, filterFrom, filterTo]);
 
   const statsDateFilter = (
     <div className={styles.statsDateFilter} style={{ alignItems: 'center', marginBottom: 0 }}>
-      <span className={styles.statsDateLabel}>Filter stats by date:</span>
+      <span className={styles.statsDateLabel}>
+        {selectedDoctor ? 'Filter posters by date:' : 'Filter doctors by date:'}
+      </span>
       <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
         <div style={{ width: '230px' }}>
           <Datepicker
@@ -640,10 +600,10 @@ export default function UsersDoctorsBoard({
         <button
           type="button"
           className={`${styles.statsDateClear} ${!(filterFrom || filterTo) ? styles.clearDatesBtnHidden : ''}`}
-        onClick={() => {
-          setFilterFrom('');
-          setFilterTo('');
-        }}
+          onClick={() => {
+            setFilterFrom('');
+            setFilterTo('');
+          }}
           disabled={!(filterFrom || filterTo)}
           aria-hidden={!(filterFrom || filterTo)}
         >
@@ -706,23 +666,18 @@ export default function UsersDoctorsBoard({
         : '';
       const rows = [[
         'ID', 'Name', 'Degree', 'Clinic / Hospital', 'Contact Number', 'Active',
-        'Posters Made', 'Downloads', 'Logo File', 'Education Files', 'Festival Files', 'Video Files',
+        'Posters Made', 'Logo File', 'Education Files', 'Festival Files', 'Video Files',
         ...(filterFrom || filterTo ? ['Date From', 'Date To'] : []),
       ]];
 
       let exportedAny = false;
       for (const doctor of details) {
-        const stats = statsForDateRange(doctor, filterFrom, filterTo);
-        const posters = (doctor.posters || []).filter((poster) => {
-          if (!filterFrom && !filterTo) return true;
-          return dateInRangePoster(poster.createdAt, filterFrom, filterTo);
-        });
-
-        if ((filterFrom || filterTo) && posters.length === 0 && stats.postersMade === 0) {
+        if ((filterFrom || filterTo) && !dateInRange(doctor.createdAt, filterFrom, filterTo)) {
           continue;
         }
         exportedAny = true;
 
+        const posters = doctor.posters || [];
         const safeName = `${doctor.id}-${safeFilePart(doctor.name, 'doctor')}`;
         const filesByKind = { education: [], festival: [], video: [] };
         const counts = { education: 0, festival: 0, video: 0 };
@@ -742,7 +697,7 @@ export default function UsersDoctorsBoard({
 
         rows.push([
           doctor.id, doctor.name, doctor.doctorDegree, doctor.clinicName, doctor.contactnumber,
-          doctor.active ? 'Active' : 'Inactive', stats.postersMade, stats.downloadCount,
+          doctor.active ? 'Active' : 'Inactive', doctor.postersMade || 0,
           logoFile, filesByKind.education.join('\n'), filesByKind.festival.join('\n'), filesByKind.video.join('\n'),
           ...(filterFrom || filterTo ? [filterFrom || '', filterTo || ''] : []),
         ]);
@@ -774,7 +729,11 @@ export default function UsersDoctorsBoard({
         ? `${adminName}’s employees`
         : 'Employees';
 
-  const doctorPosters = selectedDoctor?.posters || [];
+  const doctorPosters = useMemo(() => {
+    const posters = selectedDoctor?.posters || [];
+    if (!filterFrom && !filterTo) return posters;
+    return posters.filter((poster) => dateInRange(poster.createdAt, filterFrom, filterTo));
+  }, [selectedDoctor, filterFrom, filterTo]);
 
   const leftContent = (
     <>
@@ -956,8 +915,7 @@ export default function UsersDoctorsBoard({
                 f.isStandard ? selectedDoctor[f.key] : selectedDoctor.dynamicFields?.[f.key]
               ]),
               ['Status', selectedDoctor.active ? 'Active' : 'Inactive'],
-              ['Posters made', selectedDoctorStats.postersMade],
-              ['Downloads', selectedDoctorStats.downloadCount],
+              ['Posters made', selectedDoctor.postersMade ?? 0],
               ['Created', selectedDoctor.createdAt ? new Date(selectedDoctor.createdAt).toLocaleString() : '—'],
               ['Last updated', selectedDoctor.updatedAt ? new Date(selectedDoctor.updatedAt).toLocaleString() : '—'],
             ].map(([label, value]) => (
@@ -1050,7 +1008,9 @@ export default function UsersDoctorsBoard({
           </div>
           <div className={styles.posterOverlayBody}>
             {doctorPosters.length === 0 ? (
-              <p className={styles.posterEmpty}>No posters yet.</p>
+              <p className={styles.posterEmpty}>
+                {(filterFrom || filterTo) ? 'No posters in the selected date range.' : 'No posters yet.'}
+              </p>
             ) : (
               <div className={styles.posterGallery} style={posterGalleryStyle(doctorPosters.length)}>
                 {doctorPosters.map((poster, index) => {
