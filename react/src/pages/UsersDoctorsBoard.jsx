@@ -915,7 +915,7 @@ export default function UsersDoctorsBoard({
                 f.isStandard ? selectedDoctor[f.key] : selectedDoctor.dynamicFields?.[f.key]
               ]),
               ['Status', selectedDoctor.active ? 'Active' : 'Inactive'],
-              ['Posters made', selectedDoctor.postersMade ?? 0],
+              ['Posters made', doctorPosters.length],
               ['Created', selectedDoctor.createdAt ? new Date(selectedDoctor.createdAt).toLocaleString() : '—'],
               ['Last updated', selectedDoctor.updatedAt ? new Date(selectedDoctor.updatedAt).toLocaleString() : '—'],
             ].map(([label, value]) => (
