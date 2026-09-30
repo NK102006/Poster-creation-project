@@ -3,6 +3,7 @@ import { mapThemeToRiskFactor, themePageStyle } from '../lib/posterExport';
 import { apiRequest } from '../lib/apiClient';
 import RiskFactorPoster from './RiskFactorPoster';
 import PosterFooterOverlay from './PosterFooterOverlay';
+import BottomSheetSelect from './BottomSheetSelect';
 import { fitPosterScale } from '../lib/posterFooterLayout';
 import styles from './PosterCarousel.module.css';
 
@@ -533,20 +534,21 @@ export default function PosterCarousel({
       </div>
 
       <div className={styles.categoryRow} style={{ justifyContent: 'flex-end' }}>
-        <select
-          className={`${styles.categoryBtn} ${styles.monthSelect}`}
-          value={selectedMonth}
-          onChange={(e) => {
-            setSelectedMonth(e.target.value);
-            onIndexChange?.(0);
-          }}
-          style={{ outline: 'none' }}
-        >
-          <option value="" style={{ color: '#000' }}>Select</option>
-          {['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'].map(m => (
-            <option key={m} value={m} style={{ color: '#000' }}>{m}</option>
-          ))}
-        </select>
+        <div style={{ width: '150px' }}>
+          <BottomSheetSelect
+            className={styles.compactDropdown}
+            value={selectedMonth}
+            onChange={(e) => {
+              setSelectedMonth(e.target.value);
+              onIndexChange?.(0);
+            }}
+          options={[
+            { value: '', label: 'Select Month' },
+            ...['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'].map(m => ({ value: m, label: m }))
+          ]}
+          placeholder="Select Month"
+        />
+        </div>
       </div>
 
 
