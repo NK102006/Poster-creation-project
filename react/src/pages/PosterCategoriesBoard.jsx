@@ -145,7 +145,7 @@ export default function PosterCategoriesBoard({ onContextChange, onNavigateToPos
       lengthMenu: [5, 10, 25, 50],
       order: [[0, 'asc']],
       autoWidth: false,
-      scrollX: true,
+
       layout: {
         topStart: 'pageLength',
         topEnd: 'search',

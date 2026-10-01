@@ -1,5 +1,6 @@
 .shell {
   min-height: 100vh;
+  min-height: 100dvh;
   display: grid;
   grid-template-columns: 240px 1fr;
   background: var(--color-bg);
@@ -14,6 +15,7 @@
 /* —— Login —— */
 .loginPage {
   min-height: 100vh;
+  min-height: 100dvh;
   display: grid;
   place-items: center;
   padding: 24px;
@@ -1072,6 +1074,10 @@
   animation: overlayFadeIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
+:global(body:has(div[class*="modalOverlay"])) {
+  overflow: hidden;
+}
+
 .modalOverlay.closing {
   animation: overlayFadeOut 0.4s ease-in forwards;
   pointer-events: none;
@@ -1080,6 +1086,7 @@
 .modal {
   width: min(520px, 100%);
   max-height: calc(100vh - 40px);
+  max-height: calc(100dvh - 40px);
   overflow-y: auto;
   background: #fff;
   border-radius: 16px;
@@ -1135,10 +1142,11 @@
   color: var(--color-text-muted);
 }
 
-.field input,
+.field input:not([type="checkbox"]),
 .field select,
-.loginCard input {
+.loginCard input:not([type="checkbox"]) {
   box-sizing: border-box;
+  width: 100%;
   border: 1px solid var(--color-border);
   border-radius: 12px;
   padding: 11px 12px;
@@ -1149,9 +1157,9 @@
   background: #fff;
 }
 
-.field input:focus,
+.field input:not([type="checkbox"]):focus,
 .field select:focus,
-.loginCard input:focus {
+.loginCard input:not([type="checkbox"]):focus {
   outline: none;
   box-shadow: var(--focus-ring);
   border-color: rgba(74, 159, 212, 0.55);

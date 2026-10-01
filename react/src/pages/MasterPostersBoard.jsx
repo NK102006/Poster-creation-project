@@ -174,7 +174,7 @@ export default function MasterPostersBoard({ onContextChange }) {
       lengthMenu: [5, 10, 25, 50],
       order: [[4, 'desc']],
       autoWidth: false,
-      scrollX: true,
+
       layout: {
         topStart: 'pageLength',
         topEnd: 'search',

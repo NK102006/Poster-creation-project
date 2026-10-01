@@ -454,9 +454,11 @@ export default function DoctorManagePage({
 
             <div className={styles.footerActions}>
               <div className={styles.footerLeft}>
-                <button type="button" className={styles.secondaryBtn} onClick={handleToggleActive}>
-                  {isInactive ? 'Activate' : 'Deactivate'}
-                </button>
+                {(user?.role === 'admin' || user?.role === 'superadmin') && (
+                  <button type="button" className={styles.secondaryBtn} onClick={handleToggleActive}>
+                    {isInactive ? 'Activate' : 'Deactivate'}
+                  </button>
+                )}
                 <button type="button" className={styles.dangerBtn} onClick={handleRemove}>
                   Remove
                 </button>

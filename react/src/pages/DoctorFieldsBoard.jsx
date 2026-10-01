@@ -145,7 +145,7 @@ export default function DoctorFieldsBoard({ onContextChange }) {
       columns,
       pageLength: 10,
       autoWidth: false,
-      scrollX: true,
+
     });
 
     function onClick(event) {
@@ -245,7 +245,7 @@ export default function DoctorFieldsBoard({ onContextChange }) {
         </button>
       </div>
 
-      {error && <p className={styles.error}>{error}</p>}
+      {error && <p className={styles.error} style={{ marginBottom: '16px' }}>{error}</p>}
       {loading && <p className={styles.statusText}>Loading…</p>}
 
       <div className={styles.tableCard}>

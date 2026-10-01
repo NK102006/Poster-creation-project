@@ -198,7 +198,7 @@ export default function PosterThemesBoard({ onContextChange, onNavigateToPosters
       pageLength: 10,
       lengthMenu: [5, 10, 25, 50],
       autoWidth: false,
-      scrollX: true,
+
       layout: {
         topStart: 'pageLength',
         topEnd: 'search',

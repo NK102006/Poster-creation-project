@@ -26,7 +26,7 @@ const dataTableOptions = {
   paging: true,
   pagingType: 'simple_numbers',
   autoWidth: false,
-  scrollX: true,
+
   order: [[0, 'desc']],
   layout: {
     topStart: 'pageLength',

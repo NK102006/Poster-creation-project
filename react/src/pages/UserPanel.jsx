@@ -162,7 +162,22 @@ export default function UserPanel({
       }
     };
 
-    window.__userPanel = { openEdit, removeRow, openDoctor };
+    const toggleActive = async (item) => {
+      try {
+        const id = getItemId(item);
+        const nextActive = item.active === false ? true : false;
+        await apiRequest(`/api/doctors/${id}/status`, {
+          method: 'PATCH',
+          body: { active: nextActive }
+        });
+        reloadTable();
+      } catch (err) {
+        setListError('Failed to update status: ' + err.message);
+        setTimeout(() => setListError(''), 5000);
+      }
+    };
+
+    window.__userPanel = { openEdit, removeRow, toggleActive, openDoctor };
     return () => {
       delete window.__userPanel;
     };
@@ -186,7 +201,6 @@ export default function UserPanel({
       paging: true,
       pagingType: 'simple_numbers',
       autoWidth: false,
-      scrollX: true,
       order: [[0, 'desc']],
       layout: {
         topStart: 'pageLength',
@@ -256,7 +270,13 @@ export default function UserPanel({
         {
           title: 'Status',
           data: 'active',
-          render: (data) => (data === false ? 'Inactive' : 'Active'),
+          className: styles.colActions,
+          render: (data) => `
+            <label class="${styles.switch}">
+              <input type="checkbox" data-action="toggle-active" ${data !== false ? 'checked' : ''} />
+              <span class="${styles.slider}"></span>
+            </label>
+          `,
         },
         {
           title: 'Edit',
@@ -290,20 +310,36 @@ export default function UserPanel({
 
     function onClick(event) {
       const button = event.target.closest('button[data-action]');
+      const checkbox = event.target.closest('input[data-action]');
+      const actionEl = button || checkbox;
+      
       const row = event.target.closest('tbody tr');
       if (!row) return;
       const rowData = table.row(row).data();
       if (!rowData) return;
+      
+      if (actionEl) {
+        event.stopPropagation();
+        const action = actionEl.getAttribute('data-action');
+        if (action === 'delete') {
+          event.preventDefault();
+          window.__userPanel?.removeRow(getItemId(rowData));
+          return;
+        }
+        if (action === 'edit') {
+          event.preventDefault();
+          window.__userPanel?.openEdit(rowData);
+          return;
+        }
+        if (action === 'toggle-active') {
+          // let the checkbox toggle visually but we'll fetch
+          window.__userPanel?.toggleActive(rowData);
+          return;
+        }
+      }
+      
       event.preventDefault();
       event.stopPropagation();
-      if (button?.getAttribute('data-action') === 'delete') {
-        window.__userPanel?.removeRow(getItemId(rowData));
-        return;
-      }
-      if (button?.getAttribute('data-action') === 'edit') {
-        window.__userPanel?.openEdit(rowData);
-        return;
-      }
       if (window.__userPanel?.openDoctor?.(rowData)) return;
       window.__userPanel?.openEdit(rowData);
     }

@@ -125,7 +125,7 @@ const dataTableOptions = {
   paging: true,
   pagingType: 'simple_numbers',
   autoWidth: false,
-  scrollX: true,
+
   order: [[0, 'desc']],
   layout: {
     topStart: 'pageLength',
@@ -218,7 +218,13 @@ const doctorColumns = [
   {
     title: 'Status',
     data: 'active',
-    render: (data) => escapeHtml(data === false ? 'Inactive' : 'Active'),
+    className: styles.colActions,
+    render: (data) => `
+      <label class="${styles.switch}">
+        <input type="checkbox" data-action="toggle-active" ${data !== false ? 'checked' : ''} />
+        <span class="${styles.slider}"></span>
+      </label>
+    `,
   },
   {
     title: 'Posters made',
@@ -249,16 +255,26 @@ function useDataTable({ enabled, data, columns, onRowAction }) {
 
     function onClick(event) {
       const button = event.target.closest('button[data-action]');
+      const checkbox = event.target.closest('input[data-action]');
+      const actionEl = button || checkbox;
+      
       const row = event.target.closest('tbody tr');
       if (!row) return;
       const rowData = table.row(row).data();
       if (!rowData) return;
-      event.preventDefault();
-      event.stopPropagation();
-      if (button) {
-        actionRef.current?.(button.getAttribute('data-action'), rowData);
+      
+      if (actionEl) {
+        event.stopPropagation();
+        const action = actionEl.getAttribute('data-action');
+        if (action === 'delete' || action === 'delete-user' || action === 'edit-user') {
+          event.preventDefault();
+        }
+        actionRef.current?.(action, rowData);
         return;
       }
+      
+      event.preventDefault();
+      event.stopPropagation();
       actionRef.current?.('open-row', rowData);
     }
 
@@ -628,8 +644,21 @@ export default function UsersDoctorsBoard({
     enabled: Boolean(selectedUser) && !selectedDoctor,
     data: displayedDoctors,
     columns: doctorColumns,
-    onRowAction: (action, doctor) => {
+    onRowAction: async (action, doctor) => {
       if (!doctor || action === 'edit-user' || action === 'delete-user') return;
+      if (action === 'toggle-active') {
+        try {
+          await apiRequest(`/api/doctors/${doctor.id}/status`, {
+            method: 'PATCH',
+            body: { active: doctor.active === false ? true : false },
+          });
+          selectUser(selectedUser);
+        } catch (err) {
+          setError('Failed to update status: ' + err.message);
+          setTimeout(() => setError(''), 5000);
+        }
+        return;
+      }
       selectDoctor(doctor);
     },
   });
@@ -878,7 +907,7 @@ export default function UsersDoctorsBoard({
         <div className={`${styles.toolbarActions} ${styles.desktopOnly}`}>{rightContent}</div>
       </div>
       {mobileActionsPortal && createPortal(mobileActionsContent, mobileActionsPortal)}
-      {error && <p className={styles.error}>{error}</p>}
+      {error && <p className={styles.error} style={{ marginBottom: '16px' }}>{error}</p>}
       {importSummary && !selectedDoctor && (
         <p className={styles.statusText}>{importSummary}</p>
       )}
