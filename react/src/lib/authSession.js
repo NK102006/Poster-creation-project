@@ -32,24 +32,24 @@ function scopeFromRole(role) {
 }
 
 function migrateLegacy(scope) {
-  const legacy = parseStored(localStorage.getItem(LEGACY_KEY));
+  const legacy = parseStored(sessionStorage.getItem(LEGACY_KEY));
   if (!legacy) return null;
 
   const inferred = scopeFromRole(legacy.role);
   if (scope === 'userpanel') {
-    localStorage.setItem(AUTH_KEYS.userpanel, JSON.stringify(legacy));
-    localStorage.removeItem(LEGACY_KEY);
+    sessionStorage.setItem(AUTH_KEYS.userpanel, JSON.stringify(legacy));
+    sessionStorage.removeItem(LEGACY_KEY);
     return legacy;
   }
   if (inferred !== scope) return null;
 
-  localStorage.setItem(AUTH_KEYS[scope], JSON.stringify(legacy));
-  localStorage.removeItem(LEGACY_KEY);
+  sessionStorage.setItem(AUTH_KEYS[scope], JSON.stringify(legacy));
+  sessionStorage.removeItem(LEGACY_KEY);
   return legacy;
 }
 
 export function readAuth(scope = authScopeFromPath()) {
-  const stored = parseStored(localStorage.getItem(AUTH_KEYS[scope]));
+  const stored = parseStored(sessionStorage.getItem(AUTH_KEYS[scope]));
   if (stored) return stored;
   return migrateLegacy(scope);
 }
@@ -59,14 +59,14 @@ export function writeAuth(auth, scope = authScopeFromPath()) {
     clearAuth(scope);
     return null;
   }
-  localStorage.setItem(AUTH_KEYS[scope], JSON.stringify(auth));
-  localStorage.removeItem(LEGACY_KEY);
+  sessionStorage.setItem(AUTH_KEYS[scope], JSON.stringify(auth));
+  sessionStorage.removeItem(LEGACY_KEY);
   return auth;
 }
 
 export function clearAuth(scope = authScopeFromPath()) {
-  localStorage.removeItem(AUTH_KEYS[scope]);
-  if (scope === 'portal') localStorage.removeItem(LEGACY_KEY);
+  sessionStorage.removeItem(AUTH_KEYS[scope]);
+  if (scope === 'portal') sessionStorage.removeItem(LEGACY_KEY);
 }
 
 export function canAccessPage(auth, page) {
