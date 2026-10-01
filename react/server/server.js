@@ -28,7 +28,7 @@ app.use(session({
 
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 500 * 1024 * 1024 }, // 500MB limit for high-res posters and videos
+  limits: { fileSize: 100 * 1024 * 1024 }, // 100MB limit for high-res posters and videos
 });
 
 const PORT = process.env.PORT || 3000;
@@ -38,8 +38,8 @@ app.use(cors({
   origin: true,
   credentials: true,
 }));
-app.use(express.json({ limit: '500mb' }));
-app.use(express.urlencoded({ extended: true, limit: '500mb' }));
+app.use(express.json({ limit: '100mb' }));
+app.use(express.urlencoded({ extended: true, limit: '100mb' }));
 
 const UPLOADS_DIR = path.resolve('uploads');
 fs.mkdirSync(path.join(UPLOADS_DIR, 'logos'), { recursive: true });
