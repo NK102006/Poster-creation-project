@@ -253,10 +253,10 @@ const CSS = `
 const RiskFactorPoster = forwardRef(function RiskFactorPoster(
   {
     logo,
-    doctorName = 'Dr. Doctor Name',
-    doctorDegree = 'MBBS, MD',
-    clinicName = 'Your Clinic Name',
-    phone = '+91 00000 00000',
+    doctorName = '',
+    doctorDegree = '',
+    clinicName = '',
+    phone = '',
     theme = 'blue',
     logoFit = 'cover',
     photo = '',

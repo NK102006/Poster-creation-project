@@ -20,6 +20,18 @@ const STEPS = [
   { id: 2, label: 'Preview', short: 'Preview' },
 ];
 
+const isLogoConfigField = (f) => f.key === 'logo' || f.key === 'photo' || f.type === 'file';
+
+// Without a field config every field (including the logo) is treated as active and required.
+function getLogoRule(formFieldConfig) {
+  if (!Array.isArray(formFieldConfig) || formFieldConfig.length === 0) {
+    return { enabled: true, required: true };
+  }
+  const logoField = formFieldConfig.find(isLogoConfigField);
+  const enabled = Boolean(logoField?.enabled);
+  return { enabled, required: enabled && Boolean(logoField.required) };
+}
+
 export default function PosterGenerator({
   formData = { name: '', contactnumber: '', clinicName: '', doctorDegree: '', dynamicFields: {} },
   setFormData,
@@ -147,13 +159,11 @@ export default function PosterGenerator({
   };
 
   const handleContinueToDesign = () => {
-    const logoField = formFieldConfig?.find(f => f.key === 'logo' || f.key === 'photo' || f.type === 'file');
-    const isLogoEnabled = !formFieldConfig || formFieldConfig.length === 0 || (logoField && logoField.enabled);
-    const isLogoRequired = !formFieldConfig || formFieldConfig.length === 0 || (logoField && logoField.required);
+    const { required: isLogoRequired } = getLogoRule(formFieldConfig);
     const hasLogo = Boolean(logoFile || logoPreview);
     const errors = {};
 
-    if (isLogoEnabled && isLogoRequired && !hasLogo) errors.logo = 'Doctor photo or clinic logo is required.';
+    if (isLogoRequired && !hasLogo) errors.logo = 'Doctor photo or clinic logo is required.';
 
     if (formFieldConfig && formFieldConfig.length > 0) {
       const enabledFields = formFieldConfig.filter(f => f.enabled && f.key !== 'logo' && f.key !== 'photo' && f.type !== 'file');
@@ -216,11 +226,9 @@ export default function PosterGenerator({
 
   const checkCanNavigate = (targetStep) => {
     if (targetStep <= 1) return true;
-    const logoField = formFieldConfig?.find(f => f.key === 'logo' || f.key === 'photo' || f.type === 'file');
-    const isLogoEnabled = !formFieldConfig || formFieldConfig.length === 0 || (logoField && logoField.enabled);
-    const isLogoRequired = !formFieldConfig || formFieldConfig.length === 0 || (logoField && logoField.required);
+    const { required: isLogoRequired } = getLogoRule(formFieldConfig);
     const hasLogo = Boolean(logoFile || logoPreview);
-    let allValid = (isLogoEnabled && isLogoRequired) ? hasLogo : true;
+    let allValid = isLogoRequired ? hasLogo : true;
 
     if (formFieldConfig && formFieldConfig.length > 0) {
       const enabledFields = formFieldConfig.filter(f => f.enabled && f.required && f.key !== 'logo' && f.key !== 'photo' && f.type !== 'file');
@@ -246,7 +254,9 @@ export default function PosterGenerator({
 
     if (!allValid) {
       setStepError(
-        'Please fill in all required fields and Logo to proceed.'
+        isLogoRequired
+          ? 'Please fill in all required fields and Logo to proceed.'
+          : 'Please fill in all required fields to proceed.'
       );
       return false;
     }
@@ -263,14 +273,23 @@ export default function PosterGenerator({
     }, 400);
   };
 
-  const rawDocName = formData.name?.trim() || doctor?.name || 'Doctor Name';
-  const formattedDoctorName = rawDocName.startsWith('Dr.') ? rawDocName : `Dr. ${rawDocName}`;
+  // A field removed or disabled by the superadmin must render nothing on the poster.
+  const hasFieldConfig = Array.isArray(formFieldConfig) && formFieldConfig.length > 0;
+  const isFieldActive = (...keys) =>
+    !hasFieldConfig || formFieldConfig.some((f) => keys.includes(f.key) && f.enabled);
+  const fieldValue = (key, fallback) =>
+    isFieldActive(key) ? String(formData[key] || fallback || '').trim() : '';
+
+  const rawDocName = fieldValue('name', doctor?.name);
+  const formattedDoctorName = !rawDocName || rawDocName.startsWith('Dr.') ? rawDocName : `Dr. ${rawDocName}`;
+  const logoRule = getLogoRule(formFieldConfig);
+  const isLogoActive = logoRule.enabled;
   const doctorFields = {
-    logo: logoPreview || doctor?.logo || null,
+    logo: isLogoActive ? logoPreview || doctor?.logo || null : null,
     doctorName: formattedDoctorName,
-    doctorDegree: formData.doctorDegree?.trim() || doctor?.doctorDegree || '',
-    clinicName: formData.clinicName?.trim() || 'Your Clinic Name',
-    phone: formData.contactnumber?.trim() || doctor?.contactnumber || '',
+    doctorDegree: fieldValue('doctorDegree', doctor?.doctorDegree),
+    clinicName: fieldValue('clinicName', doctor?.clinicName),
+    phone: fieldValue('contactnumber', doctor?.contactnumber),
   };
 
   const carouselProps = {
@@ -313,7 +332,7 @@ export default function PosterGenerator({
 
       const label = targetPoster?.label || 'Poster';
 
-      const cleanDocName = formattedDoctorName
+      const cleanDocName = (formattedDoctorName || doctor?.name || 'Doctor')
         .replace(/[^a-zA-Z0-9_-]/g, '_')
         .replace(/_+/g, '_');
       const posterLabel = targetPoster?.id || 'poster';
@@ -402,7 +421,7 @@ export default function PosterGenerator({
       setDownloadSuccess(false);
 
       const zip = new JSZip();
-      const cleanDocName = formattedDoctorName
+      const cleanDocName = (formattedDoctorName || doctor?.name || 'Doctor')
         .replace(/[^a-zA-Z0-9_-]/g, '_')
         .replace(/_+/g, '_');
 
@@ -622,10 +641,10 @@ export default function PosterGenerator({
                 )}
               </div>
 
-              {(!formFieldConfig || formFieldConfig.length === 0 || formFieldConfig.some(f => (f.key === 'logo' || f.key === 'photo' || f.type === 'file') && f.enabled)) && (
+              {logoRule.enabled && (
                 <div className={styles.formGroup}>
                   <label className={styles.formLabel}>
-                    Doctor photo or clinic logo <span className={styles.requiredStar}>*</span>
+                    Doctor photo or clinic logo {logoRule.required && <span className={styles.requiredStar}>*</span>}
                   </label>
 
                   <input

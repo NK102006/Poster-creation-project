@@ -187,6 +187,12 @@ const doctorFieldConfigSchema = new mongoose.Schema({
 });
 export const DoctorField = mongoose.model('DoctorField', doctorFieldConfigSchema);
 
+// The logo is only mandatory while the superadmin keeps the logo field enabled and required.
+async function isDoctorLogoRequired() {
+  const logoField = await DoctorField.findOne({ key: 'logo' }).lean();
+  return Boolean(logoField && logoField.enabled && logoField.required);
+}
+
 export const Doctor = mongoose.model('Doctor', doctorSchema);
 export const User = mongoose.model('User', userSchema);
 export const Admin = mongoose.model('Admin', adminSchema);
@@ -978,11 +984,11 @@ app.post('/api/doctors', requireAuth('superadmin', 'admin', 'user'), upload.any(
       });
     }
 
-    if (!logoBuffer) {
+    if (!logoBuffer && (await isDoctorLogoRequired())) {
       return res.status(400).json({ success: false, message: 'Doctor logo is required.' });
     }
 
-    const logoPath = await saveFile(logoBuffer, logoName, 'logos');
+    const logoPath = logoBuffer ? await saveFile(logoBuffer, logoName, 'logos') : null;
 
     let ownerUser = mongoose.isValidObjectId(ownerUserId) ? ownerUserId : null;
     if (req.auth?.role === 'user') {
@@ -2175,7 +2181,7 @@ app.post('/api/admin/collections/:collection', requireAuth('superadmin', 'admin'
         }
       }
 
-      if (!createData.logo) {
+      if (!createData.logo && (await isDoctorLogoRequired())) {
         return res.status(400).json({ message: 'Doctor logo is required.' });
       }
 
@@ -2233,7 +2239,7 @@ app.put('/api/admin/collections/:collection/:id', requireAuth('superadmin', 'adm
         }
       }
 
-      if (updateData.hasOwnProperty('logo') && !updateData.logo) {
+      if (updateData.hasOwnProperty('logo') && !updateData.logo && (await isDoctorLogoRequired())) {
         return res.status(400).json({ message: 'Doctor logo is required.' });
       }
 
