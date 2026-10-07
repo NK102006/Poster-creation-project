@@ -312,12 +312,12 @@ export default function UserPanel({
       const button = event.target.closest('button[data-action]');
       const checkbox = event.target.closest('input[data-action]');
       const actionEl = button || checkbox;
-      
+
       const row = event.target.closest('tbody tr');
       if (!row) return;
       const rowData = table.row(row).data();
       if (!rowData) return;
-      
+
       if (actionEl) {
         event.stopPropagation();
         const action = actionEl.getAttribute('data-action');
@@ -337,7 +337,7 @@ export default function UserPanel({
           return;
         }
       }
-      
+
       event.preventDefault();
       event.stopPropagation();
       if (window.__userPanel?.openDoctor?.(rowData)) return;
@@ -548,10 +548,10 @@ export default function UserPanel({
         <button
           type="button"
           className={`${styles.clearDatesBtn} ${!(dateFrom || dateTo) ? styles.clearDatesBtnHidden : ''}`}
-        onClick={() => {
-          setDateFrom('');
-          setDateTo('');
-        }}
+          onClick={() => {
+            setDateFrom('');
+            setDateTo('');
+          }}
           disabled={!(dateFrom || dateTo)}
           aria-hidden={!(dateFrom || dateTo)}
         >

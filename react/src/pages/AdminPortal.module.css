@@ -462,8 +462,6 @@
   border-radius: 16px;
   border: 1px solid rgba(31, 111, 159, 0.08);
   box-shadow: 0 10px 30px -18px rgba(31, 111, 159, 0.25);
-  overflow-x: auto;
-  overflow-y: hidden;
   padding: 16px 18px 12px;
   width: 100%;
   max-width: 100%;
@@ -486,6 +484,12 @@
   color: var(--color-text);
   width: 100% !important;
   max-width: 100%;
+}
+
+.dtHost :global(.dt-layout-table) {
+  overflow-x: auto;
+  overflow-y: hidden;
+  width: 100%;
 }
 
 /* Keep DataTables top/bottom controls on one row (length | search, info | paging) */
