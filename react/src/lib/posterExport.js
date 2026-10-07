@@ -4,6 +4,7 @@ import { toJpeg } from 'html-to-image';
 import { createElement } from 'react';
 import RiskFactorPoster from '../components/RiskFactorPoster';
 import PosterFooterOverlay from '../components/PosterFooterOverlay';
+import PosterFieldsOverlay from '../components/PosterFieldsOverlay';
 import { POSTER_CANVAS } from './posterFooterLayout';
 
 export function mapThemeToRiskFactor(themeId) {
@@ -113,14 +114,20 @@ export async function renderMasterPosterBlob(poster, fields) {
         crossOrigin: 'anonymous',
         style: { width: '100%', height: '100%', objectFit: 'cover', display: 'block' },
       }),
-      createElement(PosterFooterOverlay, {
-        key: 'overlay',
-        logo: fields.logo,
-        doctorName: fields.doctorName,
-        doctorDegree: fields.doctorDegree,
-        clinicName: fields.clinicName,
-        phone: fields.phone,
-      }),
+      poster.fields?.length > 0
+        ? createElement(PosterFieldsOverlay, {
+            key: 'overlay',
+            fields: poster.fields,
+            values: fields.values || {},
+          })
+        : createElement(PosterFooterOverlay, {
+            key: 'overlay',
+            logo: fields.logo,
+            doctorName: fields.doctorName,
+            doctorDegree: fields.doctorDegree,
+            clinicName: fields.clinicName,
+            phone: fields.phone,
+          }),
     ])
   );
 

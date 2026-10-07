@@ -18,7 +18,7 @@ export default function DoctorDetailsPage({
   const [doctor, setDoctor] = useState(existingDoctor);
   const [doctorFields, setDoctorFields] = useState([]);
   const [formData, setFormData] = useState({
-    dynamicFields: {},
+    dynamicFields: existingDoctor?.dynamicFields || {},
     name: existingDoctor?.name || '',
     contactnumber: existingDoctor?.contactnumber
       ? String(existingDoctor.contactnumber)

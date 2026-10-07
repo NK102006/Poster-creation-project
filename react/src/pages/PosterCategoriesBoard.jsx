@@ -3,6 +3,7 @@ import DataTable from 'datatables.net-dt';
 import 'datatables.net-dt/css/dataTables.dataTables.css';
 import { apiRequest } from '../lib/apiClient';
 import styles from './AdminPortal.module.css';
+import { confirmDialog } from '../lib/alerts';
 
 const columns = [
   {
@@ -117,7 +118,7 @@ export default function PosterCategoriesBoard({ onContextChange, onNavigateToPos
       const confirmMsg = cat.posterCount > 0
         ? `Category "${cat.name}" is used by ${cat.posterCount} poster(s). Are you sure you want to delete this category?`
         : `Delete category "${cat.name}"?`;
-      if (!window.confirm(confirmMsg)) return;
+      if (!(await confirmDialog({ title: 'Delete category?', text: confirmMsg, confirmText: 'Delete', danger: true }))) return;
 
       try {
         await apiRequest(`/superadmin/categories/${cat._id}`, { method: 'DELETE' });
@@ -140,6 +141,7 @@ export default function PosterCategoriesBoard({ onContextChange, onNavigateToPos
 
     const table = new DataTable(tableEl, {
       data: categories,
+      language: { emptyTable: 'No categories found. Click "+ Add category" to create one.' },
       columns,
       pageLength: 10,
       lengthMenu: [5, 10, 25, 50],
@@ -262,9 +264,6 @@ export default function PosterCategoriesBoard({ onContextChange, onNavigateToPos
 
       <div className={styles.tableCard}>
         <div ref={hostRef} className={styles.dtHost} />
-        {!loading && categories.length === 0 && (
-          <p className={styles.emptyState}>No categories found. Click "+ Add category" to create one.</p>
-        )}
       </div>
 
       {showModal && (

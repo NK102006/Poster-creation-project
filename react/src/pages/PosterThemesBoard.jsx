@@ -3,6 +3,7 @@ import DataTable from 'datatables.net-dt';
 import 'datatables.net-dt/css/dataTables.dataTables.css';
 import { apiRequest } from '../lib/apiClient';
 import styles from './AdminPortal.module.css';
+import { confirmDialog } from '../lib/alerts';
 
 const THEME_PRESETS = [
   { name: 'Ocean Teal', headerBg: '#0f766e', footerBg: '#134e4a', accentColor: '#14b8a6' },
@@ -169,9 +170,9 @@ export default function PosterThemesBoard({ onContextChange, onNavigateToPosters
     },
     remove: async (theme) => {
       const confirmMsg = theme.posterCount > 0
-        ? `Theme "${theme.name}" matches ${theme.posterCount} poster(s). Are you sure you want to delete this theme?`
+        ? `Theme "${theme.name}" is used by ${theme.posterCount} poster(s). Deleting it also deletes those posters from the Posters list. Posters already created for doctors are not affected.`
         : `Delete theme "${theme.name}"?`;
-      if (!window.confirm(confirmMsg)) return;
+      if (!(await confirmDialog({ title: 'Delete theme?', text: confirmMsg, confirmText: 'Delete', danger: true }))) return;
 
       try {
         await apiRequest(`/superadmin/themes/${theme._id}`, { method: 'DELETE' });
@@ -194,6 +195,7 @@ export default function PosterThemesBoard({ onContextChange, onNavigateToPosters
 
     const table = new DataTable(tableEl, {
       data: themes,
+      language: { emptyTable: 'No themes found. Click "+ Add theme" to create one.' },
       columns,
       pageLength: 10,
       lengthMenu: [5, 10, 25, 50],
@@ -332,9 +334,6 @@ export default function PosterThemesBoard({ onContextChange, onNavigateToPosters
 
       <div className={styles.tableCard}>
         <div ref={hostRef} className={styles.dtHost} />
-        {!loading && themes.length === 0 && (
-          <p className={styles.emptyState}>No themes found. Click "+ Add theme" to create one.</p>
-        )}
       </div>
 
       {showModal && (

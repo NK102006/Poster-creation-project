@@ -11,6 +11,7 @@ import DoctorFieldsBoard from './DoctorFieldsBoard';
 import PosterCategoriesBoard from './PosterCategoriesBoard';
 import PosterThemesBoard from './PosterThemesBoard';
 import styles from './AdminPortal.module.css';
+import { confirmDialog } from '../lib/alerts';
 
 function escapeHtml(value) {
   return String(value ?? '')
@@ -134,7 +135,12 @@ export default function SuperAdminPortal() {
       setClosingModal(false);
     },
     remove: async (admin) => {
-      if (!window.confirm(`Delete admin ${admin.username} and every employee and doctor under them?`)) return;
+      if (!(await confirmDialog({
+        title: 'Delete admin?',
+        text: `Delete admin ${admin.username} and every employee and doctor under them?`,
+        confirmText: 'Delete',
+        danger: true,
+      }))) return;
       try {
         await apiRequest(`/superadmin/admins/${admin.id}`, { method: 'DELETE' });
         loadAdmins();
@@ -157,6 +163,7 @@ export default function SuperAdminPortal() {
     const table = new DataTable(tableEl, {
       ...dataTableOptions,
       data: admins,
+      language: { ...dataTableOptions.language, emptyTable: 'No admins found.' },
       columns: adminColumns,
     });
 
@@ -487,9 +494,6 @@ export default function SuperAdminPortal() {
               {loading && <p className={styles.statusText}>Loading…</p>}
               <div className={styles.tableCard}>
                 <div ref={hostRef} className={styles.dtHost} />
-                {!loading && admins.length === 0 && (
-                  <p className={styles.emptyState}>No admins found.</p>
-                )}
               </div>
             </>
           )}

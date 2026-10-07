@@ -3,6 +3,7 @@ import DataTable from 'datatables.net-dt';
 import 'datatables.net-dt/css/dataTables.dataTables.css';
 import { apiRequest } from '../lib/apiClient';
 import styles from './AdminPortal.module.css';
+import { confirmDialog } from '../lib/alerts';
 
 const columns = [
   { title: 'Field Key', data: 'key' },
@@ -117,7 +118,12 @@ export default function DoctorFieldsBoard({ onContextChange }) {
       }
     },
     delete: async (field) => {
-      if (!window.confirm(`Are you sure you want to delete the field "${field.label}"?`)) return;
+      if (!(await confirmDialog({
+        title: 'Delete field?',
+        text: `Are you sure you want to delete the field "${field.label}"?`,
+        confirmText: 'Delete',
+        danger: true,
+      }))) return;
       try {
         setLoading(true);
         await apiRequest(`/superadmin/doctor-fields/${field._id}`, {
@@ -142,6 +148,7 @@ export default function DoctorFieldsBoard({ onContextChange }) {
 
     const table = new DataTable(tableEl, {
       data: fields,
+      language: { emptyTable: 'No fields found. Click "+ Add field" to create one.' },
       columns,
       pageLength: 10,
       autoWidth: false,
@@ -189,10 +196,6 @@ export default function DoctorFieldsBoard({ onContextChange }) {
   const handleSave = async (event) => {
     event.preventDefault();
     const errs = {};
-    if (!form.key.trim()) errs.key = 'Key is required';
-    else if (!/^[a-zA-Z][a-zA-Z0-9_]*$/.test(form.key.trim())) {
-      errs.key = 'Key must start with a letter and only contain letters, numbers, or underscores';
-    }
     if (!form.label.trim()) errs.label = 'Label is required';
     if (!form.type) errs.type = 'Type is required';
 
@@ -219,7 +222,6 @@ export default function DoctorFieldsBoard({ onContextChange }) {
         await apiRequest('/superadmin/doctor-fields', {
           method: 'POST',
           body: {
-            key: form.key.trim(),
             label: form.label.trim(),
             type: form.type,
             required: form.required,
@@ -250,9 +252,6 @@ export default function DoctorFieldsBoard({ onContextChange }) {
 
       <div className={styles.tableCard}>
         <div ref={hostRef} className={styles.dtHost} />
-        {!loading && fields.length === 0 && (
-          <p className={styles.emptyState}>No fields found. Click "+ Add field" to create one.</p>
-        )}
       </div>
 
       {showModal && (
@@ -273,20 +272,6 @@ export default function DoctorFieldsBoard({ onContextChange }) {
             )}
 
             <form onSubmit={handleSave} className={styles.form} noValidate>
-              <label className={styles.field}>
-                <span>Internal Key * (e.g. years_experience)</span>
-                <input
-                  className={styles.inputField}
-                  value={form.key}
-                  disabled={Boolean(editingField)}
-                  onChange={(e) => {
-                    setForm((p) => ({ ...p, key: e.target.value }));
-                    if (formErrors.key) setFormErrors((p) => ({ ...p, key: null }));
-                  }}
-                />
-                {formErrors.key && <span className={styles.fieldError}>{formErrors.key}</span>}
-              </label>
-
               <label className={styles.field}>
                 <span>Display Label * (e.g. Years of Experience)</span>
                 <input

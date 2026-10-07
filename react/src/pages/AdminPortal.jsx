@@ -8,6 +8,7 @@ import StaffLogin from './StaffLogin';
 import { validatePassword } from '../features/auth/validators';
 import UsersDoctorsBoard from './UsersDoctorsBoard';
 import styles from './AdminPortal.module.css';
+import { errorAlert } from '../lib/alerts';
 
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api').replace(
   /\/$/,
@@ -174,7 +175,7 @@ export default function AdminPortal() {
       link.click();
       URL.revokeObjectURL(url);
     } catch (err) {
-      alert('Export All failed: ' + err.message);
+      errorAlert(err.message, 'Export failed');
     }
   };
 

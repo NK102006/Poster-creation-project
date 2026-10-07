@@ -3,6 +3,7 @@ import { mapThemeToRiskFactor, themePageStyle } from '../lib/posterExport';
 import { apiRequest } from '../lib/apiClient';
 import RiskFactorPoster from './RiskFactorPoster';
 import PosterFooterOverlay from './PosterFooterOverlay';
+import PosterFieldsOverlay from './PosterFieldsOverlay';
 import BottomSheetSelect from './BottomSheetSelect';
 import { fitPosterScale } from '../lib/posterFooterLayout';
 import styles from './PosterCarousel.module.css';
@@ -121,13 +122,17 @@ export function PosterPage({
           style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
           crossOrigin="anonymous"
         />
-        <PosterFooterOverlay
-          logo={doctorFields?.logo}
-          doctorName={doctorFields?.doctorName}
-          doctorDegree={doctorFields?.doctorDegree}
-          clinicName={doctorFields?.clinicName}
-          phone={doctorFields?.phone}
-        />
+        {poster.fields?.length > 0 ? (
+          <PosterFieldsOverlay fields={poster.fields} values={doctorFields?.values || {}} />
+        ) : (
+          <PosterFooterOverlay
+            logo={doctorFields?.logo}
+            doctorName={doctorFields?.doctorName}
+            doctorDegree={doctorFields?.doctorDegree}
+            clinicName={doctorFields?.clinicName}
+            phone={doctorFields?.phone}
+          />
+        )}
       </div>
     );
   }
@@ -432,6 +437,7 @@ export default function PosterCarousel({
             category: p.category,
             month: p.month,
             color: p.color,
+            fields: p.fields || [],
             label: `Poster-${idx + 1}`
           })));
         }

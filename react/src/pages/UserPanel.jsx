@@ -9,6 +9,7 @@ import Datepicker from '../components/DatePicker';
 import { sanitizePhoneInput, validatePassword, validatePhoneNumber } from '../features/auth/validators';
 import { enabledFormFields, isFullWidthDoctorField } from '../lib/doctorFields';
 import styles from './AdminPortal.module.css';
+import { confirmDialog } from '../lib/alerts';
 
 function getItemId(item) {
   return item?.id || item?._id || '';
@@ -45,6 +46,7 @@ export default function UserPanel({
   onBack,
   onBrandClick,
   onSelectDoctor,
+  onEditDoctor,
   onAddNew,
 } = {}) {
   const embedded = Boolean(user);
@@ -124,15 +126,16 @@ export default function UserPanel({
     apiRequest('/logout', { method: 'POST' }).catch(() => { });
   };
 
-  const openDoctor = (item) => {
-    if (!onSelectDoctor) return false;
+  const openDoctor = (item, { edit = false } = {}) => {
+    const open = edit ? onEditDoctor || onSelectDoctor : onSelectDoctor;
+    if (!open) return false;
     if (item.active === false) {
       setListError('This doctor is inactive and cannot create new posters.');
       setTimeout(() => setListError(''), 5000);
       return true;
     }
     const id = getItemId(item);
-    onSelectDoctor({ ...item, id });
+    open({ ...item, id });
     return true;
   };
 
@@ -144,7 +147,7 @@ export default function UserPanel({
     if (!isLoggedIn) return undefined;
 
     const openEdit = (item) => {
-      if (openDoctor(item)) return;
+      if (openDoctor(item, { edit: true })) return;
       setEditingItem(item);
       setFormData({ dynamicFields: {}, ...item });
       setShowModal(true);
@@ -152,7 +155,12 @@ export default function UserPanel({
     };
 
     const removeRow = async (id) => {
-      if (!window.confirm('Delete this record? This cannot be undone.')) return;
+      if (!(await confirmDialog({
+        title: 'Delete this record?',
+        text: 'This cannot be undone.',
+        confirmText: 'Delete',
+        danger: true,
+      }))) return;
       try {
         await apiRequest(`/userpanel/collections/doctors/${id}`, { method: 'DELETE' });
         reloadTable();
@@ -181,7 +189,7 @@ export default function UserPanel({
     return () => {
       delete window.__userPanel;
     };
-  }, [isLoggedIn, onSelectDoctor]);
+  }, [isLoggedIn, onSelectDoctor, onEditDoctor]);
 
   useEffect(() => {
     if (!isLoggedIn || !hostRef.current) return undefined;
@@ -234,12 +242,11 @@ export default function UserPanel({
           orderable: false,
           searchable: false,
           className: styles.colId,
-          render: (data, _type, row) => {
-            const initial = (row.name || 'D').charAt(0).toUpperCase();
+          render: (data) => {
             if (data) {
               return `<img src="${data}" alt="" style="width:36px;height:36px;border-radius:50%;object-fit:cover;border:2px solid #e8f0fe;" />`;
             }
-            return `<div style="width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,#4285f4,#34a853);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:15px;">${initial}</div>`;
+            return '—';
           },
         },
         { title: 'Name', data: 'name', className: styles.nameCell },
@@ -278,23 +285,30 @@ export default function UserPanel({
             </label>
           `,
         },
+        // One "Action" heading covers the three button columns; together they keep the old Edit + Delete width.
         {
-          title: 'Edit',
+          title: 'Action',
           data: null,
           orderable: false,
           searchable: false,
-          className: styles.colActions,
-          render: () => `<button type="button" class="${styles.editBtn}" data-action="edit">Edit</button>`,
+          width: '75px',
+          render: () => `<button type="button" class="${styles.editBtn}" data-action="edit" data-tip="Edit" aria-label="Edit"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></button>`,
         },
         {
-          title: 'Delete',
+          title: '',
           data: null,
           orderable: false,
           searchable: false,
-          className: styles.colActions,
-          render: () => {
-            return `<button type="button" class="${styles.deleteBtn}" data-action="delete">Delete</button>`;
-          },
+          width: '60px',
+          render: () => `<button type="button" class="${styles.deleteBtn}" data-action="delete" data-tip="Delete" aria-label="Delete"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>`,
+        },
+        {
+          title: '',
+          data: null,
+          orderable: false,
+          searchable: false,
+          width: '60px',
+          render: () => `<button type="button" class="${styles.editBtn}" data-action="continue" data-tip="Save and continue" aria-label="Save and continue"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="M12 5l7 7-7 7"/></svg></button>`,
         },
       ],
       language: {
@@ -331,6 +345,11 @@ export default function UserPanel({
           window.__userPanel?.openEdit(rowData);
           return;
         }
+        if (action === 'continue') {
+          event.preventDefault();
+          if (!window.__userPanel?.openDoctor(rowData)) window.__userPanel?.openEdit(rowData);
+          return;
+        }
         if (action === 'toggle-active') {
           // let the checkbox toggle visually but we'll fetch
           window.__userPanel?.toggleActive(rowData);
@@ -340,7 +359,6 @@ export default function UserPanel({
       
       event.preventDefault();
       event.stopPropagation();
-      if (window.__userPanel?.openDoctor?.(rowData)) return;
       window.__userPanel?.openEdit(rowData);
     }
 
