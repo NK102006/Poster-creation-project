@@ -9,6 +9,8 @@ import SuperAdminPortal from './pages/SuperAdminPortal.jsx';
 import UserPanel from './pages/UserPanel.jsx';
 import NotFoundPage from './pages/NotFoundPage.jsx';
 import { clearAuth, readAuth, writeAuth } from './lib/authSession.js';
+import { apiRequest } from './lib/apiClient';
+import { doctorHasMissingRequiredFields } from './lib/doctorFields';
 
 const VIEW_STATE_KEY = 'app_view_state';
 const STAFF_VIEWS = new Set(['admin', 'superadmin', 'userpanel']);
@@ -136,6 +138,7 @@ export default function App() {
   const [doctorId, setDoctorId] = useState(() => initialAuthView?.doctorId || null);
   const [selectedDoctor, setSelectedDoctor] = useState(null);
   const [startAtDesign, setStartAtDesign] = useState(false);
+  const [showMissingFields, setShowMissingFields] = useState(false);
   const [loginKey, setLoginKey] = useState(0);
 
   const restoreAppState = (historyState) => {
@@ -209,6 +212,29 @@ export default function App() {
     navigate('new', { doctorId: null, doctor: null, startAtDesign: false });
   };
 
+  const editExistingDoctor = (doc, { showMissing = false } = {}) => {
+    setShowMissingFields(showMissing);
+    setSelectedDoctor(doc);
+    navigate('manage', { doctorId: doc.id, doctor: doc });
+  };
+
+  // Existing doctors open on the poster preview; incomplete profiles go to the edit page first.
+  const openExistingDoctor = async (doc) => {
+    let incomplete = true;
+    try {
+      const res = await apiRequest('/doctor-fields');
+      incomplete = doctorHasMissingRequiredFields(res?.fields, doc);
+    } catch (err) {
+      console.warn('Could not load fields:', err);
+    }
+    if (incomplete) {
+      editExistingDoctor(doc, { showMissing: true });
+      return;
+    }
+    setSelectedDoctor(doc);
+    navigate('new', { doctorId: doc.id, doctor: doc, startAtDesign: true });
+  };
+
   const handleLoginSuccess = (payload) => {
     const user = payload?.user || payload?.auth || payload;
     setCurrentUser(writeAuth(user, 'portal'));
@@ -255,10 +281,8 @@ export default function App() {
         onBrandClick={goToHub}
         onBack={goToHub}
         onAddNew={goToNewDoctor}
-        onSelectDoctor={(doc) => {
-          setSelectedDoctor(doc);
-          navigate('manage', { doctorId: doc.id, doctor: doc });
-        }}
+        onSelectDoctor={openExistingDoctor}
+        onEditDoctor={(doc) => editExistingDoctor(doc)}
       />
     );
   } else if (view === 'manage' && doctorId) {
@@ -266,6 +290,7 @@ export default function App() {
       <DoctorManagePage
         user={currentUser}
         doctorId={doctorId}
+        showMissingFields={showMissingFields}
         onLogout={handleLogout}
         onBrandClick={goToHub}
         onBack={() => navigate('existing')}
@@ -288,11 +313,7 @@ export default function App() {
         onBrandClick={goToHub}
         onOpenExisting={() => navigate('existing')}
         onStartNew={goToNewDoctor}
-        onBack={
-          doctorId
-            ? () => navigate('manage', { doctorId, doctor: selectedDoctor })
-            : goToHub
-        }
+        onBack={doctorId ? () => navigate('existing') : goToHub}
         existingDoctor={selectedDoctor}
         doctorId={doctorId}
         initialStep={startAtDesign ? 2 : 1}

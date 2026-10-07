@@ -1,3 +1,5 @@
+import { validatePhoneNumber } from '../features/auth/validators';
+
 /** Shared helpers for doctor field config ordering and layout. */
 
 const STANDARD_BEFORE_CUSTOM = ['name', 'clinicName', 'doctorDegree', 'contactnumber'];
@@ -32,4 +34,22 @@ export function enabledFormFields(fields = []) {
   return sortDoctorFields(fields).filter(
     (f) => f.enabled && f.key !== 'logo' && f.key !== 'photo' && f.type !== 'file'
   );
+}
+
+/** True when an enabled required field (or the phone number / logo) is empty or invalid on a saved doctor. */
+export function doctorHasMissingRequiredFields(fields = [], doctor = {}) {
+  if (!Array.isArray(fields) || fields.length === 0) {
+    return (
+      !doctor?.logo ||
+      ['name', 'clinicName', 'doctorDegree'].some((key) => !String(doctor?.[key] || '').trim()) ||
+      Boolean(validatePhoneNumber(String(doctor?.contactnumber || '')))
+    );
+  }
+  return fields.some((f) => {
+    if (!f.enabled || !f.required) return false;
+    if (f.key === 'logo' || f.key === 'photo' || f.type === 'file') return !doctor?.logo;
+    const val = String((f.isStandard ? doctor?.[f.key] : doctor?.dynamicFields?.[f.key]) || '').trim();
+    if (!val) return true;
+    return f.key === 'contactnumber' && Boolean(validatePhoneNumber(val));
+  });
 }

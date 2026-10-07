@@ -14,6 +14,7 @@ import { apiRequest } from '../lib/apiClient';
 import styles from './PosterGenerator.module.css';
 import { sanitizePhoneInput, validatePhoneNumber } from '../features/auth/validators';
 import { enabledFormFields, isFullWidthDoctorField } from '../lib/doctorFields';
+import { errorAlert } from '../lib/alerts';
 
 const STEPS = [
   { id: 1, label: 'Doctor Details', short: 'Details' },
@@ -291,6 +292,18 @@ export default function PosterGenerator({
     clinicName: fieldValue('clinicName', doctor?.clinicName),
     phone: fieldValue('contactnumber', doctor?.contactnumber),
   };
+  // Values by field key, used by posters whose fields were placed in the poster designer.
+  doctorFields.values = {
+    name: doctorFields.doctorName,
+    clinicName: doctorFields.clinicName,
+    doctorDegree: doctorFields.doctorDegree,
+    contactnumber: doctorFields.phone,
+    logo: doctorFields.logo,
+  };
+  (formFieldConfig || []).forEach((f) => {
+    if (f.isStandard || !f.enabled || isLogoConfigField(f)) return;
+    doctorFields.values[f.key] = String(formData.dynamicFields?.[f.key] ?? '').trim();
+  });
 
   const carouselProps = {
     activeIndex: activePosterIndex,
@@ -390,7 +403,7 @@ export default function PosterGenerator({
     } catch (err) {
       console.error('Failed to render poster:', err);
       setIsGenerating(false);
-      alert('Could not render poster. Please try again.');
+      errorAlert('Please try again.', 'Could not render poster');
     }
   };
 
@@ -471,7 +484,7 @@ export default function PosterGenerator({
     } catch (err) {
       console.error('Failed to build zip:', err);
       setIsGenerating(false);
-      alert('Could not create zip. Please try again.');
+      errorAlert('Please try again.', 'Could not create zip');
     }
   };
 

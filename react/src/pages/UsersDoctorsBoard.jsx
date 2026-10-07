@@ -8,6 +8,7 @@ import { sanitizePasswordInput, sanitizeUsernameInput, validateNewPassword } fro
 import Datepicker from '../components/DatePicker';
 import { isFullWidthDoctorField, sortDoctorFields } from '../lib/doctorFields';
 import styles from './AdminPortal.module.css';
+import { confirmDialog } from '../lib/alerts';
 
 const csvCell = (value) => `"${String(value ?? '').replaceAll('"', '""')}"`;
 const POSTER_FOLDERS = ['education', 'festival', 'video'];
@@ -235,7 +236,7 @@ const doctorColumns = [
   },
 ];
 
-function useDataTable({ enabled, data, columns, onRowAction }) {
+function useDataTable({ enabled, data, columns, onRowAction, emptyText }) {
   const hostRef = useRef(null);
   const tableRef = useRef(null);
   const actionRef = useRef(onRowAction);
@@ -251,7 +252,12 @@ function useDataTable({ enabled, data, columns, onRowAction }) {
     tableEl.style.width = '100%';
     host.appendChild(tableEl);
 
-    const table = new DataTable(tableEl, { ...dataTableOptions, data, columns });
+    const table = new DataTable(tableEl, {
+      ...dataTableOptions,
+      language: { ...dataTableOptions.language, ...(emptyText ? { emptyTable: emptyText } : {}) },
+      data,
+      columns,
+    });
 
     function onClick(event) {
       const button = event.target.closest('button[data-action]');
@@ -568,7 +574,12 @@ export default function UsersDoctorsBoard({
   };
 
   const deleteUser = async (user) => {
-    if (!window.confirm(`Delete employee ${user.empid || user.id} and their doctors?`)) return;
+    if (!(await confirmDialog({
+      title: 'Delete employee?',
+      text: `Delete employee ${user.empid || user.id} and their doctors?`,
+      confirmText: 'Delete',
+      danger: true,
+    }))) return;
     setError('');
     try {
       const path = adminId
@@ -591,6 +602,7 @@ export default function UsersDoctorsBoard({
     enabled: !selectedUser,
     data: users,
     columns,
+    emptyText: 'No employees found.',
     onRowAction: (action, user) => {
       if (!user) return;
       if (action === 'edit-user') openEditUser(user);
@@ -644,6 +656,7 @@ export default function UsersDoctorsBoard({
     enabled: Boolean(selectedUser) && !selectedDoctor,
     data: displayedDoctors,
     columns: doctorColumns,
+    emptyText: 'This employee has not created any doctors yet.',
     onRowAction: async (action, doctor) => {
       if (!doctor || action === 'edit-user' || action === 'delete-user') return;
       if (action === 'toggle-active') {
@@ -916,7 +929,6 @@ export default function UsersDoctorsBoard({
       {!selectedUser && (
         <div className={styles.tableCard}>
           <div ref={usersHostRef} className={styles.dtHost} />
-          {!loading && users.length === 0 && <p className={styles.emptyState}>No employees found.</p>}
         </div>
       )}
 
@@ -927,9 +939,6 @@ export default function UsersDoctorsBoard({
           </div>
           <div className={styles.tableCard}>
             <div ref={doctorsHostRef} className={styles.dtHost} />
-            {!loading && doctors.length === 0 && (
-              <p className={styles.emptyState}>This employee has not created any doctors yet.</p>
-            )}
           </div>
         </>
       )}

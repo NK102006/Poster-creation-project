@@ -92,13 +92,30 @@ const userSchema = new mongoose.Schema({
   ownerAdmin: { type: mongoose.Schema.Types.ObjectId, ref: 'Admin', default: null, index: true },
 }, { strict: false, timestamps: true });
 
+// A doctor field placed on a poster. x/y/w/h are fractions (0-1) of the 4:5 poster canvas.
+const posterFieldSchema = new mongoose.Schema({
+  key: { type: String, required: true },
+  type: { type: String, default: 'text' },
+  x: { type: Number, required: true },
+  y: { type: Number, required: true },
+  w: { type: Number, required: true },
+  h: { type: Number, required: true },
+  color: { type: String, default: '#ffffff' },
+  align: { type: String, enum: ['left', 'center', 'right'], default: 'left' },
+  shape: { type: String, enum: ['circle', 'rectangle', 'square'], default: 'rectangle' },
+}, { _id: false });
+
 const templatePosterSchema = new mongoose.Schema({
   posterlink: { type: String, required: true },
   category: { type: String, default: '' },
   color: { type: String, default: '' },
   month: { type: String, default: '' },
   enabled: { type: Boolean, default: true },
-  uploaddate: { type: Date, default: Date.now }
+  uploaddate: { type: Date, default: Date.now },
+  // Posters without a status predate the designer and count as published.
+  status: { type: String, enum: ['draft', 'published'], default: 'published' },
+  fields: { type: [posterFieldSchema], default: [] },
+  disabledFields: { type: [String], default: [] },
 }, { timestamps: true });
 
 const adminSchema = new mongoose.Schema({
@@ -1347,25 +1364,21 @@ app.get('/api/doctor-fields', async (req, res) => {
 
 app.post('/api/superadmin/doctor-fields', requireAuth('superadmin'), async (req, res) => {
   try {
-    const key = String(req.body?.key || '').trim();
     const label = String(req.body?.label || '').trim();
     const type = String(req.body?.type || 'text').trim() || 'text';
     const required = Boolean(req.body?.required);
     const enabled = req.body?.enabled !== false;
 
-    if (!key) return res.status(400).json({ success: false, message: 'Key is required' });
-    if (!/^[a-zA-Z][a-zA-Z0-9_]*$/.test(key)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Key must start with a letter and only contain letters, numbers, or underscores',
-      });
-    }
     if (!label) return res.status(400).json({ success: false, message: 'Label is required' });
 
-    const existing = await DoctorField.findOne({ key });
-    if (existing) {
-      return res.status(409).json({ success: false, message: 'A field with this key already exists' });
-    }
+    // The internal key is generated from the label (snake_case) and made unique.
+    const baseKey = label
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '_')
+      .replace(/^_+|_+$/g, '')
+      .replace(/^[0-9]+/, '') || 'field';
+    let key = baseKey;
+    for (let n = 2; await DoctorField.exists({ key }); n += 1) key = `${baseKey}_${n}`;
 
     const logoField = await DoctorField.findOne({ key: 'logo' });
     const maxBeforeLogo = await DoctorField.find({
@@ -2419,7 +2432,7 @@ async function ensureMongoRunning() {
 app.get('/api/posters', requireAuth('superadmin', 'admin', 'user'), async (req, res) => {
   try {
     const { month, category } = req.query;
-    const filter = { enabled: { $ne: false } };
+    const filter = { enabled: { $ne: false }, status: { $ne: 'draft' } };
     if (month) filter.month = { $regex: `^${escapeRegex(month)}$`, $options: 'i' };
     if (category && category !== 'all') filter.category = { $regex: `^${escapeRegex(category)}$`, $options: 'i' };
     const posters = await Poster.find(filter).sort({ uploaddate: -1 });
@@ -2430,9 +2443,101 @@ app.get('/api/posters', requireAuth('superadmin', 'admin', 'user'), async (req, 
   }
 });
 
+const POSTER_MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+const POSTER_FIELD_MIN_W = 0.01;
+const POSTER_FIELD_MIN_H = 0.01;
+
+function parseJsonField(raw, fallback) {
+  if (raw === undefined || raw === '') return fallback;
+  if (typeof raw !== 'string') return raw;
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+
+// Validates the field layout sent by the poster designer. Drafts only need clean geometry;
+// a published poster needs a category and every active doctor field placed.
+async function resolvePosterLayout(body, status) {
+  const rawFields = parseJsonField(body.fields, []);
+  const rawDisabled = parseJsonField(body.disabledFields, []);
+  if (!Array.isArray(rawFields) || !Array.isArray(rawDisabled)) {
+    return { error: 'Invalid field layout' };
+  }
+
+  const disabledFields = [...new Set(rawDisabled.map((k) => String(k).trim()).filter(Boolean))];
+  const seen = new Set();
+  let fields = [];
+  for (const raw of rawFields) {
+    const key = String(raw?.key || '').trim();
+    if (!key) return { error: 'Every placed field needs a key' };
+    if (seen.has(key)) return { error: `Field "${key}" is placed more than once` };
+    seen.add(key);
+
+    const x = Number(raw.x);
+    const y = Number(raw.y);
+    const w = Number(raw.w);
+    const h = Number(raw.h);
+    const inside = [x, y, w, h].every(Number.isFinite)
+      && x >= 0 && y >= 0 && w >= POSTER_FIELD_MIN_W && h >= POSTER_FIELD_MIN_H
+      && x + w <= 1.001 && y + h <= 1.001;
+    if (!inside) return { error: `Field "${key}" has an invalid position` };
+
+    fields.push({
+      key,
+      type: String(raw.type || 'text'),
+      x,
+      y,
+      w: Math.min(w, 1 - x),
+      h: Math.min(h, 1 - y),
+      color: /^#[0-9a-f]{6}$/i.test(String(raw.color || '')) ? String(raw.color) : '#ffffff',
+      align: ['left', 'center', 'right'].includes(raw.align) ? raw.align : 'left',
+      shape: ['circle', 'rectangle', 'square'].includes(raw.shape) ? raw.shape : 'rectangle',
+    });
+  }
+
+  if (status === 'draft') return { fields, disabledFields, category: String(body.category || '').trim() };
+
+  const categoryName = String(body.category || '').trim();
+  if (!categoryName) return { error: 'Choose a category for this poster' };
+  const category = await Category.findOne({ name: { $regex: `^${escapeRegex(categoryName)}$`, $options: 'i' } });
+  if (!category) return { error: 'Choose one of the existing poster categories' };
+
+  const themeName = String(body.color || '').trim();
+  if (!themeName) return { error: 'Choose a theme for this poster' };
+  const theme = await Theme.findOne({ name: { $regex: `^${escapeRegex(themeName)}$`, $options: 'i' } });
+  if (!theme) return { error: 'Choose one of the existing poster themes' };
+
+  const monthName = String(body.month || '').trim();
+  const month = POSTER_MONTHS.find((m) => m.toLowerCase() === monthName.toLowerCase());
+  if (!month) return { error: 'Choose a month for this poster' };
+
+  const activeFields = await DoctorField.find({ enabled: true }).lean();
+  const activeKeys = new Set(activeFields.map((f) => f.key));
+  const disabled = new Set(disabledFields);
+
+  fields = fields.filter((f) => !disabled.has(f.key));
+  const unknown = fields.find((f) => !activeKeys.has(f.key));
+  if (unknown) return { error: `Field "${unknown.key}" is not an active doctor field` };
+  if (fields.length === 0) return { error: 'Place at least one field on the poster' };
+
+  const placed = new Set(fields.map((f) => f.key));
+  const missing = activeFields.filter((f) => !disabled.has(f.key) && !placed.has(f.key));
+  if (missing.length > 0) {
+    return { error: `Place every field on the poster before saving. Missing: ${missing.map((f) => f.label).join(', ')}` };
+  }
+
+  return { fields, disabledFields, category: category.name, color: theme.name, month };
+}
+
 app.get('/api/superadmin/posters', requireAuth('superadmin'), async (req, res) => {
   try {
-    const posters = await Poster.find().sort({ uploaddate: -1 });
+    if (req.query.status === 'draft') {
+      const drafts = await Poster.find({ status: 'draft' }).sort({ updatedAt: -1 });
+      return res.status(200).json({ posters: drafts });
+    }
+    const posters = await Poster.find({ status: { $ne: 'draft' } }).sort({ uploaddate: -1 });
     res.status(200).json({ posters });
   } catch (error) {
     console.error('Error fetching posters:', error);
@@ -2442,7 +2547,9 @@ app.get('/api/superadmin/posters', requireAuth('superadmin'), async (req, res) =
 
 app.post('/api/superadmin/posters', requireAuth('superadmin'), upload.any(), async (req, res) => {
   try {
-    const { category, color, month, uploaddate } = req.body;
+    const { uploaddate } = req.body;
+    let { color, month } = req.body;
+    let category = req.body.category;
     let posterlink = req.body.posterlink || '';
 
     const posterFile = req.files?.find((f) => f.fieldname === 'posterFile');
@@ -2454,6 +2561,16 @@ app.post('/api/superadmin/posters', requireAuth('superadmin'), upload.any(), asy
       return res.status(400).json({ message: 'Poster file or link is required' });
     }
 
+    // Only the designer sends `fields`; the plain upload form creates a legacy footer poster.
+    const status = req.body.status === 'draft' ? 'draft' : 'published';
+    let layout = { fields: [], disabledFields: [] };
+    if (req.body.fields !== undefined) {
+      layout = await resolvePosterLayout(req.body, status);
+      if (layout.error) return res.status(400).json({ message: layout.error });
+      category = layout.category;
+      if (status === 'published') ({ color, month } = layout);
+    }
+
     const enabledVal = req.body.enabled === undefined ? true : String(req.body.enabled) === 'true' || req.body.enabled === true;
     const newPoster = new Poster({
       posterlink,
@@ -2461,6 +2578,9 @@ app.post('/api/superadmin/posters', requireAuth('superadmin'), upload.any(), asy
       color: color || '',
       month: month || '',
       enabled: enabledVal,
+      status,
+      fields: layout.fields,
+      disabledFields: layout.disabledFields,
       ...(uploaddate ? { uploaddate: new Date(uploaddate) } : {}),
     });
 
@@ -2474,7 +2594,9 @@ app.post('/api/superadmin/posters', requireAuth('superadmin'), upload.any(), asy
 
 app.put('/api/superadmin/posters/:id', requireAuth('superadmin'), upload.any(), async (req, res) => {
   try {
-    const { category, color, month, uploaddate } = req.body;
+    const { uploaddate } = req.body;
+    let { color, month } = req.body;
+    let category = req.body.category;
     const poster = await Poster.findById(req.params.id);
     if (!poster) return res.status(404).json({ message: 'Poster not found' });
 
@@ -2483,6 +2605,17 @@ app.put('/api/superadmin/posters/:id', requireAuth('superadmin'), upload.any(), 
       poster.posterlink = await saveFile(posterFile.buffer, posterFile.originalname, 'master_posters');
     } else if (req.body.posterlink) {
       poster.posterlink = req.body.posterlink;
+    }
+
+    if (req.body.fields !== undefined) {
+      const status = req.body.status === 'draft' ? 'draft' : 'published';
+      const layout = await resolvePosterLayout(req.body, status);
+      if (layout.error) return res.status(400).json({ message: layout.error });
+      poster.status = status;
+      poster.fields = layout.fields;
+      poster.disabledFields = layout.disabledFields;
+      category = layout.category;
+      if (status === 'published') ({ color, month } = layout);
     }
 
     if (category !== undefined) poster.category = category;
@@ -2669,7 +2802,7 @@ app.get('/api/superadmin/themes', requireAuth('superadmin'), async (req, res) =>
       const tSlug = (t.slug || '').toLowerCase();
       const posterCount = posters.filter((p) => {
         const c = (p.color || '').toLowerCase().trim();
-        return c && (tName.includes(c) || c.includes(tName) || tSlug.includes(c) || c.includes(tSlug));
+        return c && (c === tName || c === tSlug);
       }).length;
       return {
         _id: t._id,
@@ -2795,7 +2928,12 @@ app.delete('/api/superadmin/themes/:id', requireAuth('superadmin'), async (req, 
       return res.status(404).json({ message: 'Theme not found' });
     }
     await Theme.findByIdAndDelete(req.params.id);
-    res.status(200).json({ success: true, message: 'Theme deleted successfully' });
+    // Remove the master posters built on this theme. Posters already saved on doctors are separate copies and stay.
+    const names = [...new Set([theme.name, theme.slug].filter(Boolean))];
+    const { deletedCount } = await Poster.deleteMany({
+      $or: names.map((n) => ({ color: { $regex: `^\\s*${escapeRegex(n)}\\s*$`, $options: 'i' } })),
+    });
+    res.status(200).json({ success: true, message: 'Theme deleted successfully', deletedPosters: deletedCount });
   } catch (error) {
     console.error('Error deleting theme:', error);
     res.status(500).json({ message: 'Failed to delete theme' });

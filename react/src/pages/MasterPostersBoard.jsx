@@ -2,9 +2,9 @@ import { useState, useEffect, useRef } from 'react';
 import DataTable from 'datatables.net-dt';
 import 'datatables.net-dt/css/dataTables.dataTables.css';
 import { apiRequest } from '../lib/apiClient';
-import BottomSheetSelect from '../components/BottomSheetSelect';
-import Datepicker from '../components/DatePicker';
+import PosterDesigner from './PosterDesigner';
 import styles from './AdminPortal.module.css';
+import { confirmDialog } from '../lib/alerts';
 
 const columns = [
   {
@@ -61,21 +61,9 @@ export default function MasterPostersBoard({ onContextChange }) {
   const [themes, setThemes] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [showModal, setShowModal] = useState(false);
-  const [closingModal, setClosingModal] = useState(false);
-  const [editingPoster, setEditingPoster] = useState(null);
-  const [saving, setSaving] = useState(false);
-  const [modalError, setModalError] = useState('');
-  const [formErrors, setFormErrors] = useState({});
-
-  const [form, setForm] = useState({
-    category: '',
-    color: '',
-    month: '',
-    enabled: true,
-    uploaddate: new Date().toISOString().split('T')[0],
-  });
-  const [posterFile, setPosterFile] = useState(null);
+  const [editingPoster, setEditingPoster] = useState(null); // poster opened in the designer
+  const [designerOpen, setDesignerOpen] = useState(false);
+  const [notice, setNotice] = useState('');
 
   const hostRef = useRef(null);
   const tableRef = useRef(null);
@@ -123,21 +111,7 @@ export default function MasterPostersBoard({ onContextChange }) {
   }, []);
 
   actionRef.current = {
-    edit: (poster) => {
-      setEditingPoster(poster);
-      setForm({
-        category: poster.category || '',
-        color: poster.color || '',
-        month: poster.month || '',
-        enabled: poster.enabled !== false,
-        uploaddate: poster.uploaddate ? new Date(poster.uploaddate).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
-      });
-      setPosterFile(null);
-      setModalError('');
-      setFormErrors({});
-      setShowModal(true);
-      setClosingModal(false);
-    },
+    edit: (poster) => openDesigner(poster),
     toggleStatus: async (poster) => {
       try {
         await apiRequest(`/superadmin/posters/${poster._id}/toggle-status`, { method: 'PATCH' });
@@ -147,7 +121,7 @@ export default function MasterPostersBoard({ onContextChange }) {
       }
     },
     remove: async (poster) => {
-      if (!window.confirm('Delete this poster?')) return;
+      if (!(await confirmDialog({ title: 'Delete this poster?', confirmText: 'Delete', danger: true }))) return;
       try {
         await apiRequest(`/superadmin/posters/${poster._id}`, { method: 'DELETE' });
         loadPosters();
@@ -169,6 +143,7 @@ export default function MasterPostersBoard({ onContextChange }) {
 
     const table = new DataTable(tableEl, {
       data: posters,
+      language: { emptyTable: 'No posters found.' },
       columns,
       pageLength: 10,
       lengthMenu: [5, 10, 25, 50],
@@ -213,213 +188,51 @@ export default function MasterPostersBoard({ onContextChange }) {
     };
   }, [posters]);
 
-  const openCreate = () => {
+  const openDesigner = (poster = null) => {
     loadCategories();
     loadThemes();
+    setNotice('');
+    setEditingPoster(poster);
+    setDesignerOpen(true);
+  };
+
+  const handleDesignerSaved = (message) => {
+    setDesignerOpen(false);
     setEditingPoster(null);
-    setForm({ category: '', color: '', month: '', enabled: true, uploaddate: new Date().toISOString().split('T')[0] });
-    setPosterFile(null);
-    setModalError('');
-    setFormErrors({});
-    setShowModal(true);
-    setClosingModal(false);
-  };
-
-  const closeModal = () => {
-    setClosingModal(true);
-    setTimeout(() => {
-      setShowModal(false);
-      setClosingModal(false);
-    }, 400);
-  };
-
-  const handleSave = async (event) => {
-    event.preventDefault();
-
-    const errs = {};
-    if (!editingPoster && !posterFile) errs.posterFile = 'Please select a poster image to upload.';
-    if (!form.category.trim()) errs.category = 'Category is required.';
-    if (!form.color.trim()) errs.color = 'Color is required.';
-    if (!form.month.trim()) errs.month = 'Month is required.';
-    if (!form.uploaddate) errs.uploaddate = 'Upload date is required.';
-
-    if (Object.keys(errs).length > 0) {
-      setFormErrors(errs);
-      return;
-    }
-
-    setSaving(true);
-    setFormErrors({});
-    setModalError('');
-
-    const formData = new FormData();
-    if (posterFile) formData.append('posterFile', posterFile);
-    formData.append('category', form.category.trim());
-    formData.append('color', form.color.trim());
-    formData.append('month', form.month.trim());
-    formData.append('enabled', form.enabled);
-    if (form.uploaddate) formData.append('uploaddate', form.uploaddate);
-
-    try {
-      if (editingPoster) {
-        await apiRequest(`/superadmin/posters/${editingPoster._id}`, {
-          method: 'PUT',
-          body: formData,
-        });
-      } else {
-        await apiRequest('/superadmin/posters', {
-          method: 'POST',
-          body: formData,
-        });
-      }
-      closeModal();
-      loadPosters();
-    } catch (err) {
-      setModalError(err.message || 'Could not save poster');
-    } finally {
-      setSaving(false);
-    }
+    setNotice(message);
+    loadPosters();
   };
 
   return (
     <>
       <div className={`${styles.toolbar} ${styles.desktopOnly}`}>
         <div />
-        <button type="button" className={styles.primaryBtn} onClick={openCreate}>
-          + Add poster
-        </button>
+        <div className={styles.toolbarActions}>
+          <button type="button" className={styles.primaryBtn} onClick={() => openDesigner()}>
+            + Add poster
+          </button>
+        </div>
       </div>
 
       {error && <p className={styles.error}>{error}</p>}
+      {notice && <p className={styles.statusText} role="status">{notice}</p>}
       {loading && <p className={styles.statusText}>Loading…</p>}
 
       <div className={styles.tableCard}>
         <div ref={hostRef} className={styles.dtHost} />
-        {!loading && posters.length === 0 && (
-          <p className={styles.emptyState}>No posters found.</p>
-        )}
       </div>
 
-      {showModal && (
-        <div className={`${styles.modalOverlay} ${closingModal ? styles.closing : ''}`} onClick={closeModal}>
-          <div className={styles.modal} style={{ maxWidth: '500px' }} role="dialog" aria-modal="true" onClick={e => e.stopPropagation()}>
-            <h2 className={styles.modalTitle}>{editingPoster ? 'Edit poster' : 'Add poster'}</h2>
-
-            {modalError && <p className={styles.error} style={{ marginBottom: '16px' }}>{modalError}</p>}
-
-            <form onSubmit={handleSave} className={styles.form} noValidate>
-              <label className={styles.field}>
-                <span>Poster Image {editingPoster ? '(Leave blank to keep)' : '*'}</span>
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={e => {
-                    setPosterFile(e.target.files?.[0]);
-                    if (formErrors.posterFile) setFormErrors(p => ({ ...p, posterFile: null }));
-                  }}
-                />
-                {formErrors.posterFile && <span className={styles.fieldError}>{formErrors.posterFile}</span>}
-              </label>
-
-              <label className={styles.field}>
-                <span>Category *</span>
-                <BottomSheetSelect 
-                  value={form.category} 
-                  onChange={e => {
-                    setForm(p => ({ ...p, category: e.target.value }));
-                    if (formErrors.category) setFormErrors(p => ({ ...p, category: null }));
-                  }}
-                  placeholder="Select Category"
-                  options={[
-                    ...categories.map(cat => ({ label: cat.name, value: cat.name })),
-                    ...(form.category && !categories.some(c => c.name.toLowerCase() === form.category.toLowerCase()) 
-                      ? [{ label: `${form.category} (Current)`, value: form.category }] 
-                      : [])
-                  ]}
-                />
-                {formErrors.category && <span className={styles.fieldError}>{formErrors.category}</span>}
-              </label>
-
-              <label className={styles.field}>
-                <span>Color / Theme *</span>
-                <BottomSheetSelect 
-                  value={form.color} 
-                  onChange={e => {
-                    setForm(p => ({ ...p, color: e.target.value }));
-                    if (formErrors.color) setFormErrors(p => ({ ...p, color: null }));
-                  }}
-                  placeholder="Select Theme / Color"
-                  options={[
-                    ...themes.map(th => ({ 
-                      label: th.name, 
-                      value: th.name, 
-                      colorDot: th.accentColor || th.headerBg 
-                    })),
-                    ...(form.color && !themes.some(t => t.name.toLowerCase() === form.color.toLowerCase())
-                      ? [{ label: `${form.color} (Current)`, value: form.color }]
-                      : [])
-                  ]}
-                />
-                {formErrors.color && <span className={styles.fieldError}>{formErrors.color}</span>}
-              </label>
-
-              <label className={styles.field}>
-                <span>Month *</span>
-                <BottomSheetSelect 
-                  value={form.month} 
-                  onChange={e => {
-                    setForm(p => ({ ...p, month: e.target.value }));
-                    if (formErrors.month) setFormErrors(p => ({ ...p, month: null }));
-                  }}
-                  placeholder="Select Month"
-                  options={['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'].map(m => ({
-                    label: m,
-                    value: m
-                  }))}
-                />
-                {formErrors.month && <span className={styles.fieldError}>{formErrors.month}</span>}
-              </label>
-
-              <label className={styles.field}>
-                <span>Upload Date *</span>
-                <Datepicker
-                  select="date"
-                  value={form.uploaddate}
-                  onChange={args => {
-                    const dateVal = Array.isArray(args.value) ? args.value[0] : args.value;
-                    setForm(p => ({ ...p, uploaddate: dateVal }));
-                    if (formErrors.uploaddate) setFormErrors(p => ({ ...p, uploaddate: null }));
-                  }}
-                  inputProps={{ placeholder: "Select Date" }}
-                />
-                {formErrors.uploaddate && <span className={styles.fieldError}>{formErrors.uploaddate}</span>}
-              </label>
-
-              {editingPoster && (
-                <label className={styles.field} style={{ flexDirection: 'row', alignItems: 'center', gap: '8px', cursor: 'pointer', marginTop: '8px' }}>
-                  <label className={styles.switch}>
-                    <input
-                      type="checkbox"
-                      checked={form.enabled}
-                      onChange={e => setForm(p => ({ ...p, enabled: e.target.checked }))}
-                    />
-                    <span className={styles.slider}></span>
-                  </label>
-                  <span style={{ marginBottom: 0 }}>Active? (Uncheck to remove from form)</span>
-                </label>
-              )}
-
-              <div className={styles.modalActions}>
-                <button type="button" className={styles.secondaryBtn} onClick={closeModal}>
-                  Cancel
-                </button>
-                <button type="submit" className={styles.primaryBtn} disabled={saving}>
-                  {saving ? 'Saving…' : 'Save'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
+      {designerOpen && (
+        <PosterDesigner
+          categories={categories}
+          themes={themes}
+          initialPoster={editingPoster}
+          onClose={() => {
+            setDesignerOpen(false);
+            setEditingPoster(null);
+          }}
+          onSaved={handleDesignerSaved}
+        />
       )}
     </>
   );

@@ -6,6 +6,7 @@ import { sanitizePhoneInput, validatePhoneNumber } from '../features/auth/valida
 import { enabledFormFields, isFullWidthDoctorField } from '../lib/doctorFields';
 import styles from './DoctorManagePage.module.css';
 import adminStyles from './AdminPortal.module.css';
+import { confirmDialog } from '../lib/alerts';
 
 const EMPTY_FORM = {
   dynamicFields: {},
@@ -49,6 +50,7 @@ function formatPosterSendDate(value) {
 export default function DoctorManagePage({
   user,
   doctorId,
+  showMissingFields = false,
   onLogout,
   onBack,
   onStartNew,
@@ -104,6 +106,32 @@ export default function DoctorManagePage({
       setOriginalLogoUrl(res.doctor.logo || null);
       setLogoCropState(null);
       setTempLogoCropState(null);
+
+      if (showMissingFields) {
+        // Opened here instead of the preview: tell the user which required details are missing.
+        const errs = {};
+        const missing = [];
+        for (const f of (fieldsRes?.fields || []).filter((field) => field.enabled && field.required)) {
+          if (f.key === 'logo' || f.key === 'photo' || f.type === 'file') {
+            if (!res.doctor.logo) missing.push('Doctor photo / logo');
+            continue;
+          }
+          const val = String((f.isStandard ? res.doctor[f.key] : res.doctor.dynamicFields?.[f.key]) || '').trim();
+          const fieldError = !val
+            ? `${f.label} is required`
+            : f.key === 'contactnumber'
+              ? validatePhoneNumber(val)
+              : null;
+          if (fieldError) {
+            errs[f.key] = fieldError;
+            missing.push(f.label);
+          }
+        }
+        if (missing.length > 0) {
+          setFormFieldErrors(errs);
+          setError(`Complete the missing details to open the preview: ${missing.join(', ')}.`);
+        }
+      }
     } catch (err) {
       setError(err.message || 'Failed to load doctor');
     } finally {
@@ -170,7 +198,12 @@ export default function DoctorManagePage({
     if (!doctor) return;
     const nextActive = !doctor.active;
     const label = nextActive ? 'activate' : 'deactivate';
-    if (!window.confirm(`Are you sure you want to ${label} this doctor?`)) return;
+    if (!(await confirmDialog({
+      title: nextActive ? 'Activate doctor?' : 'Deactivate doctor?',
+      text: `Are you sure you want to ${label} this doctor?`,
+      confirmText: nextActive ? 'Activate' : 'Deactivate',
+      danger: !nextActive,
+    }))) return;
 
     try {
       const res = await apiRequest(`/doctors/${doctorId}/status`, {
@@ -185,7 +218,12 @@ export default function DoctorManagePage({
   };
 
   const handleRemove = async () => {
-    if (!window.confirm('Permanently remove this doctor and all posters?')) return;
+    if (!(await confirmDialog({
+      title: 'Remove doctor?',
+      text: 'This permanently removes this doctor and all posters.',
+      confirmText: 'Remove',
+      danger: true,
+    }))) return;
     try {
       await apiRequest(`/doctors/${doctorId}`, { method: 'DELETE' });
       onBack?.();
@@ -325,7 +363,7 @@ export default function DoctorManagePage({
               {logoPreview ? (
                 <img src={logoPreview} alt="" />
               ) : (
-                <span>{(doctor.name || 'D').slice(0, 1)}</span>
+                <span>—</span>
               )}
             </div>
             <div className={styles.profileCopy}>

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { apiRequest } from '../lib/apiClient';
 import StudioShell from '../components/StudioShell';
 import styles from './ExistingDoctorsPage.module.css';
+import { confirmDialog } from '../lib/alerts';
 
 export default function ExistingDoctorsPage({ user, onLogout, onBack, onSelectDoctor, onBrandClick }) {
   const [doctors, setDoctors] = useState([]);
@@ -50,7 +51,12 @@ export default function ExistingDoctorsPage({ user, onLogout, onBack, onSelectDo
   const handleRemove = async (event, doc) => {
     event.preventDefault();
     event.stopPropagation();
-    if (!window.confirm(`Permanently remove ${doc.name || 'this doctor'} and all posters?`)) {
+    if (!(await confirmDialog({
+      title: 'Remove doctor?',
+      text: `Permanently remove ${doc.name || 'this doctor'} and all posters?`,
+      confirmText: 'Remove',
+      danger: true,
+    }))) {
       return;
     }
     try {
@@ -119,7 +125,7 @@ export default function ExistingDoctorsPage({ user, onLogout, onBack, onSelectDo
                   {doc.logo ? (
                     <img src={doc.logo} alt="" />
                   ) : (
-                    <span>{(doc.name || 'D').slice(0, 1)}</span>
+                    <span>—</span>
                   )}
                 </div>
                 <div className={styles.rowBody}>
