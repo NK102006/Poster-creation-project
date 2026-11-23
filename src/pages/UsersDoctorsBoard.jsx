@@ -264,6 +264,13 @@ function useDataTable({ enabled, data, columns, onRowAction, emptyText }) {
       const button = event.target.closest('button[data-action]');
       const checkbox = event.target.closest('input[data-action]');
       const actionEl = button || checkbox;
+
+      // A click on a toggle switch's slider (or label) isn't on the hidden checkbox itself.
+      // Let the browser forward it to the checkbox, which fires its own click handled below.
+      if (!actionEl && event.target.closest('label')?.querySelector('input[data-action]')) {
+        event.stopPropagation();
+        return;
+      }
       
       const row = event.target.closest('tbody tr');
       if (!row) return;
@@ -662,7 +669,7 @@ export default function UsersDoctorsBoard({
       if (!doctor || action === 'edit-user' || action === 'delete-user') return;
       if (action === 'toggle-active') {
         try {
-          await apiRequest(`/api/doctors/${doctor.id}/status`, {
+          await apiRequest(`/doctors/${doctor.id}/status`, {
             method: 'PATCH',
             body: { active: doctor.active === false ? true : false },
           });
