@@ -27,11 +27,11 @@ Rebuild after changing APP_BASE_PATH or any VITE_* value. Both root `npm start` 
 `cd server && npm start` load the root .env; server/.env is an optional fallback.
 
 The included root `.htaccess` disables directory listings and proxies requests to
-Node. Apache must enable `rewrite`, `proxy`, and `proxy_http`, and allow
+Node. Apache must enable `rewrite`, `proxy`, `proxy_http`, and `headers`, and allow
 `AllowOverride All` for this clone directory. On Ubuntu/Debian:
 
 ```bash
-sudo a2enmod rewrite proxy proxy_http
+sudo a2enmod rewrite proxy proxy_http headers
 sudo systemctl reload apache2
 ```
 
@@ -45,6 +45,7 @@ Alternatively, in the existing HTTPS VirtualHost, use the following instead of
 .htaccess (keep the existing SSL settings):
 
 ```apache
+RequestHeader set X-Forwarded-Proto "https"
 ProxyPass /Poster-Creater/ http://127.0.0.1:4017/Poster-Creater/
 ProxyPassReverse /Poster-Creater/ http://127.0.0.1:4017/Poster-Creater/
 RedirectMatch 301 ^/Poster-Creater$ /Poster-Creater/
@@ -76,3 +77,24 @@ npm run dev
 Open the Vite URL with `/Poster-Creater/`. Vite proxies API and upload requests
 to Node on port 4017. To serve at the domain root instead, set APP_BASE_PATH=/
 and rebuild; update Apache's URL mapping accordingly.
+
+## Login immediately returns to the sign-in page
+
+Deploy the updated .htaccess (including X-Forwarded-Proto), enable Apache's
+headers module, reload Apache, and restart Node with the same SESSION_SECRET
+in every worker. COOKIE_SECURE=auto supports local HTTP and HTTPS behind Apache;
+COOKIE_SECURE=true requires the forwarded HTTPS scheme. If using the VirtualHost
+proxy example instead of .htaccess, include its RequestHeader directive inside
+the HTTPS VirtualHost. If TLS terminates at a load balancer, configure Apache to
+forward the trusted load balancer's original scheme instead of its local scheme.
+
+Sessions now persist in the app_sessions table in the same SQLite database.
+Existing in-memory logins require one fresh login after this update.
+
+The startup log prints the exact database path. Relative SQLITE_PATH values are
+resolved from the project root, regardless of whether Node starts from root or
+server/. The OS user running Node needs write permission on both the database
+and its containing directory (SQLite creates WAL/SHM files there). An empty
+new AWS database does not contain local admins or doctors: migrate your existing
+SQLite database separately while Node is stopped. Do not make database files
+publicly accessible. No separate database service is required.

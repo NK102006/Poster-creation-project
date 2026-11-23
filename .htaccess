@@ -1,7 +1,10 @@
-# Apache modules: rewrite, proxy, proxy_http. AllowOverride All required.
+# Apache modules: rewrite, proxy, proxy_http, headers. AllowOverride All required.
 Options -Indexes -MultiViews
 DirectoryIndex disabled
 RewriteEngine On
+
+# Node must know the original scheme to issue secure login cookies.
+RequestHeader set X-Forwarded-Proto "expr=%{REQUEST_SCHEME}"
 
 # Never serve repository files, even when someone guesses their names.
 RewriteRule (^|/)\. - [F,L]

@@ -7,6 +7,7 @@ import session from 'express-session';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { SQLiteSessionStore } from './sessionStore.js';
 
 const SERVER_DIR = path.dirname(fileURLToPath(import.meta.url));
 const PROJECT_DIR = path.resolve(SERVER_DIR, '..');
@@ -18,6 +19,7 @@ const BASE_PATH = `/${(process.env.APP_BASE_PATH || '/Poster-Creater').replace(/
 // The database is opened (and its schema created) when db.js is imported.
 const {
   DB_PATH,
+  db,
   isValidId,
   Superadmins,
   Admins,
@@ -42,13 +44,15 @@ app.use((req, res, next) => {
 app.use(session({
   secret: process.env.SESSION_SECRET || 'local-development-only',
   name: 'poster.sid',
+  store: new SQLiteSessionStore(db),
   resave: false,
   saveUninitialized: false,
   cookie: {
     httpOnly: true,
     sameSite: 'lax',
     path: BASE_PATH || '/',
-    secure: process.env.COOKIE_SECURE === 'true',
+    secure: process.env.COOKIE_SECURE === 'false' ? false : process.env.COOKIE_SECURE === 'true' ? true : 'auto',
+    maxAge: 24 * 60 * 60 * 1000,
   },
 }));
 
@@ -537,7 +541,7 @@ function setAuthSession(req, auth) {
       if (err) return reject(err);
       req.session.auths = { ...previous, [auth.role]: auth };
       req.session.auth = auth;
-      resolve(auth);
+      req.session.save((saveError) => saveError ? reject(saveError) : resolve(auth));
     });
   });
 }

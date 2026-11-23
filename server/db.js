@@ -8,7 +8,7 @@ import { fileURLToPath } from 'url';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 export const DB_PATH = process.env.SQLITE_PATH
-  ? path.resolve(process.env.SQLITE_PATH)
+  ? path.resolve(HERE, '..', process.env.SQLITE_PATH)
   : path.join(HERE, 'data', 'poster-creation.db');
 
 fs.mkdirSync(path.dirname(DB_PATH), { recursive: true });
