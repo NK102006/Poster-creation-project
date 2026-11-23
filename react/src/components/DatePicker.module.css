@@ -1,0 +1,216 @@
+.root {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  width: 100%;
+  z-index: 1;
+}
+
+.rangeRoot {
+  width: 100%;
+}
+
+.compact {
+  max-width: 200px;
+}
+
+.input {
+  width: 100%;
+  min-height: 36px;
+  box-sizing: border-box;
+  padding: 8px 16px;
+  border-radius: 999px;
+  border: 1px solid rgba(31, 111, 159, 0.16);
+  background: #fff;
+  color: var(--color-text);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.input::placeholder {
+  color: #6b7280;
+  font-weight: 500;
+}
+
+.input:hover,
+.input:focus {
+  outline: none;
+  border-color: rgba(31, 111, 159, 0.42);
+  box-shadow: 0 0 0 3px rgba(74, 159, 212, 0.12);
+}
+
+.dropdown {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 30;
+  width: min(320px, 92vw);
+  border-radius: 14px;
+  border: 1px solid rgba(31, 111, 159, 0.14);
+  background: #fff;
+  box-shadow: 0 12px 28px -14px rgba(15, 40, 70, 0.35);
+  overflow: hidden;
+}
+
+.sheetHeader {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  align-items: stretch;
+  padding: 10px 10px 8px;
+  border-bottom: 1px solid rgba(31, 111, 159, 0.1);
+  background: #f7fbfe;
+}
+
+.tab {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 8px 10px;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+}
+
+.tabActive {
+  background: rgba(74, 159, 212, 0.12);
+}
+
+.tabLabel {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.tabActive .tabLabel,
+.tabActive .tabValue {
+  color: #1f6f9f;
+}
+
+.tabValue {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--color-text);
+  font-variant-numeric: tabular-nums;
+}
+
+.monthBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px 4px;
+}
+
+.monthTitle {
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--color-primary-rich);
+}
+
+.monthNav {
+  display: flex;
+  gap: 2px;
+}
+
+.navBtn {
+  width: 30px;
+  height: 30px;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: #1f6f9f;
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.navBtn:hover {
+  background: rgba(74, 159, 212, 0.12);
+}
+
+.weekRow,
+.dayGrid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+  padding: 0 10px;
+}
+
+.dayGrid {
+  padding-bottom: 12px;
+}
+
+.weekday {
+  text-align: center;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--color-text-muted);
+  padding: 4px 0;
+}
+
+.dayEmpty {
+  min-height: 34px;
+}
+
+.day {
+  min-height: 34px;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--color-text);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.day:hover {
+  background: rgba(74, 159, 212, 0.12);
+}
+
+.dayInRange {
+  background: rgba(74, 159, 212, 0.16);
+  border-radius: 0;
+}
+
+.dayStart {
+  border-top-left-radius: 999px;
+  border-bottom-left-radius: 999px;
+}
+
+.dayEnd {
+  border-top-right-radius: 999px;
+  border-bottom-right-radius: 999px;
+}
+
+.daySelected {
+  background: #2396e0 !important;
+  color: #fff !important;
+  border-radius: 999px !important;
+}
+
+@media (max-width: 480px) {
+  .root,
+  .compact,
+  .rangeRoot {
+    flex: 1 1 100%;
+    max-width: none;
+  }
+
+  .dropdown {
+    width: 100%;
+  }
+}
