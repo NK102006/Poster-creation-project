@@ -1,3 +1,5 @@
+import { appPath } from './appPath';
+
 /** Shared helpers for doctor fields placed on a poster by the designer. */
 
 // Placed rectangles are fractions (0-1) of the 4:5 poster canvas.
@@ -107,5 +109,9 @@ export function fieldBoxStyle(field) {
 export function posterImageUrl(link) {
   const raw = String(link || '');
   if (!raw) return '';
-  return /^(https?:|data:|blob:)/.test(raw) || raw.startsWith('/') ? raw : `/${raw}`;
+  // Legacy database values may be uploads/... or /uploads/....
+  if (/^\/?uploads[\/\\]/.test(raw)) {
+    return appPath(`/${raw.replace(/^\//, '').replace(/\\/g, '/')}`);
+  }
+  return /^(https?:|data:|blob:)/.test(raw) || raw.startsWith('/') ? raw : appPath(`/${raw}`);
 }

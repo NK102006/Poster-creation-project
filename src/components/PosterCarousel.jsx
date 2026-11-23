@@ -1,3 +1,4 @@
+import { posterImageUrl } from '../lib/posterFields';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { mapThemeToRiskFactor, themePageStyle } from '../lib/posterExport';
 import { apiRequest } from '../lib/apiClient';
@@ -106,10 +107,7 @@ export function PosterPage({
 
   const rawImage = poster.image || poster.src || poster.imageUrl;
   if (rawImage) {
-    const imageSrc =
-      /^(https?:|data:|blob:)/.test(rawImage) || rawImage.startsWith('/')
-        ? rawImage
-        : `/${rawImage}`;
+    const imageSrc = posterImageUrl(rawImage);
     return (
       <div
         className={`${styles.blankPage} ${styles.componentPage}`}

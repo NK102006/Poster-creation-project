@@ -1,3 +1,4 @@
+import { posterImageUrl } from '../lib/posterFields';
 import { useState, useEffect, useRef } from 'react';
 import DataTable from 'datatables.net-dt';
 import 'datatables.net-dt/css/dataTables.dataTables.css';
@@ -10,7 +11,7 @@ const columns = [
   {
     title: 'Poster',
     data: 'posterlink',
-    render: (data) => data ? `<img src="${data.startsWith('http') ? data : '/' + data}" alt="Poster" style="width: 50px; height: 50px; object-fit: cover; border-radius: 4px;" />` : '—',
+    render: (data) => data ? `<img src="${posterImageUrl(data).replaceAll('&', '&amp;').replaceAll('"', '&quot;').replaceAll('<', '&lt;')}" alt="Poster" style="width: 50px; height: 50px; object-fit: cover; border-radius: 4px;" />` : '—',
   },
   { title: 'Category', data: 'category' },
   { title: 'Color', data: 'color' },

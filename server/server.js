@@ -148,7 +148,7 @@ function normalizeStoredPath(value) {
   let str = String(value).replace(/^https?:\/\/[^/]+/, '');
   if (BASE_PATH && str.startsWith(`${BASE_PATH}/uploads/`)) str = str.slice(BASE_PATH.length);
   const match = /^\/(uploads\/.*)$/.exec(str);
-  return match ? match[1] : str;
+  return match ? match[1] : String(value);
 }
 
 function slugifyTheme(name) {
@@ -392,9 +392,12 @@ async function saveFile(buffer, originalname, subfolder) {
 function bufferToDataUrl(value, fallbackMime = 'image/png') {
   if (!value) return null;
   if (typeof value === 'string') {
+    value = normalizeStoredPath(value);
     if (value.startsWith('uploads/') || value.startsWith('uploads\\')) {
       // Relative by default so the URL works from any device (proxied by Vite); set PUBLIC_BASE_URL to force an absolute origin.
-      const base = (process.env.PUBLIC_BASE_URL || BASE_PATH).replace(/\/$/, '');
+      let base = (process.env.PUBLIC_BASE_URL || BASE_PATH).replace(/\/$/, '');
+      // An origin-only override still needs the application's subfolder.
+      if (/^https?:\/\/[^/]+$/.test(base)) base += BASE_PATH;
       return `${base}/${value.replace(/\\/g, '/')}`;
     }
     return value;
@@ -2098,6 +2101,10 @@ app.use((err, req, res, next) => {
   });
 });
 
+function formatPosterTemplate(poster) {
+  return { ...poster, posterlink: bufferToDataUrl(poster.posterlink) };
+}
+
 // --- Superadmin Template Posters API ---
 app.get('/api/posters', requireAuth('superadmin', 'admin', 'user'), async (req, res) => {
   try {
@@ -2108,7 +2115,7 @@ app.get('/api/posters', requireAuth('superadmin', 'admin', 'user'), async (req, 
       month: month ? String(month) : undefined,
       category: category && category !== 'all' ? String(category) : undefined,
     });
-    res.status(200).json({ posters });
+    res.status(200).json({ posters: posters.map(formatPosterTemplate) });
   } catch (error) {
     console.error('Error fetching posters:', error);
     res.status(500).json({ message: 'Failed to fetch posters' });
@@ -2207,10 +2214,10 @@ app.get('/api/superadmin/posters', requireAuth('superadmin'), async (req, res) =
   try {
     if (req.query.status === 'draft') {
       const drafts = PosterTemplates.list({ status: 'draft', orderBy: 'updatedAt' });
-      return res.status(200).json({ posters: drafts });
+      return res.status(200).json({ posters: drafts.map(formatPosterTemplate) });
     }
     const posters = PosterTemplates.list({ status: 'published' });
-    res.status(200).json({ posters });
+    res.status(200).json({ posters: posters.map(formatPosterTemplate) });
   } catch (error) {
     console.error('Error fetching posters:', error);
     res.status(500).json({ message: 'Failed to fetch posters' });
@@ -2256,7 +2263,7 @@ app.post('/api/superadmin/posters', requireAuth('superadmin'), upload.any(), asy
       ...(uploaddate ? { uploaddate: new Date(uploaddate) } : {}),
     });
 
-    res.status(201).json({ success: true, poster: newPoster });
+    res.status(201).json({ success: true, poster: formatPosterTemplate(newPoster) });
   } catch (error) {
     console.error('Error creating poster:', error);
     res.status(500).json({ message: 'Failed to upload poster' });
@@ -2298,7 +2305,7 @@ app.put('/api/superadmin/posters/:id', requireAuth('superadmin'), upload.any(), 
     if (uploaddate) poster.uploaddate = new Date(uploaddate);
 
     const saved = PosterTemplates.update(req.params.id, poster);
-    res.status(200).json({ success: true, poster: saved });
+    res.status(200).json({ success: true, poster: formatPosterTemplate(saved) });
   } catch (error) {
     console.error('Error updating poster:', error);
     res.status(500).json({ message: 'Failed to update poster' });
@@ -2310,7 +2317,7 @@ app.patch('/api/superadmin/posters/:id/toggle-status', requireAuth('superadmin')
     const existing = PosterTemplates.findById(req.params.id);
     if (!existing) return res.status(404).json({ message: 'Poster not found' });
     const poster = PosterTemplates.update(existing._id, { enabled: existing.enabled === false });
-    res.status(200).json({ success: true, poster });
+    res.status(200).json({ success: true, poster: formatPosterTemplate(poster) });
   } catch (error) {
     console.error('Error toggling poster status:', error);
     res.status(500).json({ message: 'Failed to toggle poster status' });

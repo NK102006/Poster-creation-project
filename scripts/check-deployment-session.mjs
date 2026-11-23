@@ -15,7 +15,7 @@ async function start() {
     cwd: path.join(root, 'server'),
     env: { ...process.env, PORT: port, HOST: '127.0.0.1', APP_BASE_PATH: '/Poster-Creater',
       SQLITE_PATH: path.join(directory, 'test.db'), UPLOADS_DIR: path.join(directory, 'uploads'),
-      SESSION_SECRET: 'deployment-test-secret', COOKIE_SECURE: 'true' },
+      SESSION_SECRET: 'deployment-test-secret', COOKIE_SECURE: 'true', PUBLIC_BASE_URL: '' },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   await new Promise((resolve, reject) => {
@@ -49,6 +49,37 @@ try {
   const create = await fetch(`${base}/superadmin/admins`, { method: 'POST', headers,
     body: JSON.stringify({ username: 'deployment_check', password: 'Check12345!' }) });
   assert.equal(create.status, 201, await create.text());
+  // A real multipart upload exercises file permissions, layout inserts and public URLs.
+  const posterBytes = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=', 'base64');
+  const multipartHeaders = { ...headers };
+  delete multipartHeaders['Content-Type'];
+  const form = new FormData();
+  form.append('posterFile', new Blob([posterBytes], { type: 'image/png' }), 'poster.png');
+  form.append('status', 'draft');
+  form.append('fields', JSON.stringify([{ key: 'name', type: 'text', x: 0.1, y: 0.1, w: 0.4, h: 0.1 }]));
+  form.append('disabledFields', '[]');
+  const upload = await fetch(`${base}/superadmin/posters`, { method: 'POST', headers: multipartHeaders, body: form });
+  assert.equal(upload.status, 201, await upload.clone().text());
+  const uploaded = (await upload.json()).poster;
+  assert.match(uploaded.posterlink, /^\/Poster-Creater\/uploads\/master_posters\//, 'API must return the application URL prefix');
+  const publicImage = new URL(uploaded.posterlink, base);
+  const image = await fetch(publicImage);
+  assert.equal(image.status, 200, `Uploaded poster URL must be accessible: ${publicImage}`);
+  assert.deepEqual(Buffer.from(await image.arrayBuffer()), posterBytes);
+  const drafts = await fetch(`${base}/superadmin/posters?status=draft`, { headers });
+  const savedDraft = (await drafts.json()).posters.find(poster => poster._id === uploaded._id);
+  assert.equal(savedDraft.posterlink, uploaded.posterlink);
+  const publishedForm = new FormData();
+  publishedForm.append('posterFile', new Blob([posterBytes], { type: 'image/png' }), 'published.png');
+  const publishedResponse = await fetch(`${base}/superadmin/posters`, { method: 'POST', headers: multipartHeaders, body: publishedForm });
+  assert.equal(publishedResponse.status, 201);
+  const published = (await publishedResponse.json()).poster;
+  for (const route of ['/superadmin/posters', '/posters']) {
+    const list = await fetch(`${base}${route}`, { headers });
+    const poster = (await list.json()).posters.find(item => item._id === published._id);
+    assert.equal(poster.posterlink, published.posterlink);
+    assert.match(poster.posterlink, /^\/Poster-Creater\/uploads\//);
+  }
   await stop();
   await start();
   const result = await fetch(`${base}/superadmin/admins`, { headers });
@@ -57,7 +88,7 @@ try {
   const logout = await fetch(`${base}/logout`, { method: 'POST', headers, body: '{}' });
   assert.equal(logout.status, 200);
   assert.equal((await fetch(`${base}/superadmin/admins`, { headers })).status, 401);
-  console.log('PASS: HTTPS cookie, protected database access, persisted session/data after restart, and logout.');
+  console.log('PASS: HTTPS login, multipart poster upload, prefixed image URL and bytes, database/session persistence, and logout.');
 } finally {
   await stop();
   await rm(directory, { recursive: true, force: true });
