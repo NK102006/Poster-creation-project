@@ -1,19 +1,26 @@
 import express from 'express';
 import cors from 'cors';
-import mongoose from 'mongoose';
 import bcrypt from 'bcryptjs';
 import multer from 'multer';
 import dotenv from 'dotenv';
 import session from 'express-session';
-import { execFile, spawn } from 'child_process';
-import { promisify } from 'util';
 import fs from 'fs';
-import net from 'net';
 import path from 'path';
 
-const execFileAsync = promisify(execFile);
-
 dotenv.config();
+
+// The database is opened (and its schema created) when db.js is imported.
+const {
+  DB_PATH,
+  isValidId,
+  Admins,
+  Users,
+  Doctors,
+  PosterTemplates,
+  DoctorFields,
+  Categories,
+  Themes,
+} = await import('./db.js');
 
 const app = express();
 app.use(session({
@@ -32,7 +39,6 @@ const upload = multer({
 });
 
 const PORT = process.env.PORT || 3000;
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/posterCreation';
 
 app.use(cors({
   origin: true,
@@ -50,18 +56,7 @@ fs.mkdirSync(path.join(UPLOADS_DIR, 'videos'), { recursive: true });
 fs.mkdirSync(path.join(UPLOADS_DIR, 'master_posters'), { recursive: true });
 app.use('/uploads', express.static(UPLOADS_DIR));
 
-// Schemas & Models
-const posterEntrySchema = new mongoose.Schema(
-  {
-    image: { type: mongoose.Schema.Types.Mixed, required: true },
-    downloads: { type: Number, default: 0 },
-    createdAt: { type: Date, default: Date.now },
-    kind: { type: String, enum: ['education', 'festival', 'video'], default: 'education' },
-    label: { type: String, default: '' },
-    month: { type: String, default: '' },
-  },
-  { _id: true }
-);
+// Tables and queries live in db.js.
 
 function normalizePosterKind(value, imageHint = '') {
   const raw = String(value || '').toLowerCase();
@@ -71,57 +66,6 @@ function normalizePosterKind(value, imageHint = '') {
   if (src.includes('.mp4') || src.includes('video')) return 'video';
   return 'education';
 }
-
-const doctorSchema = new mongoose.Schema({
-  ownerUser: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null, index: true },
-  name: { type: String, required: true },
-  clinicName: { type: String, trim: true },
-  doctorDegree: { type: String, trim: true, default: '' },
-  contactnumber: { type: Number },
-  logo: { type: mongoose.Schema.Types.Mixed },
-  poster: { type: mongoose.Schema.Types.Mixed }, // latest poster (legacy + convenience)
-  posters: { type: [posterEntrySchema], default: [] },
-  downloadCount: { type: Number, default: 0 },
-  active: { type: Boolean, default: true },
-  dynamicFields: { type: mongoose.Schema.Types.Mixed, default: {} },
-}, { timestamps: true });
-
-const userSchema = new mongoose.Schema({
-  empid: { type: mongoose.Schema.Types.Mixed },
-  password: { type: String, required: true },
-  ownerAdmin: { type: mongoose.Schema.Types.ObjectId, ref: 'Admin', default: null, index: true },
-}, { strict: false, timestamps: true });
-
-// A doctor field placed on a poster. x/y/w/h are fractions (0-1) of the 4:5 poster canvas.
-const posterFieldSchema = new mongoose.Schema({
-  key: { type: String, required: true },
-  type: { type: String, default: 'text' },
-  x: { type: Number, required: true },
-  y: { type: Number, required: true },
-  w: { type: Number, required: true },
-  h: { type: Number, required: true },
-  color: { type: String, default: '#ffffff' },
-  align: { type: String, enum: ['left', 'center', 'right'], default: 'left' },
-  shape: { type: String, enum: ['circle', 'rectangle', 'square'], default: 'rectangle' },
-}, { _id: false });
-
-const templatePosterSchema = new mongoose.Schema({
-  posterlink: { type: String, required: true },
-  category: { type: String, default: '' },
-  color: { type: String, default: '' },
-  month: { type: String, default: '' },
-  enabled: { type: Boolean, default: true },
-  uploaddate: { type: Date, default: Date.now },
-  // Posters without a status predate the designer and count as published.
-  status: { type: String, enum: ['draft', 'published'], default: 'published' },
-  fields: { type: [posterFieldSchema], default: [] },
-  disabledFields: { type: [String], default: [] },
-}, { timestamps: true });
-
-const adminSchema = new mongoose.Schema({
-  username: { type: String, required: true, unique: true, trim: true },
-  password: { type: String, required: true },
-}, { timestamps: true });
 
 function assertContactNumber(value, { required = true } = {}) {
   const digits = String(value ?? '').replace(/\D/g, '');
@@ -169,75 +113,19 @@ function assertNewPassword(password, { required = true } = {}) {
   return value;
 }
 
-function attachPasswordHashing(schema) {
-  schema.pre('save', async function hashStoredPassword() {
-    if (!this.isModified('password')) return;
-    this.password = await hashPassword(this.password);
-  });
-}
-
-async function ensureHashedPasswords(Model, fallback = 'pass1234') {
-  const docs = await Model.find();
-  let count = 0;
-  for (const doc of docs) {
-    const current = doc.password != null ? String(doc.password) : '';
-    if (isHashedPassword(current)) continue;
-    doc.password = current || fallback;
-    doc.markModified('password');
-    await doc.save();
-    count += 1;
-  }
-  return count;
-}
-
-attachPasswordHashing(userSchema);
-attachPasswordHashing(adminSchema);
-
-const doctorFieldConfigSchema = new mongoose.Schema({
-  key: { type: String, required: true, unique: true },
-  label: { type: String, required: true },
-  type: { type: String, required: true }, // 'text', 'number', 'tel', 'email' etc.
-  required: { type: Boolean, default: false },
-  isStandard: { type: Boolean, default: false },
-  enabled: { type: Boolean, default: true },
-  order: { type: Number, default: 0 }
-});
-export const DoctorField = mongoose.model('DoctorField', doctorFieldConfigSchema);
-
 // The logo is only mandatory while the superadmin keeps the logo field enabled and required.
 async function isDoctorLogoRequired() {
-  const logoField = await DoctorField.findOne({ key: 'logo' }).lean();
+  const logoField = DoctorFields.findByKey('logo');
   return Boolean(logoField && logoField.enabled && logoField.required);
 }
 
-export const Doctor = mongoose.model('Doctor', doctorSchema);
-export const User = mongoose.model('User', userSchema);
-export const Admin = mongoose.model('Admin', adminSchema);
-export const Poster = mongoose.model('Poster', templatePosterSchema);
-
-const categorySchema = new mongoose.Schema(
-  {
-    name: { type: String, required: true, unique: true, trim: true },
-    enabled: { type: Boolean, default: true },
-  },
-  { timestamps: true }
-);
-export const Category = mongoose.model('Category', categorySchema);
-
-const themeSchema = new mongoose.Schema(
-  {
-    name: { type: String, required: true, unique: true, trim: true },
-    slug: { type: String, trim: true },
-    headerBg: { type: String, default: '#1a4f8b' },
-    footerBg: { type: String, default: '#143a66' },
-    accentColor: { type: String, default: '#2b6cb0' },
-    description: { type: String, default: '' },
-    cardGlow: { type: String, default: 'rgba(26, 79, 139, 0.14)' },
-    enabled: { type: Boolean, default: true },
-  },
-  { timestamps: true }
-);
-export const Theme = mongoose.model('Theme', themeSchema);
+/** Uploaded paths come back from the client as URLs ("/uploads/x.png"); store them as "uploads/x.png". */
+function normalizeStoredPath(value) {
+  if (value == null || value === '') return null;
+  const str = String(value);
+  const match = /^(?:https?:\/\/[^/]+)?\/(uploads\/.*)$/.exec(str);
+  return match ? match[1] : str;
+}
 
 function slugifyTheme(name) {
   const base = String(name || '')
@@ -250,9 +138,6 @@ function slugifyTheme(name) {
 const SUPERADMIN_USERNAME = 'superadmin';
 const SUPERADMIN_PASSWORD = 'superadmin123';
 
-function escapeRegex(value) {
-  return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
 
 // Identity comes ONLY from the server-side session. The X-Auth-Role header just
 // selects which of the session's logins to use, and X-Auth-Id is a consistency
@@ -351,7 +236,7 @@ function requireAuth(...roles) {
       }
 
       if (auth.role === 'admin' && auth.id) {
-        const admin = await Admin.findById(auth.id);
+        const admin = Admins.findById(auth.id);
         if (!admin) {
           if (req.session) {
             if (req.session.auths) delete req.session.auths.admin;
@@ -360,7 +245,7 @@ function requireAuth(...roles) {
           return res.status(401).json({ success: false, message: 'Unauthorized - Admin not found' });
         }
       } else if (auth.role === 'user' && auth.id) {
-        const user = await User.findById(auth.id);
+        const user = Users.findById(auth.id);
         if (!user) {
           if (req.session) {
             if (req.session.auths) delete req.session.auths.user;
@@ -417,45 +302,29 @@ function formatAdmin(doc, extra = {}) {
 }
 
 async function findAdminByUsername(username) {
-  const value = String(username || '').trim();
-  if (!value) return null;
-  return Admin.findOne({ username: { $regex: `^${escapeRegex(value)}$`, $options: 'i' } });
+  return Admins.findByUsername(username);
 }
 
-async function userIdsForAdmin(adminId) {
-  if (!mongoose.isValidObjectId(adminId)) return [];
-  const users = await User.find({ ownerAdmin: adminId }).select('_id');
-  return users.map((user) => user._id);
-}
-
-async function doctorQueryForAuth(auth, { adminId } = {}) {
-  if (!auth) return { _id: null };
+// Scopes are plain objects understood by db.js: null = nothing, {} = everything,
+// { ownerUserId } / { ownerAdminId } = restricted.
+function doctorScopeForAuth(auth, { adminId } = {}) {
+  if (!auth) return null;
   if (auth.role === 'superadmin') {
-    if (adminId) {
-      const ids = await userIdsForAdmin(adminId);
-      return { ownerUser: { $in: ids } };
-    }
+    if (adminId) return isValidId(String(adminId)) ? { ownerAdminId: adminId } : null;
     return {};
   }
-  if (auth.role === 'admin') {
-    const ids = await userIdsForAdmin(auth.id);
-    return { ownerUser: { $in: ids } };
-  }
-  if (auth.role === 'user') {
-    return { ownerUser: auth.id };
-  }
-  return { _id: null };
+  if (auth.role === 'admin') return { ownerAdminId: auth.id };
+  if (auth.role === 'user') return { ownerUserId: auth.id };
+  return null;
 }
 
-async function userQueryForAuth(auth, { adminId } = {}) {
-  if (!auth) return { _id: null };
+function userScopeForAuth(auth, { adminId } = {}) {
+  if (!auth) return null;
   if (auth.role === 'superadmin') {
-    return adminId && mongoose.isValidObjectId(adminId) ? { ownerAdmin: adminId } : {};
+    return adminId && isValidId(String(adminId)) ? { ownerAdminId: adminId } : {};
   }
-  if (auth.role === 'admin') {
-    return { ownerAdmin: auth.id };
-  }
-  return { _id: null };
+  if (auth.role === 'admin') return { ownerAdminId: auth.id };
+  return null;
 }
 
 async function assertUserInScope(auth, user) {
@@ -470,7 +339,7 @@ async function canAccessDoctor(auth, doctor) {
   if (auth.role === 'superadmin') return true;
   if (auth.role === 'admin') {
     if (!doctor.ownerUser) return false;
-    const owner = await User.findById(doctor.ownerUser).select('ownerAdmin');
+    const owner = Users.findById(doctor.ownerUser);
     return String(owner?.ownerAdmin || '') === String(auth.id);
   }
   if (auth.role === 'user') {
@@ -631,17 +500,7 @@ function formatUser(doc, extra = {}) {
 }
 
 async function findUserByLoginId(id) {
-  const numId = Number(id);
-  const queryOr = [
-    { id },
-    { empid: id },
-    { id: String(id) },
-    { empid: String(id) },
-  ];
-  if (!Number.isNaN(numId)) {
-    queryOr.push({ id: numId }, { empid: numId });
-  }
-  return User.findOne({ $or: queryOr });
+  return Users.findByEmpid(id);
 }
 
 // Issues a fresh session id on every login (session-fixation defence) while keeping
@@ -714,7 +573,7 @@ app.post('/api/logout', (req, res) => {
 // Get current/latest doctor profile
 app.get('/api/doctors/current', async (req, res) => {
   try {
-    const doctor = await Doctor.findOne({ active: { $ne: false } }).sort({ createdAt: -1 });
+    const doctor = Doctors.latestActive();
     if (!doctor) {
       return res.status(404).json({ message: 'No doctor profiles found' });
     }
@@ -736,39 +595,15 @@ app.get('/api/doctors', requireAuth('superadmin', 'admin', 'user'), async (req, 
     const limit = Math.max(1, parseInt(req.query.limit) || 10);
     const skip = (page - 1) * limit;
 
-    const scopeQuery = await doctorQueryForAuth(auth);
-    if (scopeQuery._id === null) {
+    const scope = doctorScopeForAuth(auth);
+    if (!scope) {
       return res.status(200).json({ total: 0, totalFiltered: 0, count: 0, page: 1, totalPages: 0, doctors: [] });
     }
-    const filter = { ...scopeQuery };
+    const filter = { scope, includeInactive, search: q };
 
-    if (!includeInactive) {
-      filter.active = { $ne: false };
-    }
-
-    if (q) {
-      const escaped = escapeRegex(q);
-      filter.$or = [
-        { name: { $regex: escaped, $options: 'i' } },
-        { clinicName: { $regex: escaped, $options: 'i' } },
-        { doctorDegree: { $regex: escaped, $options: 'i' } },
-        {
-          $expr: {
-            $regexMatch: {
-              input: { $toString: { $ifNull: ['$contactnumber', ''] } },
-              regex: escaped,
-              options: 'i',
-            },
-          },
-        },
-      ];
-    }
-
-    const [doctors, totalFiltered, total] = await Promise.all([
-      Doctor.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit),
-      Doctor.countDocuments(filter),
-      Doctor.countDocuments({ ...scopeQuery, ...(includeInactive ? {} : { active: { $ne: false } }) }),
-    ]);
+    const doctors = Doctors.list(filter, { sortField: 'createdAt', sortDir: 'DESC', offset: skip, limit });
+    const totalFiltered = Doctors.count(filter);
+    const total = Doctors.count({ scope, includeInactive });
 
     return res.status(200).json({
       total,
@@ -788,7 +623,7 @@ app.get('/api/doctors', requireAuth('superadmin', 'admin', 'user'), async (req, 
 app.get('/api/doctors/:id', requireAuth('superadmin', 'admin', 'user'), async (req, res) => {
   try {
     const auth = req.auth;
-    const doctor = await Doctor.findById(req.params.id);
+    const doctor = Doctors.findById(req.params.id);
     if (!doctor || !(await canAccessDoctor(auth, doctor))) {
       return res.status(404).json({ message: 'Doctor not found' });
     }
@@ -802,8 +637,9 @@ app.get('/api/doctors/:id', requireAuth('superadmin', 'admin', 'user'), async (r
 // Update doctor profile fields
 app.put('/api/doctors/:id', upload.any(), async (req, res) => {
   try {
-    const doctor = await Doctor.findById(req.params.id);
-    if (!doctor) return res.status(404).json({ message: 'Doctor not found' });
+    const existing = Doctors.findById(req.params.id);
+    if (!existing) return res.status(404).json({ message: 'Doctor not found' });
+    const doctor = {};
 
     const { name, contactnumber, clinicName, doctorDegree, active } = req.body;
     let logoFile = req.files?.find((f) => f.fieldname === 'logo');
@@ -814,7 +650,7 @@ app.put('/api/doctors/:id', upload.any(), async (req, res) => {
       logoBuffer = Buffer.from(req.body.logo.replace(/^data:image\/\w+;base64,/, ''), 'base64');
     }
 
-    if (name != null) doctor.name = String(name).trim() || doctor.name;
+    if (name != null) doctor.name = String(name).trim() || existing.name;
     if (clinicName != null) {
       const cleaned = String(clinicName).trim();
       if (!cleaned) {
@@ -838,11 +674,11 @@ app.put('/api/doctors/:id', upload.any(), async (req, res) => {
       doctor.logo = await saveFile(logoBuffer, originalName, 'logos');
     }
 
-    await doctor.save();
+    const saved = Doctors.update(existing._id, doctor);
     return res.status(200).json({
       success: true,
       message: 'Doctor updated',
-      doctor: formatDoctor(doctor, { includePosters: true }),
+      doctor: formatDoctor(saved, { includePosters: true }),
     });
   } catch (error) {
     console.error('Error updating doctor:', error);
@@ -854,12 +690,8 @@ app.put('/api/doctors/:id', upload.any(), async (req, res) => {
 app.patch('/api/doctors/:id/status', async (req, res) => {
   try {
     const active = req.body?.active !== false && String(req.body?.active) !== 'false';
-    const doctor = await Doctor.findByIdAndUpdate(
-      req.params.id,
-      { active },
-      { new: true }
-    );
-    if (!doctor) return res.status(404).json({ message: 'Doctor not found' });
+    if (!Doctors.findById(req.params.id)) return res.status(404).json({ message: 'Doctor not found' });
+    const doctor = Doctors.update(req.params.id, { active });
     return res.status(200).json({
       success: true,
       message: active ? 'Doctor activated' : 'Doctor deactivated',
@@ -874,8 +706,7 @@ app.patch('/api/doctors/:id/status', async (req, res) => {
 // Delete doctor
 app.delete('/api/doctors/:id', async (req, res) => {
   try {
-    const doctor = await Doctor.findByIdAndDelete(req.params.id);
-    if (!doctor) return res.status(404).json({ message: 'Doctor not found' });
+    if (!Doctors.remove(req.params.id)) return res.status(404).json({ message: 'Doctor not found' });
     return res.status(200).json({ success: true, message: 'Doctor removed' });
   } catch (error) {
     console.error('Error deleting doctor:', error);
@@ -886,21 +717,10 @@ app.delete('/api/doctors/:id', async (req, res) => {
 // Record a poster download for a doctor
 app.post('/api/doctors/:id/download', async (req, res) => {
   try {
-    const doctor = await Doctor.findById(req.params.id);
-    if (!doctor) return res.status(404).json({ message: 'Doctor not found' });
+    if (!Doctors.findById(req.params.id)) return res.status(404).json({ message: 'Doctor not found' });
 
     const posterId = req.body?.posterId;
-    doctor.downloadCount = (Number(doctor.downloadCount) || 0) + 1;
-
-    if (posterId && Array.isArray(doctor.posters)) {
-      const entry = doctor.posters.id(posterId);
-      if (entry) entry.downloads = (Number(entry.downloads) || 0) + 1;
-    } else if (Array.isArray(doctor.posters) && doctor.posters.length > 0) {
-      const last = doctor.posters[doctor.posters.length - 1];
-      last.downloads = (Number(last.downloads) || 0) + 1;
-    }
-
-    await doctor.save();
+    const doctor = Doctors.recordDownload(req.params.id, posterId ? String(posterId) : null);
     return res.status(200).json({
       success: true,
       doctor: formatDoctor(doctor, { includePosters: true }),
@@ -953,7 +773,7 @@ app.post('/api/doctors', requireAuth('superadmin', 'admin', 'user'), upload.any(
     const cleanedDegree = String(doctorDegree).trim();
 
     if (cleanedContact) {
-      const existingDoc = await Doctor.findOne({ contactnumber: cleanedContact });
+      const existingDoc = Doctors.findByContact(cleanedContact);
       if (existingDoc && (!doctorId || String(existingDoc._id) !== String(doctorId))) {
         return res.status(400).json({ success: false, message: 'This mobile number already exists' });
       }
@@ -961,18 +781,20 @@ app.post('/api/doctors', requireAuth('superadmin', 'admin', 'user'), upload.any(
 
     // Update existing doctor when doctorId is provided
     if (doctorId) {
-      const doctor = await Doctor.findById(doctorId);
-      if (!doctor) {
+      const existing = Doctors.findById(doctorId);
+      if (!existing) {
         return res.status(404).json({ success: false, message: 'Doctor not found' });
       }
 
-      if (name) doctor.name = name.trim();
-      if (clinicName !== undefined) doctor.clinicName = String(clinicName).trim();
-      if (doctorDegree !== undefined) doctor.doctorDegree = cleanedDegree;
-      if (cleanedContact !== null) doctor.contactnumber = cleanedContact;
-      doctor.dynamicFields = { ...doctor.dynamicFields, ...parsedDynamicFields };
-      if (logoBuffer) doctor.logo = await saveFile(logoBuffer, logoName, 'logos');
+      const patch = {};
+      if (name) patch.name = name.trim();
+      if (clinicName !== undefined) patch.clinicName = String(clinicName).trim();
+      if (doctorDegree !== undefined) patch.doctorDegree = cleanedDegree;
+      if (cleanedContact !== null) patch.contactnumber = cleanedContact;
+      patch.dynamicFields = { ...existing.dynamicFields, ...parsedDynamicFields };
+      if (logoBuffer) patch.logo = await saveFile(logoBuffer, logoName, 'logos');
 
+      let doctor;
       if (posterBuffer) {
         let posterSubfolder = 'posters';
         if (posterKind === 'festival') posterSubfolder = 'festival_posters';
@@ -980,22 +802,22 @@ app.post('/api/doctors', requireAuth('superadmin', 'admin', 'user'), upload.any(
         else if (posterKind === 'video') posterSubfolder = 'videos';
 
         const posterPath = await saveFile(posterBuffer, posterName, posterSubfolder);
-        doctor.poster = posterPath;
-        doctor.posters = doctor.posters || [];
-        doctor.posters.push({
+        patch.poster = posterPath;
+        if (countDownload) {
+          patch.downloadCount = (Number(existing.downloadCount) || 0) + 1;
+        }
+        doctor = Doctors.addPoster(existing._id, {
           image: posterPath,
           downloads: countDownload ? 1 : 0,
           createdAt: new Date(),
           kind: posterKind,
           label: posterLabel,
           month: posterMonth,
-        });
-        if (countDownload) {
-          doctor.downloadCount = (Number(doctor.downloadCount) || 0) + 1;
-        }
+        }, patch);
+      } else {
+        doctor = Doctors.update(existing._id, patch);
       }
 
-      await doctor.save();
       return res.status(200).json({
         success: true,
         message: 'Doctor profile and poster saved successfully',
@@ -1009,12 +831,12 @@ app.post('/api/doctors', requireAuth('superadmin', 'admin', 'user'), upload.any(
 
     const logoPath = logoBuffer ? await saveFile(logoBuffer, logoName, 'logos') : null;
 
-    let ownerUser = mongoose.isValidObjectId(ownerUserId) ? ownerUserId : null;
+    let ownerUser = isValidId(ownerUserId) && Users.findById(ownerUserId) ? ownerUserId : null;
     if (req.auth?.role === 'user') {
       ownerUser = req.auth.id;
     } else if (req.auth?.role === 'admin') {
       if (ownerUser) {
-        const assigned = await User.findById(ownerUser).select('ownerAdmin');
+        const assigned = Users.findById(ownerUser);
         if (!assigned || String(assigned.ownerAdmin || '') !== String(req.auth.id)) {
           ownerUser = null;
         }
@@ -1055,8 +877,8 @@ app.post('/api/doctors', requireAuth('superadmin', 'admin', 'user'), upload.any(
       docData.downloadCount = countDownload ? 1 : 0;
     }
 
-    const doctor = new Doctor(docData);
-    await doctor.save();
+    const { posters: initialPosters, ...doctorRow } = docData;
+    const doctor = Doctors.create(doctorRow, initialPosters);
     return res.status(201).json({
       success: true,
       message: 'Doctor profile and poster saved successfully',
@@ -1068,27 +890,11 @@ app.post('/api/doctors', requireAuth('superadmin', 'admin', 'user'), upload.any(
   }
 });
 
-async function doctorCountsByUser(userIds) {
-  const match = userIds ? { ownerUser: { $in: userIds } } : { ownerUser: { $ne: null } };
-  const doctorCounts = await Doctor.aggregate([
-    { $match: match },
-    { $group: { _id: '$ownerUser', count: { $sum: 1 } } },
-  ]);
-  return new Map(doctorCounts.map((item) => [String(item._id), item.count]));
-}
-
 async function listUsersForAuth(auth, { adminId } = {}) {
-  const filter = await userQueryForAuth(auth, { adminId });
-  const users = await User.find(filter).sort({ createdAt: -1 });
-  const counts = await doctorCountsByUser(users.map((user) => user._id));
-  const adminIds = [...new Set(users.map((user) => user.ownerAdmin).filter(Boolean).map(String))];
-  const admins = adminIds.length
-    ? await Admin.find({ _id: { $in: adminIds } }).select('username')
-    : [];
-  const adminNameById = new Map(admins.map((admin) => [String(admin._id), admin.username]));
-  return users.map((user) => formatUser(user, {
-    doctorCount: counts.get(String(user._id)) || 0,
-    adminUsername: user.ownerAdmin ? adminNameById.get(String(user.ownerAdmin)) || null : null,
+  const scope = userScopeForAuth(auth, { adminId });
+  return Users.listWithCounts(scope).map((user) => formatUser(user, {
+    doctorCount: user.doctorCount || 0,
+    adminUsername: user.adminUsername,
   }));
 }
 
@@ -1104,16 +910,16 @@ async function createUserUnderAdmin(adminId, { empid, password }) {
     throw Object.assign(new Error('Employee ID already exists'), { status: 409 });
   }
   const cleanPassword = assertNewPassword(password);
-  const user = await User.create({
+  const user = Users.create({
     empid: cleanEmpid,
-    id: cleanEmpid,
-    password: cleanPassword,
-    ownerAdmin: adminId,
+    password: await hashPassword(cleanPassword),
+    ownerAdmin: adminId ? String(adminId) : null,
   });
   return formatUser(user, { doctorCount: 0 });
 }
 
-async function updateUserRecord(user, { empid, password, ownerAdmin }) {
+async function updateUserRecord(user, { empid, password, ownerAdmin, createdAt, updatedAt }) {
+  const patch = {};
   if (empid != null) {
     const cleanEmpid = String(empid).trim();
     if (!cleanEmpid) {
@@ -1127,22 +933,22 @@ async function updateUserRecord(user, { empid, password, ownerAdmin }) {
         throw Object.assign(new Error('Employee ID already exists'), { status: 409 });
       }
     }
-    user.empid = cleanEmpid;
-    user.id = cleanEmpid;
+    patch.empid = cleanEmpid;
   }
   if (password != null && String(password).trim()) {
-    user.password = assertNewPassword(password);
+    patch.password = await hashPassword(assertNewPassword(password));
   }
   if (ownerAdmin !== undefined) {
-    user.ownerAdmin = mongoose.isValidObjectId(ownerAdmin) ? ownerAdmin : null;
+    patch.ownerAdmin = isValidId(String(ownerAdmin || '')) && Admins.findById(ownerAdmin) ? String(ownerAdmin) : null;
   }
-  await user.save();
-  return formatUser(user);
+  if (createdAt) patch.createdAt = createdAt;
+  if (updatedAt) patch.updatedAt = updatedAt;
+  return formatUser(Users.update(user._id, patch));
 }
 
+/** Deleting a user cascades to their doctors (foreign key ON DELETE CASCADE). */
 async function deleteUserAndDoctors(userId) {
-  await Doctor.deleteMany({ ownerUser: userId });
-  await User.findByIdAndDelete(userId);
+  Users.remove(userId);
 }
 
 const ADMIN_CSV_HEADERS = ['id', 'username', 'password', 'createdAt', 'updatedAt'];
@@ -1253,7 +1059,7 @@ function parsePostersCell(value) {
     throw error;
   }
   return parsed.map((poster) => ({
-    image: poster?.image || '',
+    image: normalizeStoredPath(poster?.image) || '',
     downloads: Number(poster?.downloads) || 0,
     createdAt: parseCsvDate(poster?.createdAt) || undefined,
     kind: normalizePosterKind(poster?.kind, poster?.image),
@@ -1261,36 +1067,29 @@ function parsePostersCell(value) {
   })).filter((poster) => poster.image);
 }
 
-function doctorPhoneQuery(contactnumber) {
-  const raw = String(contactnumber ?? '').trim();
-  const num = parseContactNumber(raw);
-  const options = [];
-  if (raw) options.push({ contactnumber: raw });
-  if (num != null) options.push({ contactnumber: num });
-  return options.length ? { $or: options } : { _id: null };
-}
-
-function applyTimestamps(doc, row) {
+function csvTimestamps(row) {
   const createdAt = parseCsvDate(row.createdAt);
   const updatedAt = parseCsvDate(row.updatedAt);
-  if (createdAt) doc.createdAt = createdAt;
-  if (updatedAt) doc.updatedAt = updatedAt;
+  return {
+    ...(createdAt ? { createdAt } : {}),
+    ...(updatedAt ? { updatedAt } : {}),
+  };
 }
 
-function applyDoctorImportFields(doctor, row, { ownerUser }) {
-  doctor.name = String(row.name || '').trim();
-  doctor.clinicName = String(row.clinicName || '').trim();
-  doctor.doctorDegree = String(row.doctorDegree || '').trim();
-  doctor.contactnumber = parseContactNumber(row.contactnumber);
-  doctor.logo = String(row.logo || '').trim() || null;
-  doctor.poster = String(row.poster || '').trim() || null;
-  doctor.posters = parsePostersCell(row.posters);
-  doctor.downloadCount = String(row.downloadCount ?? '').trim() === ''
-    ? 0
-    : Number(row.downloadCount) || 0;
-  doctor.active = parseCsvActive(row.active);
-  doctor.ownerUser = ownerUser;
-  applyTimestamps(doctor, row);
+/** Doctor columns from one CSV row (posters are returned separately). */
+function doctorFieldsFromCsv(row, { ownerUser }) {
+  return {
+    name: String(row.name || '').trim(),
+    clinicName: String(row.clinicName || '').trim(),
+    doctorDegree: String(row.doctorDegree || '').trim(),
+    contactnumber: parseContactNumber(row.contactnumber),
+    logo: normalizeStoredPath(String(row.logo || '').trim()),
+    poster: normalizeStoredPath(String(row.poster || '').trim()),
+    downloadCount: String(row.downloadCount ?? '').trim() === '' ? 0 : Number(row.downloadCount) || 0,
+    active: parseCsvActive(row.active),
+    ownerUser,
+    ...csvTimestamps(row),
+  };
 }
 
 // --- Auth for staff pages ---
@@ -1357,7 +1156,7 @@ app.post('/api/userpanel/login', async (req, res) => {
 // --- Doctor Fields Config ---
 app.get('/api/doctor-fields', async (req, res) => {
   try {
-    const fields = await DoctorField.find().sort({ order: 1 });
+    const fields = DoctorFields.list();
     res.json({ success: true, fields });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
@@ -1380,23 +1179,15 @@ app.post('/api/superadmin/doctor-fields', requireAuth('superadmin'), async (req,
       .replace(/^_+|_+$/g, '')
       .replace(/^[0-9]+/, '') || 'field';
     let key = baseKey;
-    for (let n = 2; await DoctorField.exists({ key }); n += 1) key = `${baseKey}_${n}`;
+    for (let n = 2; DoctorFields.findByKey(key); n += 1) key = `${baseKey}_${n}`;
 
-    const logoField = await DoctorField.findOne({ key: 'logo' });
-    const maxBeforeLogo = await DoctorField.find({
-      key: { $nin: ['logo', 'photo'] },
-      type: { $ne: 'file' },
-    })
-      .sort({ order: -1 })
-      .limit(1);
-
-    const nextOrder = (maxBeforeLogo[0]?.order || 0) + 1;
+    const logoField = DoctorFields.findByKey('logo');
+    const nextOrder = DoctorFields.maxRegularOrder() + 1;
     if (logoField && Number(logoField.order) <= nextOrder) {
-      logoField.order = nextOrder + 1;
-      await logoField.save();
+      DoctorFields.update(logoField._id, { order: nextOrder + 1 });
     }
 
-    const field = await DoctorField.create({
+    const field = DoctorFields.create({
       key,
       label,
       type,
@@ -1409,7 +1200,7 @@ app.post('/api/superadmin/doctor-fields', requireAuth('superadmin'), async (req,
     return res.status(201).json({ success: true, field });
   } catch (err) {
     console.error('Error creating doctor field:', err);
-    if (err?.code === 11000) {
+    if (err?.code === 'DUPLICATE') {
       return res.status(409).json({ success: false, message: 'A field with this key already exists' });
     }
     return res.status(500).json({ success: false, message: err.message || 'Failed to create field' });
@@ -1418,19 +1209,29 @@ app.post('/api/superadmin/doctor-fields', requireAuth('superadmin'), async (req,
 
 app.put('/api/superadmin/doctor-fields/:id', requireAuth('superadmin'), async (req, res) => {
   try {
-    const field = await DoctorField.findByIdAndUpdate(req.params.id, req.body, { new: true });
-    if (!field) return res.status(404).json({ success: false, message: 'Field not found' });
+    if (!DoctorFields.findById(req.params.id)) {
+      return res.status(404).json({ success: false, message: 'Field not found' });
+    }
+    // The key identifies the field on posters and doctor records, so it is never renamed here.
+    const body = req.body || {};
+    const patch = {};
+    if (body.label !== undefined) patch.label = String(body.label).trim();
+    if (body.type !== undefined) patch.type = String(body.type).trim() || 'text';
+    if (body.required !== undefined) patch.required = Boolean(body.required);
+    if (body.enabled !== undefined) patch.enabled = Boolean(body.enabled);
+    if (body.order !== undefined) patch.order = Number(body.order) || 0;
+    const field = DoctorFields.update(req.params.id, patch);
     res.json({ success: true, field });
   } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
+    res.status(err.status || 500).json({ success: false, message: err.message });
   }
 });
 
 app.delete('/api/superadmin/doctor-fields/:id', requireAuth('superadmin'), async (req, res) => {
   try {
-    const field = await DoctorField.findById(req.params.id);
-    if (!field) return res.status(404).json({ success: false, message: 'Field not found' });
-    await field.deleteOne();
+    if (!DoctorFields.remove(req.params.id)) {
+      return res.status(404).json({ success: false, message: 'Field not found' });
+    }
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
@@ -1440,16 +1241,9 @@ app.delete('/api/superadmin/doctor-fields/:id', requireAuth('superadmin'), async
 // --- Superadmin: admins ---
 app.get('/api/superadmin/admins', requireAuth('superadmin'), async (_req, res) => {
   try {
-    const admins = await Admin.find().sort({ createdAt: -1 });
-    const counts = await User.aggregate([
-      { $match: { ownerAdmin: { $ne: null } } },
-      { $group: { _id: '$ownerAdmin', count: { $sum: 1 } } },
-    ]);
-    const countByAdmin = new Map(counts.map((item) => [String(item._id), item.count]));
+    const admins = Admins.listWithUserCounts();
     return res.json({
-      admins: admins.map((admin) => formatAdmin(admin, {
-        userCount: countByAdmin.get(String(admin._id)) || 0,
-      })),
+      admins: admins.map((admin) => formatAdmin(admin, { userCount: admin.userCount || 0 })),
     });
   } catch (error) {
     console.error('Error fetching admins:', error);
@@ -1467,7 +1261,7 @@ app.post('/api/superadmin/admins', requireAuth('superadmin'), async (req, res) =
     const cleanPassword = assertNewPassword(password);
     const existing = await findAdminByUsername(username);
     if (existing) return res.status(409).json({ message: 'Admin username already exists' });
-    const admin = await Admin.create({ username, password: cleanPassword });
+    const admin = Admins.create({ username, password: await hashPassword(cleanPassword) });
     return res.status(201).json({ success: true, admin: formatAdmin(admin, { userCount: 0 }) });
   } catch (error) {
     console.error('Error creating admin:', error);
@@ -1499,8 +1293,8 @@ app.post('/api/superadmin/admins/import', requireAuth('superadmin'), upload.sing
         }
 
         let admin = null;
-        if (id && mongoose.isValidObjectId(id)) {
-          admin = await Admin.findById(id);
+        if (id && isValidId(id)) {
+          admin = Admins.findById(id);
         }
         if (!admin) {
           admin = await findAdminByUsername(username);
@@ -1511,22 +1305,18 @@ app.post('/api/superadmin/admins/import', requireAuth('superadmin'), upload.sing
           if (taken && String(taken._id) !== String(admin._id)) {
             throw Object.assign(new Error('Admin username already exists'), { status: 409 });
           }
-          admin.username = username;
-          if (password.trim()) admin.password = assertNewPassword(password);
-          applyTimestamps(admin, row);
-          await admin.save();
+          const patch = { username, ...csvTimestamps(row) };
+          if (password.trim()) patch.password = await hashPassword(assertNewPassword(password));
+          Admins.update(admin._id, patch);
           updated += 1;
         } else {
           if (!password.trim()) {
             throw Object.assign(new Error('Password is required for a new admin'), { status: 400 });
           }
-          const createdAt = parseCsvDate(row.createdAt);
-          const updatedAt = parseCsvDate(row.updatedAt);
-          await Admin.create({
+          Admins.create({
             username,
-            password: assertNewPassword(password),
-            ...(createdAt ? { createdAt } : {}),
-            ...(updatedAt ? { updatedAt } : {}),
+            password: await hashPassword(assertNewPassword(password)),
+            ...csvTimestamps(row),
           });
           created += 1;
         }
@@ -1543,11 +1333,12 @@ app.post('/api/superadmin/admins/import', requireAuth('superadmin'), upload.sing
 
 app.put('/api/superadmin/admins/:id', requireAuth('superadmin'), async (req, res) => {
   try {
-    if (!mongoose.isValidObjectId(req.params.id)) {
+    if (!isValidId(req.params.id)) {
       return res.status(400).json({ message: 'Invalid admin ID' });
     }
-    const admin = await Admin.findById(req.params.id);
+    const admin = Admins.findById(req.params.id);
     if (!admin) return res.status(404).json({ message: 'Admin not found' });
+    const patch = {};
     if (req.body?.username != null) {
       const username = String(req.body.username).trim();
       if (!username) return res.status(400).json({ message: 'Username is required' });
@@ -1555,13 +1346,12 @@ app.put('/api/superadmin/admins/:id', requireAuth('superadmin'), async (req, res
       if (existing && String(existing._id) !== String(admin._id)) {
         return res.status(409).json({ message: 'Admin username already exists' });
       }
-      admin.username = username;
+      patch.username = username;
     }
     if (req.body?.password != null && String(req.body.password).trim()) {
-      admin.password = assertNewPassword(req.body.password);
+      patch.password = await hashPassword(assertNewPassword(req.body.password));
     }
-    await admin.save();
-    return res.json({ success: true, admin: formatAdmin(admin) });
+    return res.json({ success: true, admin: formatAdmin(Admins.update(admin._id, patch)) });
   } catch (error) {
     console.error('Error updating admin:', error);
     return res.status(error.status || 500).json({ message: error.message || 'Failed to update admin' });
@@ -1570,16 +1360,11 @@ app.put('/api/superadmin/admins/:id', requireAuth('superadmin'), async (req, res
 
 app.delete('/api/superadmin/admins/:id', requireAuth('superadmin'), async (req, res) => {
   try {
-    if (!mongoose.isValidObjectId(req.params.id)) {
+    if (!isValidId(req.params.id)) {
       return res.status(400).json({ message: 'Invalid admin ID' });
     }
-    const admin = await Admin.findById(req.params.id);
-    if (!admin) return res.status(404).json({ message: 'Admin not found' });
-    const users = await User.find({ ownerAdmin: admin._id }).select('_id');
-    const userIds = users.map((user) => user._id);
-    await Doctor.deleteMany({ ownerUser: { $in: userIds } });
-    await User.deleteMany({ ownerAdmin: admin._id });
-    await Admin.findByIdAndDelete(admin._id);
+    // Foreign keys cascade: admin -> employees -> doctors -> generated posters.
+    if (!Admins.remove(req.params.id)) return res.status(404).json({ message: 'Admin not found' });
     return res.json({ success: true, message: 'Admin deleted' });
   } catch (error) {
     console.error('Error deleting admin:', error);
@@ -1589,10 +1374,10 @@ app.delete('/api/superadmin/admins/:id', requireAuth('superadmin'), async (req, 
 
 app.get('/api/superadmin/admins/:adminId/users', requireAuth('superadmin'), async (req, res) => {
   try {
-    if (!mongoose.isValidObjectId(req.params.adminId)) {
+    if (!isValidId(req.params.adminId)) {
       return res.status(400).json({ message: 'Invalid admin ID' });
     }
-    const admin = await Admin.findById(req.params.adminId);
+    const admin = Admins.findById(req.params.adminId);
     if (!admin) return res.status(404).json({ message: 'Admin not found' });
     const users = await listUsersForAuth(req.auth, { adminId: req.params.adminId });
     return res.json({ admin: formatAdmin(admin), users });
@@ -1604,10 +1389,10 @@ app.get('/api/superadmin/admins/:adminId/users', requireAuth('superadmin'), asyn
 
 app.post('/api/superadmin/admins/:adminId/users', requireAuth('superadmin'), async (req, res) => {
   try {
-    if (!mongoose.isValidObjectId(req.params.adminId)) {
+    if (!isValidId(req.params.adminId)) {
       return res.status(400).json({ message: 'Invalid admin ID' });
     }
-    const admin = await Admin.findById(req.params.adminId);
+    const admin = Admins.findById(req.params.adminId);
     if (!admin) return res.status(404).json({ message: 'Admin not found' });
     const user = await createUserUnderAdmin(admin._id, req.body || {});
     return res.status(201).json({ success: true, user });
@@ -1640,31 +1425,25 @@ async function importEmployeesForAdmin(adminId, fileBuffer) {
       }
 
       let user = null;
-      if (id && mongoose.isValidObjectId(id)) {
-        user = await User.findById(id);
+      if (id && isValidId(id)) {
+        user = Users.findById(id);
       }
       if (!user) {
         user = await findUserByLoginId(empid);
       }
 
       if (user) {
-        await updateUserRecord(user, { empid, password, ownerAdmin: adminId });
-        applyTimestamps(user, row);
-        await user.save();
+        await updateUserRecord(user, { empid, password, ownerAdmin: adminId, ...csvTimestamps(row) });
         updated += 1;
       } else {
         if (!password.trim()) {
           throw Object.assign(new Error('Password is required for a new employee'), { status: 400 });
         }
-        const createdAt = parseCsvDate(row.createdAt);
-        const updatedAt = parseCsvDate(row.updatedAt);
-        await User.create({
+        Users.create({
           empid,
-          id: empid,
-          password: assertNewPassword(password),
-          ownerAdmin: adminId,
-          ...(createdAt ? { createdAt } : {}),
-          ...(updatedAt ? { updatedAt } : {}),
+          password: await hashPassword(assertNewPassword(password)),
+          ownerAdmin: String(adminId),
+          ...csvTimestamps(row),
         });
         created += 1;
       }
@@ -1678,10 +1457,10 @@ async function importEmployeesForAdmin(adminId, fileBuffer) {
 
 app.post('/api/superadmin/admins/:adminId/users/import', requireAuth('superadmin'), upload.single('file'), async (req, res) => {
   try {
-    if (!mongoose.isValidObjectId(req.params.adminId)) {
+    if (!isValidId(req.params.adminId)) {
       return res.status(400).json({ message: 'Invalid admin ID' });
     }
-    const admin = await Admin.findById(req.params.adminId);
+    const admin = Admins.findById(req.params.adminId);
     if (!admin) return res.status(404).json({ message: 'Admin not found' });
     const result = await importEmployeesForAdmin(admin._id, req.file?.buffer);
     return res.json({ success: true, ...result });
@@ -1692,10 +1471,10 @@ app.post('/api/superadmin/admins/:adminId/users/import', requireAuth('superadmin
 
 app.put('/api/superadmin/admins/:adminId/users/:userId', requireAuth('superadmin'), async (req, res) => {
   try {
-    if (!mongoose.isValidObjectId(req.params.adminId) || !mongoose.isValidObjectId(req.params.userId)) {
+    if (!isValidId(req.params.adminId) || !isValidId(req.params.userId)) {
       return res.status(400).json({ message: 'Invalid admin or user ID' });
     }
-    const user = await User.findOne({ _id: req.params.userId, ownerAdmin: req.params.adminId });
+    const user = Users.findForAdmin(req.params.userId, req.params.adminId);
     if (!user) return res.status(404).json({ message: 'User not found for this admin' });
     const updated = await updateUserRecord(user, req.body || {});
     return res.json({ success: true, user: updated });
@@ -1706,10 +1485,10 @@ app.put('/api/superadmin/admins/:adminId/users/:userId', requireAuth('superadmin
 
 app.delete('/api/superadmin/admins/:adminId/users/:userId', requireAuth('superadmin'), async (req, res) => {
   try {
-    if (!mongoose.isValidObjectId(req.params.adminId) || !mongoose.isValidObjectId(req.params.userId)) {
+    if (!isValidId(req.params.adminId) || !isValidId(req.params.userId)) {
       return res.status(400).json({ message: 'Invalid admin or user ID' });
     }
-    const user = await User.findOne({ _id: req.params.userId, ownerAdmin: req.params.adminId });
+    const user = Users.findForAdmin(req.params.userId, req.params.adminId);
     if (!user) return res.status(404).json({ message: 'User not found for this admin' });
     await deleteUserAndDoctors(user._id);
     return res.json({ success: true, message: 'User deleted' });
@@ -1721,12 +1500,12 @@ app.delete('/api/superadmin/admins/:adminId/users/:userId', requireAuth('superad
 
 app.get('/api/superadmin/admins/:adminId/users/:userId/doctors', requireAuth('superadmin'), async (req, res) => {
   try {
-    if (!mongoose.isValidObjectId(req.params.adminId) || !mongoose.isValidObjectId(req.params.userId)) {
+    if (!isValidId(req.params.adminId) || !isValidId(req.params.userId)) {
       return res.status(400).json({ message: 'Invalid admin or user ID' });
     }
-    const user = await User.findOne({ _id: req.params.userId, ownerAdmin: req.params.adminId });
+    const user = Users.findForAdmin(req.params.userId, req.params.adminId);
     if (!user) return res.status(404).json({ message: 'User not found for this admin' });
-    const doctors = await Doctor.find({ ownerUser: user._id }).sort({ createdAt: -1 });
+    const doctors = Doctors.list({ scope: { ownerUserId: user._id } });
     return res.json({
       user: formatUser(user),
       doctors: doctors.map((doctor) => formatDoctor(doctor, { light: true })),
@@ -1739,12 +1518,12 @@ app.get('/api/superadmin/admins/:adminId/users/:userId/doctors', requireAuth('su
 
 app.get('/api/superadmin/admins/:adminId/users/:userId/doctors/:doctorId', requireAuth('superadmin'), async (req, res) => {
   try {
-    if (!mongoose.isValidObjectId(req.params.adminId) || !mongoose.isValidObjectId(req.params.userId) || !mongoose.isValidObjectId(req.params.doctorId)) {
+    if (!isValidId(req.params.adminId) || !isValidId(req.params.userId) || !isValidId(req.params.doctorId)) {
       return res.status(400).json({ message: 'Invalid id' });
     }
-    const user = await User.findOne({ _id: req.params.userId, ownerAdmin: req.params.adminId });
+    const user = Users.findForAdmin(req.params.userId, req.params.adminId);
     if (!user) return res.status(404).json({ message: 'User not found for this admin' });
-    const doctor = await Doctor.findOne({ _id: req.params.doctorId, ownerUser: user._id });
+    const doctor = Doctors.findForUser(req.params.doctorId, user._id);
     if (!doctor) return res.status(404).json({ message: 'Doctor not found for this user' });
     return res.json({ doctor: formatDoctor(doctor, { includePosters: true }) });
   } catch (error) {
@@ -1769,7 +1548,7 @@ app.post('/api/admin/users/import', requireAuth('superadmin', 'admin'), upload.s
   try {
     const requestedAdmin = req.body?.ownerAdmin || req.query.adminId;
     const adminId = req.auth.role === 'admin' ? req.auth.id : requestedAdmin;
-    if (!mongoose.isValidObjectId(adminId)) {
+    if (!isValidId(adminId)) {
       return res.status(400).json({ message: 'An admin must be selected to import employees' });
     }
     if (req.auth.role === 'admin' && String(adminId) !== String(req.auth.id)) {
@@ -1786,7 +1565,7 @@ app.post('/api/admin/users', requireAuth('superadmin', 'admin'), async (req, res
   try {
     const requestedAdmin = req.body?.ownerAdmin || req.query.adminId;
     const adminId = req.auth.role === 'admin' ? req.auth.id : requestedAdmin;
-    if (!mongoose.isValidObjectId(adminId)) {
+    if (!isValidId(adminId)) {
       return res.status(400).json({ message: 'An admin must be selected to create a user' });
     }
     if (req.auth.role === 'admin' && String(adminId) !== String(req.auth.id)) {
@@ -1801,10 +1580,10 @@ app.post('/api/admin/users', requireAuth('superadmin', 'admin'), async (req, res
 
 app.put('/api/admin/users/:id', requireAuth('superadmin', 'admin'), async (req, res) => {
   try {
-    if (!mongoose.isValidObjectId(req.params.id)) {
+    if (!isValidId(req.params.id)) {
       return res.status(400).json({ message: 'Invalid user ID' });
     }
-    const user = await User.findById(req.params.id);
+    const user = Users.findById(req.params.id);
     if (!user || !(await assertUserInScope(req.auth, user))) {
       return res.status(404).json({ message: 'User not found' });
     }
@@ -1819,10 +1598,10 @@ app.put('/api/admin/users/:id', requireAuth('superadmin', 'admin'), async (req, 
 
 app.delete('/api/admin/users/:id', requireAuth('superadmin', 'admin'), async (req, res) => {
   try {
-    if (!mongoose.isValidObjectId(req.params.id)) {
+    if (!isValidId(req.params.id)) {
       return res.status(400).json({ message: 'Invalid user ID' });
     }
-    const user = await User.findById(req.params.id);
+    const user = Users.findById(req.params.id);
     if (!user || !(await assertUserInScope(req.auth, user))) {
       return res.status(404).json({ message: 'User not found' });
     }
@@ -1836,14 +1615,14 @@ app.delete('/api/admin/users/:id', requireAuth('superadmin', 'admin'), async (re
 
 app.get('/api/admin/users/:userId/doctors', requireAuth('superadmin', 'admin'), async (req, res) => {
   try {
-    if (!mongoose.isValidObjectId(req.params.userId)) {
+    if (!isValidId(req.params.userId)) {
       return res.status(400).json({ message: 'Invalid user ID' });
     }
-    const user = await User.findById(req.params.userId);
+    const user = Users.findById(req.params.userId);
     if (!user || !(await assertUserInScope(req.auth, user))) {
       return res.status(404).json({ message: 'User not found' });
     }
-    const doctors = await Doctor.find({ ownerUser: user._id }).sort({ createdAt: -1 });
+    const doctors = Doctors.list({ scope: { ownerUserId: user._id } });
     return res.json({
       user: formatUser(user),
       doctors: doctors.map((doctor) => formatDoctor(doctor, { light: true })),
@@ -1856,10 +1635,10 @@ app.get('/api/admin/users/:userId/doctors', requireAuth('superadmin', 'admin'), 
 
 app.post('/api/admin/users/:userId/doctors/import', requireAuth('superadmin', 'admin'), upload.single('file'), async (req, res) => {
   try {
-    if (!mongoose.isValidObjectId(req.params.userId)) {
+    if (!isValidId(req.params.userId)) {
       return res.status(400).json({ message: 'Invalid user ID' });
     }
-    const user = await User.findById(req.params.userId);
+    const user = Users.findById(req.params.userId);
     if (!user || !(await assertUserInScope(req.auth, user))) {
       return res.status(404).json({ message: 'User not found' });
     }
@@ -1888,38 +1667,23 @@ app.post('/api/admin/users/:userId/doctors/import', requireAuth('superadmin', 'a
 
         const id = String(row.id || '').trim();
         let doctor = null;
-        if (id && mongoose.isValidObjectId(id)) {
-          doctor = await Doctor.findById(id);
+        if (id && isValidId(id)) {
+          doctor = Doctors.findById(id);
         }
         if (!doctor) {
-          doctor = await Doctor.findOne(doctorPhoneQuery(row.contactnumber));
+          doctor = Doctors.findByContact(contactnumber);
         }
         if (doctor && req.auth.role === 'admin' && !(await canAccessDoctor(req.auth, doctor))) {
           throw Object.assign(new Error('Doctor is outside your scope'), { status: 403 });
         }
 
+        const fields = doctorFieldsFromCsv(row, { ownerUser });
+        const posters = parsePostersCell(row.posters);
         if (doctor) {
-          applyDoctorImportFields(doctor, row, { ownerUser });
-          await doctor.save();
+          Doctors.updateWithPosters(doctor._id, fields, posters);
           updated += 1;
         } else {
-          const createdAt = parseCsvDate(row.createdAt);
-          const updatedAt = parseCsvDate(row.updatedAt);
-          const doc = new Doctor({
-            name,
-            clinicName,
-            doctorDegree: String(row.doctorDegree || '').trim(),
-            contactnumber,
-            logo: String(row.logo || '').trim() || null,
-            poster: String(row.poster || '').trim() || null,
-            posters: parsePostersCell(row.posters),
-            downloadCount: String(row.downloadCount ?? '').trim() === '' ? 0 : Number(row.downloadCount) || 0,
-            active: parseCsvActive(row.active),
-            ownerUser,
-            ...(createdAt ? { createdAt } : {}),
-            ...(updatedAt ? { updatedAt } : {}),
-          });
-          await doc.save();
+          Doctors.create(fields, posters);
           created += 1;
         }
       } catch (error) {
@@ -1935,14 +1699,14 @@ app.post('/api/admin/users/:userId/doctors/import', requireAuth('superadmin', 'a
 
 app.get('/api/admin/users/:userId/doctors/:doctorId', requireAuth('superadmin', 'admin'), async (req, res) => {
   try {
-    if (!mongoose.isValidObjectId(req.params.userId) || !mongoose.isValidObjectId(req.params.doctorId)) {
+    if (!isValidId(req.params.userId) || !isValidId(req.params.doctorId)) {
       return res.status(400).json({ message: 'Invalid user or doctor ID' });
     }
-    const user = await User.findById(req.params.userId);
+    const user = Users.findById(req.params.userId);
     if (!user || !(await assertUserInScope(req.auth, user))) {
       return res.status(404).json({ message: 'User not found' });
     }
-    const doctor = await Doctor.findOne({ _id: req.params.doctorId, ownerUser: user._id });
+    const doctor = Doctors.findForUser(req.params.doctorId, user._id);
     if (!doctor) return res.status(404).json({ message: 'Doctor not found for this user' });
     return res.json({ doctor: formatDoctor(doctor, { includePosters: true }) });
   } catch (error) {
@@ -1963,14 +1727,14 @@ app.get('/api/super-admin/users', requireAuth('superadmin', 'admin'), async (req
 
 app.get('/api/super-admin/users/:userId/doctors', requireAuth('superadmin', 'admin'), async (req, res) => {
   try {
-    if (!mongoose.isValidObjectId(req.params.userId)) {
+    if (!isValidId(req.params.userId)) {
       return res.status(400).json({ message: 'Invalid user ID' });
     }
-    const user = await User.findById(req.params.userId);
+    const user = Users.findById(req.params.userId);
     if (!user || !(await assertUserInScope(req.auth, user))) {
       return res.status(404).json({ message: 'User not found' });
     }
-    const doctors = await Doctor.find({ ownerUser: user._id }).sort({ createdAt: -1 });
+    const doctors = Doctors.list({ scope: { ownerUserId: user._id } });
     return res.json({
       user: formatUser(user),
       doctors: doctors.map((doctor) => formatDoctor(doctor, { light: true })),
@@ -1983,14 +1747,14 @@ app.get('/api/super-admin/users/:userId/doctors', requireAuth('superadmin', 'adm
 
 app.get('/api/super-admin/users/:userId/doctors/:doctorId', requireAuth('superadmin', 'admin'), async (req, res) => {
   try {
-    if (!mongoose.isValidObjectId(req.params.userId) || !mongoose.isValidObjectId(req.params.doctorId)) {
+    if (!isValidId(req.params.userId) || !isValidId(req.params.doctorId)) {
       return res.status(400).json({ message: 'Invalid user or doctor ID' });
     }
-    const user = await User.findById(req.params.userId);
+    const user = Users.findById(req.params.userId);
     if (!user || !(await assertUserInScope(req.auth, user))) {
       return res.status(404).json({ message: 'User not found' });
     }
-    const doctor = await Doctor.findOne({ _id: req.params.doctorId, ownerUser: user._id });
+    const doctor = Doctors.findForUser(req.params.doctorId, user._id);
     if (!doctor) return res.status(404).json({ message: 'Doctor not found for this user' });
     return res.json({ doctor: formatDoctor(doctor, { includePosters: true }) });
   } catch (error) {
@@ -1999,15 +1763,33 @@ app.get('/api/super-admin/users/:userId/doctors/:doctorId', requireAuth('superad
   }
 });
 
-const models = {
-  doctors: Doctor,
-  users: User,
-};
+const COLLECTIONS = new Set(['doctors', 'users']);
 
-async function scopedCollectionFilter(auth, collection) {
-  if (collection === 'doctors') return doctorQueryForAuth(auth);
-  if (collection === 'users') return userQueryForAuth(auth);
-  return { _id: null };
+function scopeForCollection(auth, collection) {
+  if (collection === 'doctors') return doctorScopeForAuth(auth);
+  if (collection === 'users') return userScopeForAuth(auth);
+  return null;
+}
+
+/** Whitelisted doctor columns accepted by the generic collection endpoints. */
+async function doctorPatchFromBody(body, auth) {
+  const patch = {};
+  if (body.name !== undefined) patch.name = String(body.name || '').trim() || 'Doctor';
+  if (body.clinicName !== undefined) patch.clinicName = String(body.clinicName || '').trim();
+  if (body.doctorDegree !== undefined) patch.doctorDegree = String(body.doctorDegree || '').trim();
+  if (body.contactnumber !== undefined) patch.contactnumber = body.contactnumber;
+  if (body.logo !== undefined) patch.logo = normalizeStoredPath(body.logo);
+  if (body.poster !== undefined) patch.poster = normalizeStoredPath(body.poster);
+  if (body.active !== undefined) patch.active = body.active !== false && String(body.active) !== 'false';
+  if (body.dynamicFields !== undefined && body.dynamicFields && typeof body.dynamicFields === 'object') {
+    patch.dynamicFields = body.dynamicFields;
+  }
+  if (body.ownerUser !== undefined && auth.role !== 'user') {
+    const owner = isValidId(String(body.ownerUser || '')) ? Users.findById(body.ownerUser) : null;
+    const allowed = owner && (auth.role === 'superadmin' || String(owner.ownerAdmin || '') === String(auth.id));
+    patch.ownerUser = allowed ? owner._id : null;
+  }
+  return patch;
 }
 
 app.get('/api/userpanel/collections/:collection', requireAuth('superadmin', 'admin', 'user'), async (req, res, next) => {
@@ -2020,15 +1802,14 @@ app.get('/api/admin/collections/:collection', requireAuth('superadmin', 'admin',
     if (req.params.collection !== 'doctors' && req.auth.role === 'user') {
       return res.status(403).json({ message: 'Users can only access doctors' });
     }
-    const Model = models[req.params.collection];
-    if (!Model) return res.status(404).json({ message: 'Collection not found' });
+    if (!COLLECTIONS.has(req.params.collection)) return res.status(404).json({ message: 'Collection not found' });
 
-    const scope = await scopedCollectionFilter(req.auth, req.params.collection);
-    const docs = await Model.find(scope).sort({ createdAt: -1 });
+    const scope = scopeForCollection(req.auth, req.params.collection);
     if (req.params.collection === 'doctors') {
+      const docs = Doctors.list({ scope });
       return res.status(200).json(docs.map(d => formatDoctor(d, { includePosters: true })));
     }
-    return res.status(200).json(docs.map(formatUser));
+    return res.status(200).json(Users.listWithCounts(scope).map((user) => formatUser(user)));
   } catch (err) {
     res.status(500).json({ message: 'Error fetching collection', error: err.message });
   }
@@ -2046,9 +1827,8 @@ app.get('/api/admin/datatables/:collection', requireAuth('superadmin', 'admin', 
     if (collection !== 'doctors' && req.auth.role === 'user') {
       return res.status(403).json({ message: 'Users can only access doctors' });
     }
-    const Model = models[collection];
-    if (!Model) return res.status(404).json({ message: 'Collection not found' });
-    const scope = await scopedCollectionFilter(req.auth, collection);
+    if (!COLLECTIONS.has(collection)) return res.status(404).json({ message: 'Collection not found' });
+    const scope = scopeForCollection(req.auth, collection);
 
     const draw = Number(req.query.draw) || 1;
     const start = Math.max(0, Number(req.query.start) || 0);
@@ -2064,95 +1844,49 @@ app.get('/api/admin/datatables/:collection', requireAuth('superadmin', 'admin', 
     const orderDir =
       String(req.query.order?.[0]?.dir ?? req.query['order[0][dir]'] ?? 'asc').toLowerCase() ===
         'desc'
-        ? -1
-        : 1;
+        ? 'DESC'
+        : 'ASC';
 
     const doctorColumns = ['id', 'name', 'clinicName', 'contactnumber', 'logo', 'poster', null];
     const userColumns = ['id', 'empid', null];
     const columns = collection === 'doctors' ? doctorColumns : userColumns;
     const sortField = columns[orderCol] && columns[orderCol] !== 'id' ? columns[orderCol] : 'createdAt';
-    const sort = { [sortField === 'id' ? 'createdAt' : sortField]: orderDir };
+    // Column 0 (id) means "newest first".
+    const sortDir = sortField === 'createdAt' && orderCol === 0 ? 'DESC' : orderDir;
 
-    const filter = { ...scope };
-    const extras = [];
-    if (searchValue) {
-      if (collection === 'doctors') {
-        const escapedSearch = escapeRegex(searchValue);
-        const or = [
-          { name: { $regex: escapedSearch, $options: 'i' } },
-          { clinicName: { $regex: escapedSearch, $options: 'i' } },
-          { doctorDegree: { $regex: escapedSearch, $options: 'i' } },
-          {
-            $expr: {
-              $regexMatch: {
-                input: { $toString: { $ifNull: ['$contactnumber', ''] } },
-                regex: escapedSearch,
-                options: 'i',
-              },
-            },
-          },
-        ];
-        if (/^[a-f\d]{24}$/i.test(searchValue)) {
-          or.push({ _id: searchValue });
-        }
-        extras.push({ $or: or });
-      } else {
-        const or = [
-          { empid: { $regex: searchValue, $options: 'i' } },
-        ];
-        const asNumber = Number(searchValue);
-        if (!Number.isNaN(asNumber)) {
-          or.push({ empid: asNumber });
-          or.push({ id: asNumber });
-        }
-        extras.push({ $or: or });
-      }
-    }
-
-    const fromStr = String(req.query.from ?? req.query.dateFrom ?? '').trim();
-    const toStr = String(req.query.to ?? req.query.dateTo ?? '').trim();
-    if (collection === 'doctors' && (fromStr || toStr)) {
-      const range = {};
+    let recordsTotal;
+    let recordsFiltered;
+    let data;
+    if (collection === 'doctors') {
+      const fromStr = String(req.query.from ?? req.query.dateFrom ?? '').trim();
+      const toStr = String(req.query.to ?? req.query.dateTo ?? '').trim();
+      let from = null;
+      let to = null;
       if (fromStr) {
-        const from = new Date(fromStr);
-        if (!Number.isNaN(from.getTime())) {
-          from.setHours(0, 0, 0, 0);
-          range.$gte = from;
+        const date = new Date(fromStr);
+        if (!Number.isNaN(date.getTime())) {
+          date.setHours(0, 0, 0, 0);
+          from = date.toISOString();
         }
       }
       if (toStr) {
-        const to = new Date(toStr);
-        if (!Number.isNaN(to.getTime())) {
-          to.setHours(23, 59, 59, 999);
-          range.$lte = to;
+        const date = new Date(toStr);
+        if (!Number.isNaN(date.getTime())) {
+          date.setHours(23, 59, 59, 999);
+          to = date.toISOString();
         }
       }
-      if (Object.keys(range).length) {
-        extras.push({
-          $or: [
-            { createdAt: range },
-            { updatedAt: range },
-            { 'posters.createdAt': range },
-          ],
-        });
-      }
+
+      const filter = { scope, search: searchValue, from, to };
+      recordsTotal = Doctors.count({ scope });
+      recordsFiltered = Doctors.count(filter);
+      data = Doctors.list(filter, { sortField, sortDir, offset: start, limit: length }).map((d) => formatDoctor(d));
+    } else {
+      const page = Users.page(scope, { search: searchValue, sortField, sortDir, offset: start, limit: length });
+      recordsTotal = page.total;
+      recordsFiltered = page.filtered;
+      data = page.rows.map((user) => formatUser(user));
     }
-
-    if (extras.length === 1) {
-      Object.assign(filter, extras[0]);
-    } else if (extras.length > 1) {
-      filter.$and = extras;
-    }
-
-    const recordsTotal = await Model.countDocuments(scope);
-    const recordsFiltered = await Model.countDocuments(filter);
-    const docs = await Model.find(filter)
-      .sort(sortField === 'createdAt' && orderCol === 0 ? { createdAt: -1 } : sort)
-      .skip(start)
-      .limit(length);
-
-    const data =
-      collection === 'doctors' ? docs.map(formatDoctor) : docs.map(formatUser);
 
     return res.status(200).json({
       draw,
@@ -2182,49 +1916,46 @@ app.post('/api/admin/collections/:collection', requireAuth('superadmin', 'admin'
     if (req.params.collection !== 'doctors' && req.auth.role === 'user') {
       return res.status(403).json({ message: 'Users can only access doctors' });
     }
-    const Model = models[req.params.collection];
-    if (!Model) return res.status(404).json({ message: 'Collection not found' });
+    if (!COLLECTIONS.has(req.params.collection)) return res.status(404).json({ message: 'Collection not found' });
 
-    const createData = { ...req.body };
-    if (req.params.collection === 'doctors') {
-      if (createData.contactnumber) {
-        const cleanedContact = assertContactNumber(createData.contactnumber);
-        createData.contactnumber = cleanedContact;
-        const existingDoc = await Doctor.findOne({ contactnumber: cleanedContact });
-        if (existingDoc) {
-          return res.status(400).json({ message: 'This mobile number already exists for another doctor.' });
-        }
-      }
+    const body = { ...req.body };
+    if (req.params.collection === 'users') {
+      const requestedAdmin = req.auth.role === 'admin' ? req.auth.id : body.ownerAdmin;
+      const adminId = isValidId(String(requestedAdmin || '')) && Admins.findById(requestedAdmin) ? requestedAdmin : null;
+      const user = await createUserUnderAdmin(adminId, body);
+      return res.status(201).json({ success: true, data: user });
+    }
 
-      if (!createData.logo && (await isDoctorLogoRequired())) {
-        return res.status(400).json({ message: 'Doctor logo is required.' });
-      }
-
-      if (createData.logo && typeof createData.logo === 'string' && createData.logo.startsWith('data:')) {
-        const logoBuffer = Buffer.from(createData.logo.replace(/^data:image\/\w+;base64,/, ''), 'base64');
-        createData.logo = await saveFile(logoBuffer, null, 'logos');
-      }
-      if (createData.poster && typeof createData.poster === 'string' && createData.poster.startsWith('data:')) {
-        const posterBuffer = Buffer.from(createData.poster.replace(/^data:image\/\w+;base64,/, ''), 'base64');
-        createData.poster = await saveFile(posterBuffer, null, 'posters');
-        createData.posters = [{
-          image: createData.poster,
-          downloads: 0,
-          createdAt: new Date()
-        }];
+    if (body.contactnumber) {
+      const cleanedContact = assertContactNumber(body.contactnumber);
+      body.contactnumber = cleanedContact;
+      if (Doctors.findByContact(cleanedContact)) {
+        return res.status(400).json({ message: 'This mobile number already exists for another doctor.' });
       }
     }
 
-    if (req.params.collection === 'doctors' && req.auth.role === 'user') {
-      createData.ownerUser = req.auth.id;
-    }
-    if (req.params.collection === 'users' && req.auth.role === 'admin') {
-      createData.ownerAdmin = req.auth.id;
+    if (!body.logo && (await isDoctorLogoRequired())) {
+      return res.status(400).json({ message: 'Doctor logo is required.' });
     }
 
-    const doc = new Model(createData);
-    await doc.save();
-    res.status(201).json({ success: true, data: req.params.collection === 'doctors' ? formatDoctor(doc) : doc });
+    if (body.logo && typeof body.logo === 'string' && body.logo.startsWith('data:')) {
+      const logoBuffer = Buffer.from(body.logo.replace(/^data:image\/\w+;base64,/, ''), 'base64');
+      body.logo = await saveFile(logoBuffer, null, 'logos');
+    }
+    let posters = [];
+    if (body.poster && typeof body.poster === 'string' && body.poster.startsWith('data:')) {
+      const posterBuffer = Buffer.from(body.poster.replace(/^data:image\/\w+;base64,/, ''), 'base64');
+      body.poster = await saveFile(posterBuffer, null, 'posters');
+      posters = [{ image: body.poster, downloads: 0, createdAt: new Date() }];
+    }
+
+    const data = await doctorPatchFromBody(body, req.auth);
+    if (req.auth.role === 'user') data.ownerUser = req.auth.id;
+    if (!data.name) data.name = 'Doctor';
+    data.active = data.active !== false;
+
+    const doctor = Doctors.create(data, posters);
+    res.status(201).json({ success: true, data: formatDoctor(doctor) });
   } catch (err) {
     res.status(err.status || 500).json({ message: err.message || 'Error creating document' });
   }
@@ -2240,47 +1971,53 @@ app.put('/api/admin/collections/:collection/:id', requireAuth('superadmin', 'adm
     if (req.params.collection !== 'doctors' && req.auth.role === 'user') {
       return res.status(403).json({ message: 'Users can only access doctors' });
     }
-    const Model = models[req.params.collection];
-    if (!Model) return res.status(404).json({ message: 'Collection not found' });
+    if (!COLLECTIONS.has(req.params.collection)) return res.status(404).json({ message: 'Collection not found' });
 
-    const updateData = { ...req.body };
-    if (req.params.collection === 'doctors') {
-      if (updateData.contactnumber) {
-        const cleanedContact = assertContactNumber(updateData.contactnumber);
-        updateData.contactnumber = cleanedContact;
-        const existingDoc = await Doctor.findOne({ contactnumber: cleanedContact });
-        if (existingDoc && String(existingDoc._id) !== String(req.params.id)) {
-          return res.status(400).json({ message: 'This mobile number already exists for another doctor.' });
-        }
+    if (req.params.collection === 'users') {
+      const existingUser = Users.findById(req.params.id);
+      if (!existingUser || !(await assertUserInScope(req.auth, existingUser))) {
+        return res.status(404).json({ message: 'Document not found' });
       }
+      const updates = { ...req.body };
+      if (req.auth.role === 'admin') delete updates.ownerAdmin;
+      const user = await updateUserRecord(existingUser, {
+        empid: updates.empid,
+        password: updates.password,
+        ownerAdmin: updates.ownerAdmin,
+      });
+      return res.status(200).json({ success: true, data: user });
+    }
 
-      if (updateData.hasOwnProperty('logo') && !updateData.logo && (await isDoctorLogoRequired())) {
-        return res.status(400).json({ message: 'Doctor logo is required.' });
-      }
-
-      if (updateData.logo && typeof updateData.logo === 'string' && updateData.logo.startsWith('data:')) {
-        const logoBuffer = Buffer.from(updateData.logo.replace(/^data:image\/\w+;base64,/, ''), 'base64');
-        updateData.logo = await saveFile(logoBuffer, null, 'logos');
-      }
-      if (updateData.poster && typeof updateData.poster === 'string' && updateData.poster.startsWith('data:')) {
-        const posterBuffer = Buffer.from(updateData.poster.replace(/^data:image\/\w+;base64,/, ''), 'base64');
-        updateData.poster = await saveFile(posterBuffer, null, 'posters');
+    const body = { ...req.body };
+    if (body.contactnumber) {
+      const cleanedContact = assertContactNumber(body.contactnumber);
+      body.contactnumber = cleanedContact;
+      const existingDoc = Doctors.findByContact(cleanedContact);
+      if (existingDoc && String(existingDoc._id) !== String(req.params.id)) {
+        return res.status(400).json({ message: 'This mobile number already exists for another doctor.' });
       }
     }
 
-    const existing = await Model.findById(req.params.id);
-    if (!existing) return res.status(404).json({ message: 'Document not found' });
-    if (req.params.collection === 'doctors' && !(await canAccessDoctor(req.auth, existing))) {
+    if (Object.prototype.hasOwnProperty.call(body, 'logo') && !body.logo && (await isDoctorLogoRequired())) {
+      return res.status(400).json({ message: 'Doctor logo is required.' });
+    }
+
+    if (body.logo && typeof body.logo === 'string' && body.logo.startsWith('data:')) {
+      const logoBuffer = Buffer.from(body.logo.replace(/^data:image\/\w+;base64,/, ''), 'base64');
+      body.logo = await saveFile(logoBuffer, null, 'logos');
+    }
+    if (body.poster && typeof body.poster === 'string' && body.poster.startsWith('data:')) {
+      const posterBuffer = Buffer.from(body.poster.replace(/^data:image\/\w+;base64,/, ''), 'base64');
+      body.poster = await saveFile(posterBuffer, null, 'posters');
+    }
+
+    const existing = Doctors.findById(req.params.id);
+    if (!existing || !(await canAccessDoctor(req.auth, existing))) {
       return res.status(404).json({ message: 'Document not found' });
     }
-    if (req.params.collection === 'users' && !(await assertUserInScope(req.auth, existing))) {
-      return res.status(404).json({ message: 'Document not found' });
-    }
 
-    const doc = await Model.findByIdAndUpdate(req.params.id, updateData, { new: true });
-    if (!doc) return res.status(404).json({ message: 'Document not found' });
-
-    res.status(200).json({ success: true, data: req.params.collection === 'doctors' ? formatDoctor(doc) : doc });
+    const doctor = Doctors.update(existing._id, await doctorPatchFromBody(body, req.auth));
+    res.status(200).json({ success: true, data: formatDoctor(doctor) });
   } catch (err) {
     res.status(err.status || 500).json({ message: err.message || 'Error updating document' });
   }
@@ -2296,20 +2033,21 @@ app.delete('/api/admin/collections/:collection/:id', requireAuth('superadmin', '
     if (req.params.collection !== 'doctors' && req.auth.role === 'user') {
       return res.status(403).json({ message: 'Users can only access doctors' });
     }
-    const Model = models[req.params.collection];
-    if (!Model) return res.status(404).json({ message: 'Collection not found' });
+    if (!COLLECTIONS.has(req.params.collection)) return res.status(404).json({ message: 'Collection not found' });
 
-    const existing = await Model.findById(req.params.id);
-    if (!existing) return res.status(404).json({ message: 'Document not found' });
-    if (req.params.collection === 'doctors' && !(await canAccessDoctor(req.auth, existing))) {
-      return res.status(404).json({ message: 'Document not found' });
+    if (req.params.collection === 'doctors') {
+      const existing = Doctors.findById(req.params.id);
+      if (!existing || !(await canAccessDoctor(req.auth, existing))) {
+        return res.status(404).json({ message: 'Document not found' });
+      }
+      Doctors.remove(existing._id);
+    } else {
+      const existing = Users.findById(req.params.id);
+      if (!existing || !(await assertUserInScope(req.auth, existing))) {
+        return res.status(404).json({ message: 'Document not found' });
+      }
+      Users.remove(existing._id);
     }
-    if (req.params.collection === 'users' && !(await assertUserInScope(req.auth, existing))) {
-      return res.status(404).json({ message: 'Document not found' });
-    }
-
-    const doc = await Model.findByIdAndDelete(req.params.id);
-    if (!doc) return res.status(404).json({ message: 'Document not found' });
 
     res.status(200).json({ success: true, message: 'Document deleted' });
   } catch (err) {
@@ -2331,113 +2069,16 @@ app.use((err, req, res, next) => {
   });
 });
 
-function sleep(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-function isPortOpen(port, host = '127.0.0.1') {
-  return new Promise((resolve) => {
-    const socket = net.connect({ port, host }, () => {
-      socket.end();
-      resolve(true);
-    });
-    socket.on('error', () => resolve(false));
-    socket.setTimeout(800, () => {
-      socket.destroy();
-      resolve(false);
-    });
-  });
-}
-
-async function tryBrewStart() {
-  const formulas = [
-    'mongodb-community',
-    'mongodb-community@8.0',
-    'mongodb-community@7.0',
-    'mongodb-community@6.0',
-    'mongodb/brew/mongodb-community',
-  ];
-  for (const formula of formulas) {
-    try {
-      await execFileAsync('brew', ['services', 'start', formula], { timeout: 20000 });
-      console.log(`Started MongoDB via brew services (${formula})`);
-      return true;
-    } catch {
-      // try next formula
-    }
-  }
-  return false;
-}
-
-async function trySpawnMongod() {
-  const candidates = [
-    '/usr/local/var/mongodb',
-    '/opt/homebrew/var/mongodb',
-    path.join(process.env.HOME || '', 'data', 'db'),
-  ];
-  const dbpath = candidates.find((p) => {
-    try {
-      return fs.existsSync(p);
-    } catch {
-      return false;
-    }
-  }) || candidates[0];
-
-  try {
-    fs.mkdirSync(dbpath, { recursive: true });
-  } catch {
-    // ignore
-  }
-
-  const logDir = path.dirname(dbpath);
-  const logpath = path.join(logDir, 'mongod.log');
-
-  return new Promise((resolve) => {
-    const child = spawn(
-      'mongod',
-      ['--dbpath', dbpath, '--bind_ip', '127.0.0.1', '--port', '27017'],
-      { detached: true, stdio: 'ignore' }
-    );
-    child.unref();
-    console.log(`Spawned mongod with --dbpath ${dbpath}`);
-    resolve(true);
-  });
-}
-
-async function ensureMongoRunning() {
-  if (await isPortOpen(27017)) {
-    console.log('MongoDB already running on port 27017');
-    return;
-  }
-
-  console.log('MongoDB not detected — attempting to start automatically...');
-  const brewOk = await tryBrewStart();
-  if (!brewOk) {
-    await trySpawnMongod();
-  }
-
-  for (let i = 0; i < 20; i++) {
-    await sleep(500);
-    if (await isPortOpen(27017)) {
-      console.log('MongoDB is ready');
-      return;
-    }
-  }
-
-  throw new Error(
-    'Could not start MongoDB automatically. Install/start it manually, then retry.'
-  );
-}
-
-
 // --- Superadmin Template Posters API ---
 app.get('/api/posters', requireAuth('superadmin', 'admin', 'user'), async (req, res) => {
   try {
     const { month, category } = req.query;
-    const filter = { enabled: { $ne: false }, status: { $ne: 'draft' } };
-    if (month) filter.month = { $regex: `^${escapeRegex(month)}$`, $options: 'i' };
-    if (category && category !== 'all') filter.category = { $regex: `^${escapeRegex(category)}$`, $options: 'i' };
-    const posters = await Poster.find(filter).sort({ uploaddate: -1 });
+    const posters = PosterTemplates.list({
+      status: 'published',
+      enabledOnly: true,
+      month: month ? String(month) : undefined,
+      category: category && category !== 'all' ? String(category) : undefined,
+    });
     res.status(200).json({ posters });
   } catch (error) {
     console.error('Error fetching posters:', error);
@@ -2503,19 +2144,19 @@ async function resolvePosterLayout(body, status) {
 
   const categoryName = String(body.category || '').trim();
   if (!categoryName) return { error: 'Choose a category for this poster' };
-  const category = await Category.findOne({ name: { $regex: `^${escapeRegex(categoryName)}$`, $options: 'i' } });
+  const category = Categories.findByName(categoryName);
   if (!category) return { error: 'Choose one of the existing poster categories' };
 
   const themeName = String(body.color || '').trim();
   if (!themeName) return { error: 'Choose a theme for this poster' };
-  const theme = await Theme.findOne({ name: { $regex: `^${escapeRegex(themeName)}$`, $options: 'i' } });
+  const theme = Themes.findByName(themeName);
   if (!theme) return { error: 'Choose one of the existing poster themes' };
 
   const monthName = String(body.month || '').trim();
   const month = POSTER_MONTHS.find((m) => m.toLowerCase() === monthName.toLowerCase());
   if (!month) return { error: 'Choose a month for this poster' };
 
-  const activeFields = await DoctorField.find({ enabled: true }).lean();
+  const activeFields = DoctorFields.list({ enabledOnly: true });
   const activeKeys = new Set(activeFields.map((f) => f.key));
   const disabled = new Set(disabledFields);
 
@@ -2536,10 +2177,10 @@ async function resolvePosterLayout(body, status) {
 app.get('/api/superadmin/posters', requireAuth('superadmin'), async (req, res) => {
   try {
     if (req.query.status === 'draft') {
-      const drafts = await Poster.find({ status: 'draft' }).sort({ updatedAt: -1 });
+      const drafts = PosterTemplates.list({ status: 'draft', orderBy: 'updatedAt' });
       return res.status(200).json({ posters: drafts });
     }
-    const posters = await Poster.find({ status: { $ne: 'draft' } }).sort({ uploaddate: -1 });
+    const posters = PosterTemplates.list({ status: 'published' });
     res.status(200).json({ posters });
   } catch (error) {
     console.error('Error fetching posters:', error);
@@ -2574,7 +2215,7 @@ app.post('/api/superadmin/posters', requireAuth('superadmin'), upload.any(), asy
     }
 
     const enabledVal = req.body.enabled === undefined ? true : String(req.body.enabled) === 'true' || req.body.enabled === true;
-    const newPoster = new Poster({
+    const newPoster = PosterTemplates.create({
       posterlink,
       category: category || '',
       color: color || '',
@@ -2586,7 +2227,6 @@ app.post('/api/superadmin/posters', requireAuth('superadmin'), upload.any(), asy
       ...(uploaddate ? { uploaddate: new Date(uploaddate) } : {}),
     });
 
-    await newPoster.save();
     res.status(201).json({ success: true, poster: newPoster });
   } catch (error) {
     console.error('Error creating poster:', error);
@@ -2599,8 +2239,8 @@ app.put('/api/superadmin/posters/:id', requireAuth('superadmin'), upload.any(), 
     const { uploaddate } = req.body;
     let { color, month } = req.body;
     let category = req.body.category;
-    const poster = await Poster.findById(req.params.id);
-    if (!poster) return res.status(404).json({ message: 'Poster not found' });
+    if (!PosterTemplates.findById(req.params.id)) return res.status(404).json({ message: 'Poster not found' });
+    const poster = {};
 
     const posterFile = req.files?.find((f) => f.fieldname === 'posterFile');
     if (posterFile) {
@@ -2628,8 +2268,8 @@ app.put('/api/superadmin/posters/:id', requireAuth('superadmin'), upload.any(), 
     }
     if (uploaddate) poster.uploaddate = new Date(uploaddate);
 
-    await poster.save();
-    res.status(200).json({ success: true, poster });
+    const saved = PosterTemplates.update(req.params.id, poster);
+    res.status(200).json({ success: true, poster: saved });
   } catch (error) {
     console.error('Error updating poster:', error);
     res.status(500).json({ message: 'Failed to update poster' });
@@ -2638,10 +2278,9 @@ app.put('/api/superadmin/posters/:id', requireAuth('superadmin'), upload.any(), 
 
 app.patch('/api/superadmin/posters/:id/toggle-status', requireAuth('superadmin'), async (req, res) => {
   try {
-    const poster = await Poster.findById(req.params.id);
-    if (!poster) return res.status(404).json({ message: 'Poster not found' });
-    poster.enabled = poster.enabled === false ? true : false;
-    await poster.save();
+    const existing = PosterTemplates.findById(req.params.id);
+    if (!existing) return res.status(404).json({ message: 'Poster not found' });
+    const poster = PosterTemplates.update(existing._id, { enabled: existing.enabled === false });
     res.status(200).json({ success: true, poster });
   } catch (error) {
     console.error('Error toggling poster status:', error);
@@ -2651,8 +2290,7 @@ app.patch('/api/superadmin/posters/:id/toggle-status', requireAuth('superadmin')
 
 app.delete('/api/superadmin/posters/:id', requireAuth('superadmin'), async (req, res) => {
   try {
-    const poster = await Poster.findByIdAndDelete(req.params.id);
-    if (!poster) return res.status(404).json({ message: 'Poster not found' });
+    if (!PosterTemplates.remove(req.params.id)) return res.status(404).json({ message: 'Poster not found' });
     res.status(200).json({ success: true });
   } catch (error) {
     console.error('Error deleting poster:', error);
@@ -2663,8 +2301,7 @@ app.delete('/api/superadmin/posters/:id', requireAuth('superadmin'), async (req,
 // --- Poster Categories API ---
 app.get('/api/categories', requireAuth('superadmin', 'admin', 'user'), async (req, res) => {
   try {
-    const filter = req.query.includeDisabled === 'true' ? {} : { enabled: { $ne: false } };
-    const categories = await Category.find(filter).sort({ name: 1 });
+    const categories = Categories.list({ enabledOnly: req.query.includeDisabled !== 'true', orderBy: 'name' });
     res.status(200).json({ categories });
   } catch (error) {
     console.error('Error fetching categories:', error);
@@ -2674,20 +2311,14 @@ app.get('/api/categories', requireAuth('superadmin', 'admin', 'user'), async (re
 
 app.get('/api/superadmin/categories', requireAuth('superadmin'), async (req, res) => {
   try {
-    const categories = await Category.find().sort({ createdAt: -1 });
-    const posterCounts = await Poster.aggregate([
-      { $group: { _id: { $toLower: '$category' }, count: { $sum: 1 } } },
-    ]);
-    const countMap = {};
-    posterCounts.forEach((p) => {
-      if (p._id) countMap[p._id] = p.count;
-    });
+    const categories = Categories.list({ orderBy: 'createdAt' });
+    const countMap = PosterTemplates.countsByCategory();
     const formatted = categories.map((c) => ({
       _id: c._id,
       name: c.name,
       enabled: c.enabled !== false,
       createdAt: c.createdAt,
-      posterCount: countMap[c.name.toLowerCase()] || 0,
+      posterCount: countMap.get(c.name.toLowerCase()) || 0,
     }));
     res.status(200).json({ categories: formatted });
   } catch (error) {
@@ -2702,19 +2333,15 @@ app.post('/api/superadmin/categories', requireAuth('superadmin'), async (req, re
     if (!name) {
       return res.status(400).json({ message: 'Category name is required' });
     }
-    const existing = await Category.findOne({
-      name: { $regex: `^${escapeRegex(name)}$`, $options: 'i' },
-    });
-    if (existing) {
+    if (Categories.findByName(name)) {
       return res.status(400).json({ message: 'Category already exists' });
     }
     const enabled = req.body.enabled === undefined ? true : Boolean(req.body.enabled);
-    const category = new Category({ name, enabled });
-    await category.save();
+    const category = Categories.create({ name, enabled });
     res.status(201).json({ success: true, category });
   } catch (error) {
     console.error('Error creating category:', error);
-    res.status(500).json({ message: 'Failed to create category' });
+    res.status(error.status || 500).json({ message: error.status ? error.message : 'Failed to create category' });
   }
 });
 
@@ -2724,44 +2351,37 @@ app.put('/api/superadmin/categories/:id', requireAuth('superadmin'), async (req,
     if (!name) {
       return res.status(400).json({ message: 'Category name is required' });
     }
-    const category = await Category.findById(req.params.id);
+    const category = Categories.findById(req.params.id);
     if (!category) {
       return res.status(404).json({ message: 'Category not found' });
     }
-    const existing = await Category.findOne({
-      _id: { $ne: category._id },
-      name: { $regex: `^${escapeRegex(name)}$`, $options: 'i' },
-    });
-    if (existing) {
+    const existing = Categories.findByName(name);
+    if (existing && existing._id !== category._id) {
       return res.status(400).json({ message: 'Another category with this name already exists' });
     }
     const oldName = category.name;
-    category.name = name;
+    const patch = { name };
     if (req.body.enabled !== undefined) {
-      category.enabled = Boolean(req.body.enabled);
+      patch.enabled = Boolean(req.body.enabled);
     }
-    await category.save();
+    const saved = Categories.update(category._id, patch);
 
     if (oldName.toLowerCase() !== name.toLowerCase()) {
-      await Poster.updateMany(
-        { category: { $regex: `^${escapeRegex(oldName)}$`, $options: 'i' } },
-        { $set: { category: name } }
-      );
+      PosterTemplates.renameCategory(oldName, name);
     }
 
-    res.status(200).json({ success: true, category });
+    res.status(200).json({ success: true, category: saved });
   } catch (error) {
     console.error('Error updating category:', error);
-    res.status(500).json({ message: 'Failed to update category' });
+    res.status(error.status || 500).json({ message: error.status ? error.message : 'Failed to update category' });
   }
 });
 
 app.patch('/api/superadmin/categories/:id/toggle-status', requireAuth('superadmin'), async (req, res) => {
   try {
-    const category = await Category.findById(req.params.id);
-    if (!category) return res.status(404).json({ message: 'Category not found' });
-    category.enabled = category.enabled === false ? true : false;
-    await category.save();
+    const existing = Categories.findById(req.params.id);
+    if (!existing) return res.status(404).json({ message: 'Category not found' });
+    const category = Categories.update(existing._id, { enabled: existing.enabled === false });
     res.status(200).json({ success: true, category });
   } catch (error) {
     console.error('Error toggling category status:', error);
@@ -2771,11 +2391,9 @@ app.patch('/api/superadmin/categories/:id/toggle-status', requireAuth('superadmi
 
 app.delete('/api/superadmin/categories/:id', requireAuth('superadmin'), async (req, res) => {
   try {
-    const category = await Category.findById(req.params.id);
-    if (!category) {
+    if (!Categories.remove(req.params.id)) {
       return res.status(404).json({ message: 'Category not found' });
     }
-    await Category.findByIdAndDelete(req.params.id);
     res.status(200).json({ success: true, message: 'Category deleted successfully' });
   } catch (error) {
     console.error('Error deleting category:', error);
@@ -2786,8 +2404,7 @@ app.delete('/api/superadmin/categories/:id', requireAuth('superadmin'), async (r
 // --- Poster Themes API ---
 app.get('/api/themes', requireAuth('superadmin', 'admin', 'user'), async (req, res) => {
   try {
-    const filter = req.query.includeDisabled === 'true' ? {} : { enabled: { $ne: false } };
-    const themes = await Theme.find(filter).sort({ createdAt: 1 });
+    const themes = Themes.list({ enabledOnly: req.query.includeDisabled !== 'true', orderBy: 'createdAtAsc' });
     res.status(200).json({ themes });
   } catch (error) {
     console.error('Error fetching themes:', error);
@@ -2797,15 +2414,12 @@ app.get('/api/themes', requireAuth('superadmin', 'admin', 'user'), async (req, r
 
 app.get('/api/superadmin/themes', requireAuth('superadmin'), async (req, res) => {
   try {
-    const themes = await Theme.find().sort({ createdAt: -1 });
-    const posters = await Poster.find({}, 'color');
+    const themes = Themes.list({ orderBy: 'createdAtDesc' });
+    const countByColor = PosterTemplates.countsByColor();
     const formatted = themes.map((t) => {
       const tName = t.name.toLowerCase();
       const tSlug = (t.slug || '').toLowerCase();
-      const posterCount = posters.filter((p) => {
-        const c = (p.color || '').toLowerCase().trim();
-        return c && (c === tName || c === tSlug);
-      }).length;
+      const posterCount = (countByColor.get(tName) || 0) + (tSlug && tSlug !== tName ? countByColor.get(tSlug) || 0 : 0);
       return {
         _id: t._id,
         name: t.name,
@@ -2834,10 +2448,7 @@ app.post('/api/superadmin/themes', requireAuth('superadmin'), async (req, res) =
     if (!trimmed) {
       return res.status(400).json({ message: 'Theme name is required' });
     }
-    const existing = await Theme.findOne({
-      name: { $regex: `^${escapeRegex(trimmed)}$`, $options: 'i' },
-    });
-    if (existing) {
+    if (Themes.findByName(trimmed)) {
       return res.status(400).json({ message: 'Theme with this name already exists' });
     }
 
@@ -2846,7 +2457,7 @@ app.post('/api/superadmin/themes', requireAuth('superadmin'), async (req, res) =
     const aColor = String(accentColor || '#2b6cb0').trim();
     const enabled = req.body.enabled === undefined ? true : Boolean(req.body.enabled);
 
-    const theme = new Theme({
+    const theme = Themes.create({
       name: trimmed,
       slug: slugifyTheme(trimmed),
       headerBg: hBg,
@@ -2856,11 +2467,10 @@ app.post('/api/superadmin/themes', requireAuth('superadmin'), async (req, res) =
       cardGlow: `${hBg}25`,
       enabled,
     });
-    await theme.save();
     res.status(201).json({ success: true, theme });
   } catch (error) {
     console.error('Error creating theme:', error);
-    res.status(500).json({ message: 'Failed to create theme' });
+    res.status(error.status || 500).json({ message: error.status ? error.message : 'Failed to create theme' });
   }
 });
 
@@ -2871,51 +2481,43 @@ app.put('/api/superadmin/themes/:id', requireAuth('superadmin'), async (req, res
     if (!trimmed) {
       return res.status(400).json({ message: 'Theme name is required' });
     }
-    const theme = await Theme.findById(req.params.id);
+    const theme = Themes.findById(req.params.id);
     if (!theme) {
       return res.status(404).json({ message: 'Theme not found' });
     }
-    const existing = await Theme.findOne({
-      _id: { $ne: theme._id },
-      name: { $regex: `^${escapeRegex(trimmed)}$`, $options: 'i' },
-    });
-    if (existing) {
+    const existing = Themes.findByName(trimmed);
+    if (existing && existing._id !== theme._id) {
       return res.status(400).json({ message: 'Another theme with this name already exists' });
     }
 
     const oldName = theme.name;
-    theme.name = trimmed;
-    theme.slug = slugifyTheme(trimmed);
-    if (headerBg) theme.headerBg = String(headerBg).trim();
-    if (footerBg) theme.footerBg = String(footerBg).trim();
-    if (accentColor) theme.accentColor = String(accentColor).trim();
-    if (description !== undefined) theme.description = String(description).trim();
+    const patch = { name: trimmed, slug: slugifyTheme(trimmed) };
+    if (headerBg) patch.headerBg = String(headerBg).trim();
+    if (footerBg) patch.footerBg = String(footerBg).trim();
+    if (accentColor) patch.accentColor = String(accentColor).trim();
+    if (description !== undefined) patch.description = String(description).trim();
     if (req.body.enabled !== undefined) {
-      theme.enabled = Boolean(req.body.enabled);
+      patch.enabled = Boolean(req.body.enabled);
     }
-    theme.cardGlow = `${theme.headerBg}25`;
-    await theme.save();
+    patch.cardGlow = `${patch.headerBg || theme.headerBg}25`;
+    const saved = Themes.update(theme._id, patch);
 
     if (oldName.toLowerCase() !== trimmed.toLowerCase()) {
-      await Poster.updateMany(
-        { color: { $regex: `^${escapeRegex(oldName)}$`, $options: 'i' } },
-        { $set: { color: trimmed } }
-      );
+      PosterTemplates.renameColor(oldName, trimmed);
     }
 
-    res.status(200).json({ success: true, theme });
+    res.status(200).json({ success: true, theme: saved });
   } catch (error) {
     console.error('Error updating theme:', error);
-    res.status(500).json({ message: 'Failed to update theme' });
+    res.status(error.status || 500).json({ message: error.status ? error.message : 'Failed to update theme' });
   }
 });
 
 app.patch('/api/superadmin/themes/:id/toggle-status', requireAuth('superadmin'), async (req, res) => {
   try {
-    const theme = await Theme.findById(req.params.id);
-    if (!theme) return res.status(404).json({ message: 'Theme not found' });
-    theme.enabled = theme.enabled === false ? true : false;
-    await theme.save();
+    const existing = Themes.findById(req.params.id);
+    if (!existing) return res.status(404).json({ message: 'Theme not found' });
+    const theme = Themes.update(existing._id, { enabled: existing.enabled === false });
     res.status(200).json({ success: true, theme });
   } catch (error) {
     console.error('Error toggling theme status:', error);
@@ -2925,16 +2527,13 @@ app.patch('/api/superadmin/themes/:id/toggle-status', requireAuth('superadmin'),
 
 app.delete('/api/superadmin/themes/:id', requireAuth('superadmin'), async (req, res) => {
   try {
-    const theme = await Theme.findById(req.params.id);
+    const theme = Themes.findById(req.params.id);
     if (!theme) {
       return res.status(404).json({ message: 'Theme not found' });
     }
-    await Theme.findByIdAndDelete(req.params.id);
+    Themes.remove(theme._id);
     // Remove the master posters built on this theme. Posters already saved on doctors are separate copies and stay.
-    const names = [...new Set([theme.name, theme.slug].filter(Boolean))];
-    const { deletedCount } = await Poster.deleteMany({
-      $or: names.map((n) => ({ color: { $regex: `^\\s*${escapeRegex(n)}\\s*$`, $options: 'i' } })),
-    });
+    const deletedCount = PosterTemplates.removeByColors([theme.name, theme.slug].filter(Boolean));
     res.status(200).json({ success: true, message: 'Theme deleted successfully', deletedPosters: deletedCount });
   } catch (error) {
     console.error('Error deleting theme:', error);
@@ -2942,141 +2541,79 @@ app.delete('/api/superadmin/themes/:id', requireAuth('superadmin'), async (req, 
   }
 });
 
-const startServer = async () => {
+/** Default rows for a brand-new database. */
+function seedDefaults() {
+  if (DoctorFields.count() === 0) {
+    console.log('Seeding standard doctor fields...');
+    [
+      { key: 'name', label: 'Doctor Name', type: 'text', required: true, isStandard: true, enabled: true, order: 1 },
+      { key: 'clinicName', label: 'Clinic Name', type: 'text', required: true, isStandard: true, enabled: true, order: 2 },
+      { key: 'doctorDegree', label: 'Degree', type: 'text', required: false, isStandard: true, enabled: true, order: 3 },
+      { key: 'contactnumber', label: 'Contact Number', type: 'tel', required: true, isStandard: true, enabled: true, order: 4 },
+      { key: 'logo', label: 'Doctor Photo / Logo', type: 'file', required: false, isStandard: true, enabled: true, order: 100 },
+    ].forEach((field) => DoctorFields.create(field));
+  } else if (!DoctorFields.findByKey('logo')) {
+    DoctorFields.create({ key: 'logo', label: 'Doctor Photo / Logo', type: 'file', required: false, isStandard: true, enabled: true, order: 100 });
+  }
+
+  if (Categories.count() === 0) {
+    console.log('Seeding default poster categories...');
+    ['Education', 'Festivals', 'Videos'].forEach((name) => Categories.create({ name, enabled: true }));
+  }
+
+  if (Themes.count() === 0) {
+    console.log('Seeding default poster themes...');
+    [
+      {
+        name: 'Cool Blue',
+        slug: 'theme-blue',
+        headerBg: '#1a4f8b',
+        footerBg: '#143a66',
+        accentColor: '#2b6cb0',
+        description: 'Professional medical blue',
+        cardGlow: 'rgba(26, 79, 139, 0.12)',
+      },
+      {
+        name: 'Warm Red',
+        slug: 'theme-warm-red',
+        headerBg: '#9c1c4a',
+        footerBg: '#7a1540',
+        accentColor: '#c0267a',
+        description: 'Warm crimson and rose',
+        cardGlow: 'rgba(198, 38, 122, 0.12)',
+      },
+      {
+        name: 'Emerald Green',
+        slug: 'theme-green',
+        headerBg: '#1b5c45',
+        footerBg: '#134435',
+        accentColor: '#218a62',
+        description: 'Natural emerald wellness',
+        cardGlow: 'rgba(27, 92, 69, 0.14)',
+      },
+      {
+        name: 'Royal Purple',
+        slug: 'theme-purple',
+        headerBg: '#4c1d95',
+        footerBg: '#2e1065',
+        accentColor: '#7c3aed',
+        description: 'Soft royal lilac',
+        cardGlow: 'rgba(124, 58, 237, 0.14)',
+      },
+    ].forEach((theme) => Themes.create({ ...theme, enabled: true }));
+  }
+}
+
+const startServer = () => {
   try {
-    await ensureMongoRunning();
-    await mongoose.connect(MONGODB_URI);
-    console.log(`Connected to MongoDB at ${MONGODB_URI}`);
-
-    // Keep missing passwords usable, then store every leftover plaintext password as a hash
-    const hashedUsers = await ensureHashedPasswords(User);
-    const hashedAdmins = await ensureHashedPasswords(Admin);
-    if (hashedUsers) console.log(`Hashed password for ${hashedUsers} user(s)`);
-    if (hashedAdmins) console.log(`Hashed password for ${hashedAdmins} admin(s)`);
-
-    // Backfill clinic name for older doctor records
-    const clinicBackfill = await Doctor.updateMany(
-      { $or: [{ clinicName: { $exists: false } }, { clinicName: null }, { clinicName: '' }] },
-      { $set: { clinicName: 'Clinic' } }
-    );
-    if (clinicBackfill.modifiedCount) {
-      console.log(`Backfilled clinicName for ${clinicBackfill.modifiedCount} doctor(s)`);
-    }
-
-    const degreeBackfill = await Doctor.updateMany(
-      { $or: [{ doctorDegree: { $exists: false } }, { doctorDegree: null }] },
-      { $set: { doctorDegree: '' } }
-    );
-    if (degreeBackfill.modifiedCount) {
-      console.log(`Backfilled doctorDegree for ${degreeBackfill.modifiedCount} doctor(s)`);
-    }
-
-    const activeBackfill = await Doctor.updateMany(
-      { active: { $exists: false } },
-      { $set: { active: true } }
-    );
-    if (activeBackfill.modifiedCount) {
-      console.log(`Backfilled active flag for ${activeBackfill.modifiedCount} doctor(s)`);
-    }
-
-    const downloadBackfill = await Doctor.updateMany(
-      { downloadCount: { $exists: false } },
-      { $set: { downloadCount: 0 } }
-    );
-    if (downloadBackfill.modifiedCount) {
-      console.log(`Backfilled downloadCount for ${downloadBackfill.modifiedCount} doctor(s)`);
-    }
-
-    const existingFields = await DoctorField.countDocuments();
-    if (existingFields === 0) {
-      console.log('Seeding standard doctor fields...');
-      await DoctorField.insertMany([
-        { key: 'name', label: 'Doctor Name', type: 'text', required: true, isStandard: true, enabled: true, order: 1 },
-        { key: 'clinicName', label: 'Clinic Name', type: 'text', required: true, isStandard: true, enabled: true, order: 2 },
-        { key: 'doctorDegree', label: 'Degree', type: 'text', required: false, isStandard: true, enabled: true, order: 3 },
-        { key: 'contactnumber', label: 'Contact Number', type: 'tel', required: true, isStandard: true, enabled: true, order: 4 },
-        { key: 'logo', label: 'Doctor Photo / Logo', type: 'file', required: false, isStandard: true, enabled: true, order: 100 },
-      ]);
-    } else {
-      const logoFieldExists = await DoctorField.findOne({ key: 'logo' });
-      if (!logoFieldExists) {
-        await DoctorField.create({ key: 'logo', label: 'Doctor Photo / Logo', type: 'file', required: false, isStandard: true, enabled: true, order: 100 });
-      } else if (Number(logoFieldExists.order) < 50) {
-        // Keep logo after custom fields added between contact and logo
-        logoFieldExists.order = 100;
-        await logoFieldExists.save();
-      }
-    }
-
-    const existingCategories = await Category.countDocuments();
-    if (existingCategories === 0) {
-      console.log('Seeding default poster categories...');
-      await Category.insertMany([
-        { name: 'Education' },
-        { name: 'Festivals' },
-        { name: 'Videos' },
-      ]);
-      await Poster.updateMany({ category: { $regex: /^education$/i } }, { $set: { category: 'Education' } });
-      await Poster.updateMany({ category: { $regex: /^festival(s)?$/i } }, { $set: { category: 'Festivals' } });
-      await Poster.updateMany({ category: { $regex: /^video(s)?$/i } }, { $set: { category: 'Videos' } });
-    }
-
-    const existingThemes = await Theme.countDocuments();
-    if (existingThemes === 0) {
-      console.log('Seeding default poster themes...');
-      await Theme.insertMany([
-        {
-          name: 'Cool Blue',
-          slug: 'theme-blue',
-          headerBg: '#1a4f8b',
-          footerBg: '#143a66',
-          accentColor: '#2b6cb0',
-          description: 'Professional medical blue',
-          cardGlow: 'rgba(26, 79, 139, 0.12)',
-        },
-        {
-          name: 'Warm Red',
-          slug: 'theme-warm-red',
-          headerBg: '#9c1c4a',
-          footerBg: '#7a1540',
-          accentColor: '#c0267a',
-          description: 'Warm crimson and rose',
-          cardGlow: 'rgba(198, 38, 122, 0.12)',
-        },
-        {
-          name: 'Emerald Green',
-          slug: 'theme-green',
-          headerBg: '#1b5c45',
-          footerBg: '#134435',
-          accentColor: '#218a62',
-          description: 'Natural emerald wellness',
-          cardGlow: 'rgba(27, 92, 69, 0.14)',
-        },
-        {
-          name: 'Royal Purple',
-          slug: 'theme-purple',
-          headerBg: '#4c1d95',
-          footerBg: '#2e1065',
-          accentColor: '#7c3aed',
-          description: 'Soft royal lilac',
-          cardGlow: 'rgba(124, 58, 237, 0.14)',
-        },
-      ]);
-      await Poster.updateMany({ color: { $regex: /^red$/i } }, { $set: { color: 'Warm Red' } });
-      await Poster.updateMany({ color: { $regex: /^purple$/i } }, { $set: { color: 'Royal Purple' } });
-      await Poster.updateMany({ color: { $regex: /^blue$/i } }, { $set: { color: 'Cool Blue' } });
-      await Poster.updateMany({ color: { $regex: /^green$/i } }, { $set: { color: 'Emerald Green' } });
-    }
-
-    await Poster.updateMany({ enabled: { $exists: false } }, { $set: { enabled: true } });
-    await Category.updateMany({ enabled: { $exists: false } }, { $set: { enabled: true } });
-    await Theme.updateMany({ enabled: { $exists: false } }, { $set: { enabled: true } });
+    console.log(`Using SQLite database at ${DB_PATH}`);
+    seedDefaults();
 
     app.listen(PORT, () => {
       console.log(`Server is running on port ${PORT}`);
     });
   } catch (error) {
-    console.error('Error connecting to MongoDB:', error);
+    console.error('Error starting server:', error);
     process.exit(1);
   }
 };
