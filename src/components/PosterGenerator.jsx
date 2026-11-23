@@ -1,3 +1,4 @@
+import { resolveMediaUrl } from '../lib/mediaUrl';
 import { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import JSZip from 'jszip';
@@ -360,7 +361,7 @@ export default function PosterGenerator({
       const saveMeta = { kind: posterKind, label, month: targetPoster?.month || '' };
 
       if (targetPoster?.kind === 'video') {
-        const res = await fetch(targetPoster.videoUrl);
+        const res = await fetch(resolveMediaUrl(targetPoster.videoUrl));
         const videoBlob = await res.blob();
         const dataUrl = URL.createObjectURL(videoBlob);
         const fileName = `Video_${cleanDocName}_${posterLabel}.mp4`;
@@ -403,7 +404,7 @@ export default function PosterGenerator({
     } catch (err) {
       console.error('Failed to render poster:', err);
       setIsGenerating(false);
-      errorAlert('Please try again.', 'Could not render poster');
+      errorAlert(err instanceof Error ? err.message : 'Please try again.', 'Could not render poster');
     }
   };
 
@@ -445,7 +446,7 @@ export default function PosterGenerator({
         const safeLabel = label.replace(/[^a-zA-Z0-9_-]/g, '_');
 
         if (poster.kind === 'video') {
-          const res = await fetch(poster.videoUrl);
+          const res = await fetch(resolveMediaUrl(poster.videoUrl));
           const videoBlob = await res.blob();
           zip.file(`${String(i + 1).padStart(2, '0')}_${safeLabel}.mp4`, videoBlob);
         } else {
@@ -461,7 +462,7 @@ export default function PosterGenerator({
         const firstMonth = pack[0].month || '';
         const firstSaveMeta = { kind: firstKind, label: firstLabel, month: firstMonth };
         if (pack[0].kind === 'video') {
-          const res = await fetch(pack[0].videoUrl);
+          const res = await fetch(resolveMediaUrl(pack[0].videoUrl));
           firstBlob = await res.blob();
         } else {
           firstBlob = await renderPosterBlob(pack[0], firstLabel);

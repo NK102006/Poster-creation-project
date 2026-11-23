@@ -1,3 +1,4 @@
+import { resolveMediaUrl } from '../lib/mediaUrl';
 // RiskFactorPoster.jsx
 // ─────────────────────────────────────────────────────────────────────────────
 // "Hypertension's Risk Factors" poster — one self-contained React component.
@@ -330,13 +331,13 @@ const RiskFactorPoster = forwardRef(function RiskFactorPoster(
 
         {/* fixed photo (or your own via the `photo` prop) */}
         <div className="rfp-frame">
-          <img src={photo} alt="Blood pressure check" />
+          <img src={resolveMediaUrl(photo)} alt="Blood pressure check" />
         </div>
 
         {/* Footer: photo + doctor | clinic + phone */}
         {logo ? (
           <div className="rfp-photo">
-            <img src={logo} alt="" style={{ objectFit: logoFit }} />
+            <img src={resolveMediaUrl(logo)} alt="" style={{ objectFit: logoFit }} />
           </div>
         ) : null}
         <div className={`rfp-barL${barTall ? ' rfp-barTall' : ''}${logo ? ' rfp-hasPhoto' : ''}`}>

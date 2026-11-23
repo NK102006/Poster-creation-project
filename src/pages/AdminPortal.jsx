@@ -1,3 +1,4 @@
+import { resolveMediaUrl } from '../lib/mediaUrl';
 import { appPath } from '../lib/appPath';
 import { useEffect, useRef, useState } from 'react';
 import DataTable from 'datatables.net-dt';
@@ -32,9 +33,9 @@ const addFileToZip = async (zip, path, urlOrData) => {
   if (urlOrData.startsWith('data:')) {
     const [, base64 = ''] = urlOrData.split(',', 2);
     if (base64) zip.file(path, base64, { base64: true });
-  } else if (urlOrData.startsWith('http') || urlOrData.startsWith('/')) {
+  } else {
     try {
-      const res = await fetch(urlOrData);
+      const res = await fetch(resolveMediaUrl(urlOrData));
       if (res.ok) zip.file(path, await res.blob());
     } catch (err) {
       console.warn('Failed to fetch file for zip:', urlOrData, err);

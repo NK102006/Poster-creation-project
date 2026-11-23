@@ -93,7 +93,7 @@ export function PosterPage({
         id={isCaptureTarget ? 'doctor-poster-capture' : undefined}
       >
         <video
-          src={poster.videoUrl}
+          src={posterImageUrl(poster.videoUrl)}
           autoPlay
           loop
           muted

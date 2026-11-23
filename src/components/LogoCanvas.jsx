@@ -1,3 +1,4 @@
+import { resolveMediaUrl } from '../lib/mediaUrl';
 // src/components/LogoCanvas.jsx
 // Square interactive canvas — drag to move, slider to zoom (center fixed)
 import { useRef, useState, useEffect, useCallback } from 'react';
@@ -39,7 +40,7 @@ export default function LogoCanvas({ logoSrc, onChange, initialState }) {
         });
       }
     };
-    img.src = logoSrc;
+    img.src = resolveMediaUrl(logoSrc);
   }, [logoSrc]);
 
   const draw = useCallback(() => {

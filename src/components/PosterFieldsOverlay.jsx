@@ -1,3 +1,4 @@
+import { resolveMediaUrl } from '../lib/mediaUrl';
 import { useCallback, useLayoutEffect, useRef } from 'react';
 import { fieldBoxStyle, isImageField, shapeRadius } from '../lib/posterFields';
 
@@ -76,7 +77,7 @@ export default function PosterFieldsOverlay({ fields = [], values = {} }) {
               style={{ ...fieldBoxStyle(field), overflow: 'hidden', borderRadius: shapeRadius(field.shape) }}
             >
               <img
-                src={value}
+                src={resolveMediaUrl(value)}
                 alt=""
                 style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center top', display: 'block' }}
               />

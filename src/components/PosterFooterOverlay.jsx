@@ -1,3 +1,4 @@
+import { resolveMediaUrl } from '../lib/mediaUrl';
 import { POSTER_CANVAS, POSTER_FOOTER as F } from '../lib/posterFooterLayout';
 
 function pct(value, total) {
@@ -49,7 +50,7 @@ export default function PosterFooterOverlay({
           }}
         >
           <img
-            src={logo}
+            src={resolveMediaUrl(logo)}
             alt=""
             style={{ width: '100%', height: '100%', objectFit: logoFit, objectPosition: 'center top', display: 'block' }}
           />

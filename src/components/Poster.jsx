@@ -1,3 +1,4 @@
+import { resolveMediaUrl } from '../lib/mediaUrl';
 // src/components/Poster.jsx
 // Dynamic clinical poster template + high-res canvas renderer
 
@@ -188,7 +189,7 @@ function loadImage(src) {
     img.crossOrigin = 'anonymous';
     img.onload = () => resolve(img);
     img.onerror = () => resolve(null);
-    img.src = src;
+    img.src = resolveMediaUrl(src);
   });
 }
 

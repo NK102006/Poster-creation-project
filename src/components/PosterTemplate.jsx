@@ -1,3 +1,4 @@
+import { resolveMediaUrl } from '../lib/mediaUrl';
 import React, { forwardRef } from 'react';
 import styles from './PosterTemplate.module.css';
 
@@ -273,7 +274,7 @@ const PosterTemplate = forwardRef(({ themeId, therapyId, doctor, dateText, class
             </div>
 
             <div className={styles.doctorPhotoWrap}>
-              <img src={logoUrl} alt="Doctor" className={styles.doctorPhoto} />
+              <img src={resolveMediaUrl(logoUrl)} alt="Doctor" className={styles.doctorPhoto} />
             </div>
             <div className={styles.nameplate}>
               <h3 className={styles.nameplateTitle}>{docName}</h3>

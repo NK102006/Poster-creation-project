@@ -1,3 +1,4 @@
+import { resolveMediaUrl } from './mediaUrl';
 /** Render themed blank poster pages to JPEG blobs for download / zip. */
 import { createRoot } from 'react-dom/client';
 import { toJpeg } from 'html-to-image';
@@ -21,21 +22,30 @@ export function mapThemeToRiskFactor(themeId) {
   }
 }
 
-function waitForImages(node) {
-  const images = Array.from(node?.querySelectorAll('img') || []);
-  return Promise.all(
-    images.map(
-      (img) =>
-        new Promise((resolve) => {
-          if (img.complete) {
-            resolve();
-            return;
-          }
-          img.onload = () => resolve();
-          img.onerror = () => resolve();
-        })
-    )
-  );
+async function waitForImages(node) {
+  // Embed media before SVG/canvas export so relative URLs and a second CORS
+  // request inside html-to-image cannot break an otherwise visible preview.
+  await Promise.all(Array.from(node?.querySelectorAll('img') || []).map(async (img) => {
+    const source = resolveMediaUrl(img.getAttribute('src'));
+    if (!source) return;
+    try {
+      if (!source.startsWith('data:')) {
+        const response = await fetch(source);
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const blob = await response.blob();
+        if (!blob.type.startsWith('image/')) throw new Error('Server returned a non-image response');
+        img.src = await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result);
+          reader.onerror = () => reject(new Error('Could not read image'));
+          reader.readAsDataURL(blob);
+        });
+      }
+      await img.decode();
+    } catch (error) {
+      throw new Error(`Could not load poster image: ${source}. ${error.message}`);
+    }
+  }));
 }
 
 export async function renderRiskFactorPosterBlob(fields) {
@@ -47,7 +57,7 @@ export async function renderRiskFactorPosterBlob(fields) {
   const root = createRoot(host);
   root.render(
     createElement(RiskFactorPoster, {
-      logo: fields.logo,
+      logo: resolveMediaUrl(fields.logo),
       doctorName: fields.doctorName,
       doctorDegree: fields.doctorDegree,
       clinicName: fields.clinicName,
@@ -68,9 +78,8 @@ export async function renderRiskFactorPosterBlob(fields) {
     throw new Error('Risk factor poster node not found');
   }
 
-  await waitForImages(node);
-
   try {
+    await waitForImages(node);
     const dataUrl = await toJpeg(node, {
       quality: 0.95,
       pixelRatio: 2,
@@ -92,10 +101,7 @@ export async function renderMasterPosterBlob(poster, fields) {
 
   const root = createRoot(host);
   const rawImage = poster.image || poster.src || poster.imageUrl || '';
-  const imgUrl =
-    /^(https?:|data:|blob:)/.test(rawImage) || rawImage.startsWith('/')
-      ? rawImage
-      : `/${rawImage}`;
+  const imgUrl = resolveMediaUrl(rawImage);
 
   root.render(
     createElement('div', {
@@ -122,7 +128,7 @@ export async function renderMasterPosterBlob(poster, fields) {
           })
         : createElement(PosterFooterOverlay, {
             key: 'overlay',
-            logo: fields.logo,
+            logo: resolveMediaUrl(fields.logo),
             doctorName: fields.doctorName,
             doctorDegree: fields.doctorDegree,
             clinicName: fields.clinicName,
@@ -136,9 +142,8 @@ export async function renderMasterPosterBlob(poster, fields) {
   });
 
   const node = host.querySelector('.master-export');
-  await waitForImages(node);
-
   try {
+    await waitForImages(node);
     const dataUrl = await toJpeg(node, {
       quality: 0.95,
       pixelRatio: 2,

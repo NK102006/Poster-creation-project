@@ -1,4 +1,4 @@
-import { appPath } from './appPath';
+import { resolveMediaUrl } from './mediaUrl';
 
 /** Shared helpers for doctor fields placed on a poster by the designer. */
 
@@ -107,11 +107,5 @@ export function fieldBoxStyle(field) {
 }
 
 export function posterImageUrl(link) {
-  const raw = String(link || '');
-  if (!raw) return '';
-  // Legacy database values may be uploads/... or /uploads/....
-  if (/^\/?uploads[\/\\]/.test(raw)) {
-    return appPath(`/${raw.replace(/^\//, '').replace(/\\/g, '/')}`);
-  }
-  return /^(https?:|data:|blob:)/.test(raw) || raw.startsWith('/') ? raw : appPath(`/${raw}`);
+  return resolveMediaUrl(String(link || ''));
 }

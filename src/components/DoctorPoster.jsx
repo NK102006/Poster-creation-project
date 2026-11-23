@@ -1,3 +1,4 @@
+import { resolveMediaUrl } from '../lib/mediaUrl';
 import React from "react";
 
 /**
@@ -161,7 +162,7 @@ export default function DoctorPoster({
         {/* ---------- doctor photo ---------- */}
         {photo && (
           <div style={styles.photoWrap}>
-            <img src={photo} alt={doctorName} style={styles.photoImg} />
+            <img src={resolveMediaUrl(photo)} alt={doctorName} style={styles.photoImg} />
           </div>
         )}
 

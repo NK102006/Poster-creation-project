@@ -1,3 +1,4 @@
+import { resolveMediaUrl } from '../lib/mediaUrl';
 import { useEffect, useState } from 'react';
 import { apiRequest } from '../lib/apiClient';
 import styles from './DoctorInfo.module.css';
@@ -50,7 +51,7 @@ export default function DoctorInfo() {
       <div className={styles.logoWrap}>
         <div className={styles.avatarCircle}>
           {doctor.photo || doctor.logo ? (
-            <img src={doctor.photo || doctor.logo} alt="" className={styles.logo} />
+            <img src={resolveMediaUrl(doctor.photo || doctor.logo)} alt="" className={styles.logo} />
           ) : (
             <span className={styles.fallback} aria-hidden="true">
               Dr
@@ -59,7 +60,7 @@ export default function DoctorInfo() {
         </div>
         {doctor.logo && (doctor.photo || doctor.name) && (
           <div className={styles.attachedLogo} title="Attached Doctor Logo">
-            <img src={doctor.logo} alt="" className={styles.attachedLogoImg} />
+            <img src={resolveMediaUrl(doctor.logo)} alt="" className={styles.attachedLogoImg} />
           </div>
         )}
       </div>
