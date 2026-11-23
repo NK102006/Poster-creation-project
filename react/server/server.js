@@ -496,7 +496,9 @@ function bufferToDataUrl(value, fallbackMime = 'image/png') {
   if (!value) return null;
   if (typeof value === 'string') {
     if (value.startsWith('uploads/') || value.startsWith('uploads\\')) {
-      return `${process.env.VITE_API_BASE_URL || `http://localhost:${PORT}`}/${value.replace(/\\/g, '/')}`;
+      // Relative by default so the URL works from any device (proxied by Vite); set PUBLIC_BASE_URL to force an absolute origin.
+      const base = (process.env.PUBLIC_BASE_URL || '').replace(/\/$/, '');
+      return `${base}/${value.replace(/\\/g, '/')}`;
     }
     return value;
   }

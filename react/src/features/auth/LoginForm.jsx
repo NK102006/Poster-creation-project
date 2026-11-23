@@ -20,8 +20,11 @@ export default function LoginForm({ onSuccess }) {
 
       <TextField
         label="Employee ID"
-        inputMode="numeric"
+        inputMode="text"
         autoComplete="username"
+        autoCapitalize="none"
+        autoCorrect="off"
+        spellCheck={false}
         value={values.id}
         onChange={(v) => setField('id', v)}
         error={fieldErrors.id}
