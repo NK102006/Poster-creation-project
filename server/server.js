@@ -6,8 +6,14 @@ import dotenv from 'dotenv';
 import session from 'express-session';
 import fs from 'fs';
 import path from 'path';
+import { fileURLToPath } from 'url';
 
-dotenv.config();
+const SERVER_DIR = path.dirname(fileURLToPath(import.meta.url));
+const PROJECT_DIR = path.resolve(SERVER_DIR, '..');
+dotenv.config({ path: path.join(PROJECT_DIR, '.env') });
+dotenv.config({ path: path.join(SERVER_DIR, '.env') });
+const BASE_PATH = `/${(process.env.APP_BASE_PATH || '/Poster-Creater').replace(/^\/+|\/+$/g, '')}`.replace(/^\/$/, '');
+
 
 // The database is opened (and its schema created) when db.js is imported.
 const {
@@ -23,13 +29,25 @@ const {
 } = await import('./db.js');
 
 const app = express();
+app.set('trust proxy', 'loopback');
+// Keep existing API routes while accepting the configured public URL prefix.
+app.use((req, res, next) => {
+  if (BASE_PATH && (req.path === BASE_PATH || req.path.startsWith(`${BASE_PATH}/`))) {
+    req.url = req.url.slice(BASE_PATH.length) || '/';
+    if (req.url.startsWith('?')) req.url = `/${req.url}`;
+  }
+  next();
+});
 app.use(session({
-  secret: 'Secret',
+  secret: process.env.SESSION_SECRET || 'local-development-only',
+  name: 'poster.sid',
   resave: false,
   saveUninitialized: false,
   cookie: {
     httpOnly: true,
     sameSite: 'lax',
+    path: BASE_PATH || '/',
+    secure: process.env.COOKIE_SECURE === 'true',
   },
 }));
 
@@ -38,7 +56,7 @@ const upload = multer({
   limits: { fileSize: 100 * 1024 * 1024 }, // 100MB limit for high-res posters and videos
 });
 
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 4017;
 
 app.use(cors({
   origin: true,
@@ -47,7 +65,7 @@ app.use(cors({
 app.use(express.json({ limit: '100mb' }));
 app.use(express.urlencoded({ extended: true, limit: '100mb' }));
 
-const UPLOADS_DIR = path.resolve('uploads');
+const UPLOADS_DIR = path.resolve(PROJECT_DIR, process.env.UPLOADS_DIR || 'uploads');
 fs.mkdirSync(path.join(UPLOADS_DIR, 'logos'), { recursive: true });
 fs.mkdirSync(path.join(UPLOADS_DIR, 'posters'), { recursive: true });
 fs.mkdirSync(path.join(UPLOADS_DIR, 'festival_posters'), { recursive: true });
@@ -122,8 +140,9 @@ async function isDoctorLogoRequired() {
 /** Uploaded paths come back from the client as URLs ("/uploads/x.png"); store them as "uploads/x.png". */
 function normalizeStoredPath(value) {
   if (value == null || value === '') return null;
-  const str = String(value);
-  const match = /^(?:https?:\/\/[^/]+)?\/(uploads\/.*)$/.exec(str);
+  let str = String(value).replace(/^https?:\/\/[^/]+/, '');
+  if (BASE_PATH && str.startsWith(`${BASE_PATH}/uploads/`)) str = str.slice(BASE_PATH.length);
+  const match = /^\/(uploads\/.*)$/.exec(str);
   return match ? match[1] : str;
 }
 
@@ -366,7 +385,7 @@ function bufferToDataUrl(value, fallbackMime = 'image/png') {
   if (typeof value === 'string') {
     if (value.startsWith('uploads/') || value.startsWith('uploads\\')) {
       // Relative by default so the URL works from any device (proxied by Vite); set PUBLIC_BASE_URL to force an absolute origin.
-      const base = (process.env.PUBLIC_BASE_URL || '').replace(/\/$/, '');
+      const base = (process.env.PUBLIC_BASE_URL || BASE_PATH).replace(/\/$/, '');
       return `${base}/${value.replace(/\\/g, '/')}`;
     }
     return value;
@@ -2604,12 +2623,26 @@ function seedDefaults() {
   }
 }
 
+// Serve only the production build, never the repository directory.
+app.use('/api', (_req, res) => res.status(404).json({ message: 'API route not found' }));
+app.use('/uploads', (_req, res) => res.sendStatus(404));
+const DIST_DIR = path.join(PROJECT_DIR, 'dist');
+app.use((req, res, next) => {
+  if (req.path.split('/').some((part) => part.startsWith('.'))) return res.sendStatus(404);
+  next();
+});
+app.use(express.static(DIST_DIR, { index: 'index.html' }));
+app.get('*', (req, res) => {
+  if (path.extname(req.path)) return res.sendStatus(404);
+  res.sendFile(path.join(DIST_DIR, 'index.html'));
+});
+
 const startServer = () => {
   try {
     console.log(`Using SQLite database at ${DB_PATH}`);
     seedDefaults();
 
-    app.listen(PORT, () => {
+    app.listen(PORT, process.env.HOST || '127.0.0.1', () => {
       console.log(`Server is running on port ${PORT}`);
     });
   } catch (error) {

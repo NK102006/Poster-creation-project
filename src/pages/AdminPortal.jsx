@@ -1,19 +1,15 @@
+import { appPath } from '../lib/appPath';
 import { useEffect, useRef, useState } from 'react';
 import DataTable from 'datatables.net-dt';
 import 'datatables.net-dt/css/dataTables.dataTables.css';
 import JSZip from 'jszip';
-import { apiRequest } from '../lib/apiClient';
+import { apiRequest, API_BASE_URL } from '../lib/apiClient';
 import { canAccessPage, clearAuth, readAuth, writeAuth } from '../lib/authSession';
 import StaffLogin from './StaffLogin';
 import { validatePassword } from '../features/auth/validators';
 import UsersDoctorsBoard from './UsersDoctorsBoard';
 import styles from './AdminPortal.module.css';
 import { errorAlert } from '../lib/alerts';
-
-const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || '/api').replace(
-  /\/$/,
-  ''
-);
 
 function getItemId(item) {
   return item?.id || item?._id || '';
@@ -208,7 +204,7 @@ export default function AdminPortal() {
         onClick={() => setSidebarOpen(false)}
       />
       <aside className={`${styles.sidebar} ${sidebarOpen ? styles.open : ''}`}>
-        <div className={styles.sidebarTop} onClick={() => { window.location.href = '/'; }} style={{ cursor: 'pointer' }}>
+        <div className={styles.sidebarTop} onClick={() => { window.location.href = appPath('/'); }} style={{ cursor: 'pointer' }}>
           <div className={styles.brandMark}>A</div>
           <div>
             <div className={styles.brandName}>MedPortal</div>

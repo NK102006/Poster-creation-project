@@ -1,3 +1,4 @@
+import { appPath } from '../lib/appPath';
 import { useEffect, useRef, useState } from 'react';
 import DataTable from 'datatables.net-dt';
 import 'datatables.net-dt/css/dataTables.dataTables.css';
@@ -317,7 +318,7 @@ export default function SuperAdminPortal() {
         onClick={() => setSidebarOpen(false)}
       />
       <aside className={`${styles.sidebar} ${sidebarOpen ? styles.open : ''}`}>
-        <div className={styles.sidebarTop} onClick={() => { window.location.href = '/'; }} style={{ cursor: 'pointer' }}>
+        <div className={styles.sidebarTop} onClick={() => { window.location.href = appPath('/'); }} style={{ cursor: 'pointer' }}>
           <div className={styles.brandMark}>S</div>
           <div>
             <div className={styles.brandName}>MedPortal</div>

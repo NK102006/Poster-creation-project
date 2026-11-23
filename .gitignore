@@ -4,6 +4,8 @@ react/node_modules/
 
 # env / secrets
 .env
+.env.*
+!.env.example
 react/.env
 *.local
 

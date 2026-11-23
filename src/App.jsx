@@ -1,3 +1,4 @@
+import { appPath, currentAppPath } from './lib/appPath';
 import { useEffect, useState } from 'react';
 import MedicalAtmosphere from './components/MedicalAtmosphere.jsx';
 import LoginPage from './pages/LoginPage.jsx';
@@ -41,19 +42,19 @@ function clearSavedViewState() {
 }
 
 function isAdminPath() {
-  return window.location.pathname === '/admin';
+  return currentAppPath() === '/admin';
 }
 
 function isSuperAdminPath() {
-  return window.location.pathname === '/superadmin' || window.location.pathname === '/super-admin';
+  return currentAppPath() === '/superadmin' || currentAppPath() === '/super-admin';
 }
 
 function isUserPanelPath() {
-  return window.location.pathname === '/userpanel';
+  return currentAppPath() === '/userpanel';
 }
 
 function isUnknownPath() {
-  const p = window.location.pathname;
+  const p = currentAppPath();
   return p !== '/' && p !== '/login' && !isAdminPath() && !isSuperAdminPath() && !isUserPanelPath();
 }
 
@@ -67,18 +68,18 @@ function staffViewFromPath() {
 function setAppView(view, { doctorId, replace = false } = {}) {
   const nextUrl = new URL(window.location.href);
   if (view === 'admin') {
-    nextUrl.pathname = '/admin';
+    nextUrl.pathname = appPath('/admin');
     nextUrl.search = '';
   } else if (view === 'superadmin') {
-    nextUrl.pathname = '/superadmin';
+    nextUrl.pathname = appPath('/superadmin');
     nextUrl.search = '';
   } else if (view === 'userpanel') {
-    nextUrl.pathname = '/userpanel';
+    nextUrl.pathname = appPath('/userpanel');
     nextUrl.search = '';
   } else if (view === 'notfound') {
     // leave the url alone
   } else {
-    nextUrl.pathname = '/';
+    nextUrl.pathname = appPath('/');
     if (view === 'login') {
       nextUrl.searchParams.delete('view');
     } else {
@@ -254,7 +255,7 @@ export default function App() {
   let screen = null;
 
   if (view === 'notfound') {
-    screen = <NotFoundPage onHome={() => { window.location.href = '/'; }} />;
+    screen = <NotFoundPage onHome={() => { window.location.href = appPath('/'); }} />;
   } else if (view === 'admin') {
     screen = <AdminPortal />;
   } else if (view === 'superadmin') {

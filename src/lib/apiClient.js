@@ -1,6 +1,6 @@
 import { authHeaders, clearAuth } from './authSession';
 
-const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || '/api').replace(/\/$/, '');
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || `${import.meta.env.BASE_URL}api`).replace(/\/$/, '');
 
 export { API_BASE_URL };
 

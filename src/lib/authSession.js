@@ -1,3 +1,4 @@
+import { currentAppPath } from './appPath';
 const LEGACY_KEY = 'auth_session';
 
 const AUTH_KEYS = {
@@ -18,7 +19,7 @@ function parseStored(raw) {
 }
 
 export function authScopeFromPath() {
-  const path = window.location.pathname;
+  const path = currentAppPath();
   if (path === '/admin') return 'admin';
   if (path === '/superadmin' || path === '/super-admin') return 'superadmin';
   if (path === '/userpanel') return 'userpanel';

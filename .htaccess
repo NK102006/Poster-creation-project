@@ -1,0 +1,12 @@
+# Apache modules: rewrite, proxy, proxy_http. AllowOverride All required.
+Options -Indexes -MultiViews
+DirectoryIndex disabled
+RewriteEngine On
+
+# Never serve repository files, even when someone guesses their names.
+RewriteRule (^|/)\. - [F,L]
+RewriteRule ^(?:server|src|node_modules|dist)(?:/|$) - [F,L,NC]
+RewriteRule ^(?:package(?:-lock)?\.json|vite\.config\.js|README\.md)$ - [F,L,NC]
+
+# Node serves dist, API and uploads; the URL never includes /dist.
+RewriteRule ^(.*)$ http://127.0.0.1:4017/Poster-Creater/$1 [P,L]
