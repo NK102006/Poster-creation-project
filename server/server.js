@@ -19,6 +19,7 @@ const BASE_PATH = `/${(process.env.APP_BASE_PATH || '/Poster-Creater').replace(/
 const {
   DB_PATH,
   isValidId,
+  Superadmins,
   Admins,
   Users,
   Doctors,
@@ -155,7 +156,11 @@ function slugifyTheme(name) {
 }
 
 const SUPERADMIN_USERNAME = 'superadmin';
-const SUPERADMIN_PASSWORD = 'superadmin123';
+
+// Seed the default superadmin row (password stored as a bcrypt hash of "superadmin123").
+if (!Superadmins.findById(SUPERADMIN_USERNAME)) {
+  Superadmins.ensure(SUPERADMIN_USERNAME, bcrypt.hashSync('superadmin123', 10));
+}
 
 
 // Identity comes ONLY from the server-side session. The X-Auth-Role header just
@@ -1117,7 +1122,8 @@ async function superadminLogin(req, res) {
   const loginId = String(username || '').trim();
   if (loginBlocked(req, res, `superadmin:${loginId}`)) return;
   try {
-    if (loginId === SUPERADMIN_USERNAME && String(password || '') === SUPERADMIN_PASSWORD) {
+    const superadmin = Superadmins.findById(loginId);
+    if (await verifyPasswordOrDummy(password, superadmin)) {
       clearLoginFailures(req, `superadmin:${loginId}`);
       const auth = await setAuthSession(req, buildAuthPayload('superadmin'));
       return res.status(200).json({ success: true, message: 'Superadmin login successful', auth });

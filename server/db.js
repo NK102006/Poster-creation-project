@@ -118,6 +118,11 @@ CREATE TABLE IF NOT EXISTS categories (
   updated_at  TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS superadmin (
+  id        TEXT PRIMARY KEY COLLATE NOCASE,
+  password  TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS themes (
   id            TEXT PRIMARY KEY,
   name          TEXT NOT NULL COLLATE NOCASE UNIQUE,
@@ -271,6 +276,22 @@ function defineTable(table, cols, { timestamps = true } = {}) {
 
   return { table, fromRow, insert, update, byId, remove, count };
 }
+
+// ---------------------------------------------------------------------------
+// Superadmin
+// ---------------------------------------------------------------------------
+
+export const Superadmins = {
+  findById(id) {
+    const value = String(id || '').trim();
+    if (!value) return null;
+    return db.prepare('SELECT id, password FROM superadmin WHERE id = ?').get(value) || null;
+  },
+  /** Inserts the account only if that id doesn't exist yet (never overwrites). */
+  ensure(id, password) {
+    db.prepare('INSERT OR IGNORE INTO superadmin (id, password) VALUES (?, ?)').run(id, password);
+  },
+};
 
 // ---------------------------------------------------------------------------
 // Admins
