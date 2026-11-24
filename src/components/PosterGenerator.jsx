@@ -127,7 +127,10 @@ export default function PosterGenerator({
     if (file) {
       setLogoFile?.(file);
       const url = URL.createObjectURL(file);
+      // Show the new photo right away, even if the crop dialog is cancelled.
+      setLogoPreview?.(url);
       setOriginalLogoUrl(url);
+      setCroppedLogoData(null);
       setLogoCropState(null);
       setTempLogoCropState(null);
       setShowCropModal(true);
@@ -149,6 +152,7 @@ export default function PosterGenerator({
     } else if (!originalLogoUrl && doctor?.logo) {
       setOriginalLogoUrl(doctor.logo);
     }
+    setCroppedLogoData(null);
     setShowCropModal(true);
   };
 
@@ -156,6 +160,8 @@ export default function PosterGenerator({
     if (croppedLogoData) {
       setLogoPreview?.(croppedLogoData);
       if (tempLogoCropState) setLogoCropState(tempLogoCropState);
+      // The cropped data URL is what gets saved now.
+      setLogoFile?.(null);
     }
     setShowCropModal(false);
   };

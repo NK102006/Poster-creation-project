@@ -8,6 +8,8 @@ import styles from './DoctorManagePage.module.css';
 import adminStyles from './AdminPortal.module.css';
 import { confirmDialog } from '../lib/alerts';
 
+const isPhotoField = (f) => f.key === 'logo' || f.key === 'photo' || f.type === 'file';
+
 const EMPTY_FORM = {
   dynamicFields: {},
 };
@@ -61,6 +63,7 @@ export default function DoctorManagePage({
   const [form, setForm] = useState(EMPTY_FORM);
   const [logoPreview, setLogoPreview] = useState('');
   const [logoFile, setLogoFile] = useState(null);
+  const [logoRemoved, setLogoRemoved] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState(null);
@@ -103,6 +106,7 @@ export default function DoctorManagePage({
       });
       setLogoPreview(res.doctor.logo || '');
       setLogoFile(null);
+      setLogoRemoved(false);
       setOriginalLogoUrl(res.doctor.logo || null);
       setLogoCropState(null);
       setTempLogoCropState(null);
@@ -152,6 +156,11 @@ export default function DoctorManagePage({
 
     for (const f of enabledFields) {
       const isDynamic = !f.isStandard;
+      if (isPhotoField(f)) {
+        // The photo is checked against what is on screen, not the last saved value.
+        if (f.required && !hasLogo) errs[f.key] = 'Doctor photo is required';
+        continue;
+      }
       const val = isDynamic ? (form.dynamicFields?.[f.key] || '') : (form[f.key] || '');
 
       if (f.key === 'contactnumber') {
@@ -175,18 +184,23 @@ export default function DoctorManagePage({
     try {
       const data = new FormData();
       for (const f of doctorFields.filter(field => field.enabled)) {
-        if (f.isStandard) data.append(f.key, (form[f.key] || '').trim());
+        // The photo is sent separately by appendLogo; never send the old URL as a field.
+        if (f.isStandard && !isPhotoField(f)) data.append(f.key, (form[f.key] || '').trim());
       }
       data.append('dynamicFields', JSON.stringify(form.dynamicFields || {}));
-      if (logoPreview?.startsWith('data:')) data.append('logo', logoPreview);
-      else if (logoFile) data.append('logo', logoFile);
+      appendLogo(data);
 
       const res = await apiRequest(`/doctors/${doctorId}`, {
         method: 'PUT',
         body: data,
       });
-      setDoctor(res.doctor);
-      setMessage('Doctor details saved');
+      const removalIgnored = logoRemoved && Boolean(res.doctor?.logo);
+      applySavedDoctor(res.doctor);
+      if (removalIgnored) {
+        setError('Details saved, but the photo could not be removed. Please try again.');
+      } else {
+        setMessage(logoRemoved ? 'Doctor details saved and photo removed' : 'Doctor details saved');
+      }
     } catch (err) {
       setError(err.message || 'Save failed');
     } finally {
@@ -253,9 +267,13 @@ export default function DoctorManagePage({
   const handleLogoChange = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    setLogoFile(file);
     const url = URL.createObjectURL(file);
+    setLogoFile(file);
+    setLogoRemoved(false);
+    // Show the new photo right away, even if the crop dialog is cancelled.
+    setLogoPreview(url);
     setOriginalLogoUrl(url);
+    setCroppedLogoData(null);
     setLogoCropState(null);
     setTempLogoCropState(null);
     setShowCropModal(true);
@@ -268,6 +286,7 @@ export default function DoctorManagePage({
     } else if (!originalLogoUrl && doctor?.logo) {
       setOriginalLogoUrl(doctor.logo);
     }
+    setCroppedLogoData(null);
     setShowCropModal(true);
   };
 
@@ -275,11 +294,50 @@ export default function DoctorManagePage({
     if (croppedLogoData) {
       setLogoPreview(croppedLogoData);
       if (tempLogoCropState) setLogoCropState(tempLogoCropState);
-      // Keep as data URL for save when no fresh File
+      // The cropped data URL is what gets saved now.
       setLogoFile(null);
     }
     setShowCropModal(false);
   };
+
+  /** Clears the photo on screen; the removal is stored on the next save. */
+  const handleRemoveLogo = async () => {
+    if (!(await confirmDialog({
+      title: 'Remove photo?',
+      text: 'The doctor photo will be removed when you save the profile.',
+      confirmText: 'Remove',
+      danger: true,
+    }))) return;
+    setLogoPreview('');
+    setLogoFile(null);
+    setOriginalLogoUrl(null);
+    setCroppedLogoData(null);
+    setLogoCropState(null);
+    setTempLogoCropState(null);
+    setLogoRemoved(true);
+    setMessage(null);
+  };
+
+  /** Adds the doctor photo to a save request: a cropped image wins, then a freshly picked file. */
+  const appendLogo = (data) => {
+    if (logoPreview?.startsWith('data:')) data.append('logo', logoPreview);
+    else if (logoFile) data.append('logo', logoFile);
+    else if (logoRemoved) data.append('removeLogo', 'true');
+  };
+
+  /** After a save, show exactly what the server stored. */
+  const applySavedDoctor = (saved) => {
+    if (!saved) return;
+    setDoctor(saved);
+    setForm((prev) => ({ ...prev, logo: saved.logo || '' }));
+    setLogoPreview(saved.logo || '');
+    setOriginalLogoUrl(saved.logo || null);
+    setLogoFile(null);
+    setCroppedLogoData(null);
+    setLogoRemoved(false);
+  };
+
+  const hasLogo = Boolean(logoFile || logoPreview);
 
   const handleContinue = async () => {
     const errs = {};
@@ -287,6 +345,11 @@ export default function DoctorManagePage({
 
     for (const f of enabledFields) {
       const isDynamic = !f.isStandard;
+      if (isPhotoField(f)) {
+        // The photo is checked against what is on screen, not the last saved value.
+        if (f.required && !hasLogo) errs[f.key] = 'Doctor photo is required';
+        continue;
+      }
       const val = isDynamic ? (form.dynamicFields?.[f.key] || '') : (form[f.key] || '');
 
       if (f.key === 'contactnumber') {
@@ -313,16 +376,17 @@ export default function DoctorManagePage({
     try {
       const data = new FormData();
       for (const f of doctorFields.filter(field => field.enabled)) {
-        if (f.isStandard) data.append(f.key, String(form[f.key] || '').trim());
+        // The photo is sent separately by appendLogo; never send the old URL as a field.
+        if (f.isStandard && !isPhotoField(f)) data.append(f.key, String(form[f.key] || '').trim());
       }
       data.append('dynamicFields', JSON.stringify(form.dynamicFields || {}));
-      if (logoFile) data.append('logo', logoFile);
-      else if (logoPreview?.startsWith('data:')) data.append('logo', logoPreview);
+      appendLogo(data);
 
       const res = await apiRequest(`/doctors/${doctorId}`, {
         method: 'PUT',
         body: data,
       });
+      applySavedDoctor(res.doctor);
       onContinue?.(res.doctor || doctor);
     } catch (err) {
       setError(err.message || 'Save failed');
@@ -332,6 +396,7 @@ export default function DoctorManagePage({
   };
 
   const missingRequired = doctorFields.filter(f => f.enabled && f.required).some(f => {
+    if (isPhotoField(f)) return !hasLogo;
     const isDynamic = !f.isStandard;
     const val = isDynamic ? form.dynamicFields?.[f.key] : form[f.key];
     return !String(val || '').trim();
@@ -483,10 +548,39 @@ export default function DoctorManagePage({
                   ) : (
                     <div className={styles.logoFallback}>No logo</div>
                   )}
-                  <div style={{ flex: 1 }}>
-                    <input type="file" accept="image/*" onChange={handleLogoChange} className="bs-form-control" />
+                  <div className={styles.logoControls}>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => {
+                        handleLogoChange(e);
+                        setFormFieldErrors((p) => ({ ...p, logo: null, photo: null }));
+                      }}
+                      className="bs-form-control"
+                    />
+                    {logoPreview ? (
+                      <button
+                        type="button"
+                        className={styles.removePhotoBtn}
+                        onClick={(e) => {
+                          // The button sits inside the field's <label>; don't open the file picker.
+                          e.preventDefault();
+                          handleRemoveLogo();
+                        }}
+                      >
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                          <path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6M10 11v6M14 11v6" />
+                        </svg>
+                        Remove photo
+                      </button>
+                    ) : logoRemoved ? (
+                      <span className={styles.removedNote}>Photo will be removed when you save.</span>
+                    ) : null}
                   </div>
                 </div>
+                {(formFieldErrors.logo || formFieldErrors.photo) && (
+                  <span className={styles.fieldError}>{formFieldErrors.logo || formFieldErrors.photo}</span>
+                )}
               </label>
             )}
 

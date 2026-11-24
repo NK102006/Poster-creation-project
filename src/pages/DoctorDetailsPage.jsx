@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { apiRequest } from '../lib/apiClient';
 import PosterGenerator from '../components/PosterGenerator';
 import StudioShell from '../components/StudioShell';
@@ -29,6 +29,14 @@ export default function DoctorDetailsPage({
   const [logoFile, setLogoFile] = useState(null);
   const [logoPreview, setLogoPreview] = useState(existingDoctor?.logo || null);
 
+  // Latest values for the async refresh below, so it never overwrites a photo
+  // or details the user has already changed on this screen.
+  const initialLogoRef = useRef(existingDoctor?.logo || null);
+  const initialFormRef = useRef(null);
+  const latestRef = useRef({ logoFile, logoPreview, formData });
+  latestRef.current = { logoFile, logoPreview, formData };
+  if (initialFormRef.current === null) initialFormRef.current = formData;
+
   const editingExisting = Boolean(doctor || existingDoctor || doctorId);
 
   useEffect(() => {
@@ -41,22 +49,29 @@ export default function DoctorDetailsPage({
         console.warn('Could not load fields:', err);
       }
 
-      if (!doctorId || existingDoctor?.id === doctorId) return;
+      // Always reload: the doctor passed in may be an older copy (e.g. from
+      // before the photo was changed on the profile page).
+      if (!doctorId) return;
 
       try {
         const res = await apiRequest(`/doctors/${doctorId}`);
         if (cancelled || !res?.doctor) return;
+        const latest = latestRef.current;
         setDoctor(res.doctor);
-        setFormData({
-          dynamicFields: res.doctor.dynamicFields || {},
-          name: res.doctor.name || '',
-          contactnumber: res.doctor.contactnumber
-            ? String(res.doctor.contactnumber)
-            : '',
-          clinicName: res.doctor.clinicName || '',
-          doctorDegree: res.doctor.doctorDegree || '',
-        });
-        setLogoPreview(res.doctor.logo || null);
+        if (latest.formData === initialFormRef.current) {
+          setFormData({
+            dynamicFields: res.doctor.dynamicFields || {},
+            name: res.doctor.name || '',
+            contactnumber: res.doctor.contactnumber
+              ? String(res.doctor.contactnumber)
+              : '',
+            clinicName: res.doctor.clinicName || '',
+            doctorDegree: res.doctor.doctorDegree || '',
+          });
+        }
+        if (!latest.logoFile && latest.logoPreview === initialLogoRef.current) {
+          setLogoPreview(res.doctor.logo || null);
+        }
       } catch (err) {
         console.warn('Could not load doctor for poster:', err);
       }
@@ -126,9 +141,9 @@ export default function DoctorDetailsPage({
     }
   };
 
+  // Saves the Details step: creates a new doctor, or updates an existing one
+  // (so a changed photo or details are stored before moving to the design step).
   const handleSaveDoctorInitial = async () => {
-    if (doctor?.id) return true; // Already saved
-
     const name = formData.name?.trim();
     const contactnumber = formData.contactnumber?.trim();
     const clinicName = formData.clinicName?.trim();
@@ -139,7 +154,9 @@ export default function DoctorDetailsPage({
     if (contactnumber) data.append('contactnumber', contactnumber);
     if (clinicName) data.append('clinicName', clinicName);
     if (doctorDegree) data.append('doctorDegree', doctorDegree);
-    if (user?.id) data.append('ownerUserId', user.id);
+    if (doctor?.id) data.append('doctorId', doctor.id);
+    else if (user?.id) data.append('ownerUserId', user.id);
+    data.append('dynamicFields', JSON.stringify(formData.dynamicFields || {}));
 
     if (logoPreview && typeof logoPreview === 'string' && logoPreview.startsWith('data:')) {
       data.append('logo', logoPreview);

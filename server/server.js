@@ -78,6 +78,12 @@ fs.mkdirSync(path.join(UPLOADS_DIR, 'education_posters'), { recursive: true });
 fs.mkdirSync(path.join(UPLOADS_DIR, 'videos'), { recursive: true });
 fs.mkdirSync(path.join(UPLOADS_DIR, 'master_posters'), { recursive: true });
 app.use('/uploads', express.static(UPLOADS_DIR));
+// Files uploaded before the uploads folder moved to the project root still live
+// in server/uploads; keep serving them so older photos and posters don't 404.
+const LEGACY_UPLOADS_DIR = path.join(SERVER_DIR, 'uploads');
+if (LEGACY_UPLOADS_DIR !== UPLOADS_DIR && fs.existsSync(LEGACY_UPLOADS_DIR)) {
+  app.use('/uploads', express.static(LEGACY_UPLOADS_DIR));
+}
 
 // Tables and queries live in db.js.
 
@@ -374,6 +380,15 @@ async function canAccessDoctor(auth, doctor) {
     return String(doctor.ownerUser || '') === String(auth.id);
   }
   return false;
+}
+
+/**
+ * The new photo as a data URL, if one was sent. The field can arrive as a list
+ * when a form sends "logo" more than once (e.g. the old URL plus the new image).
+ */
+function pickLogoDataUrl(value) {
+  const values = Array.isArray(value) ? value : [value];
+  return values.filter((v) => typeof v === 'string' && v.startsWith('data:image/')).pop() || null;
 }
 
 // Helper to save buffer to disk and return relative path
@@ -677,8 +692,9 @@ app.put('/api/doctors/:id', upload.any(), async (req, res) => {
     let logoBuffer = logoFile?.buffer || null;
     let originalName = logoFile?.originalname || '';
 
-    if (!logoBuffer && req.body.logo && typeof req.body.logo === 'string' && req.body.logo.startsWith('data:')) {
-      logoBuffer = Buffer.from(req.body.logo.replace(/^data:image\/\w+;base64,/, ''), 'base64');
+    const logoDataUrl = pickLogoDataUrl(req.body.logo);
+    if (!logoBuffer && logoDataUrl) {
+      logoBuffer = Buffer.from(logoDataUrl.replace(/^data:image\/[\w+.-]+;base64,/, ''), 'base64');
     }
 
     if (name != null) doctor.name = String(name).trim() || existing.name;
@@ -701,8 +717,24 @@ app.put('/api/doctors/:id', upload.any(), async (req, res) => {
     }
     if (active != null) doctor.active = String(active) !== 'false' && active !== false;
 
+    if (req.body.dynamicFields != null) {
+      try {
+        const parsed = typeof req.body.dynamicFields === 'string'
+          ? JSON.parse(req.body.dynamicFields)
+          : req.body.dynamicFields;
+        if (parsed && typeof parsed === 'object') {
+          doctor.dynamicFields = { ...(existing.dynamicFields || {}), ...parsed };
+        }
+      } catch {
+        return res.status(400).json({ message: 'Invalid custom field data.' });
+      }
+    }
+
     if (logoBuffer) {
       doctor.logo = await saveFile(logoBuffer, originalName, 'logos');
+    } else if (String(req.body.removeLogo || '') === 'true') {
+      // Photo removed on the profile page (a new upload in the same request wins).
+      doctor.logo = null;
     }
 
     const saved = Doctors.update(existing._id, doctor);
@@ -778,8 +810,9 @@ app.post('/api/doctors', requireAuth('superadmin', 'admin', 'user'), upload.any(
   const posterMonth = String(req.body.posterMonth || '').trim();
 
   // Also support base64 fallback if sent in body
-  if (!logoBuffer && req.body.logo && typeof req.body.logo === 'string' && req.body.logo.startsWith('data:')) {
-    const base64Data = req.body.logo.replace(/^data:image\/\w+;base64,/, '');
+  const logoDataUrl = pickLogoDataUrl(req.body.logo);
+  if (!logoBuffer && logoDataUrl) {
+    const base64Data = logoDataUrl.replace(/^data:image\/[\w+.-]+;base64,/, '');
     logoBuffer = Buffer.from(base64Data, 'base64');
   }
 

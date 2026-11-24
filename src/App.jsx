@@ -272,6 +272,7 @@ export default function App() {
         onBrandClick={goToHub}
         onAddNew={goToNewDoctor}
         onAccessExisting={() => navigate('existing')}
+        onSelectDoctor={openExistingDoctor}
       />
     );
   } else if (view === 'existing') {
@@ -327,6 +328,7 @@ export default function App() {
         onLogout={handleLogout}
         onAddNew={goToNewDoctor}
         onAccessExisting={() => navigate('existing')}
+        onSelectDoctor={openExistingDoctor}
       />
     );
   }

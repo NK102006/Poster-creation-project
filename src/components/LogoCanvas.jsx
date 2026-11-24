@@ -91,8 +91,15 @@ export default function LogoCanvas({ logoSrc, onChange, initialState }) {
     draw();
   }, [draw]);
 
+  // Keep the latest callback in a ref so parent re-renders (which pass a new
+  // inline function) don't keep cancelling the export timer below.
+  const onChangeRef = useRef(onChange);
   useEffect(() => {
-    if (!logoImg || !onChange) return;
+    onChangeRef.current = onChange;
+  }, [onChange]);
+
+  useEffect(() => {
+    if (!logoImg || !onChangeRef.current) return;
     const timeout = setTimeout(() => {
       const exportCanvas = document.createElement('canvas');
       exportCanvas.width = CANVAS_W;
@@ -104,10 +111,10 @@ export default function LogoCanvas({ logoSrc, onChange, initialState }) {
       const drawW = logoImg.width * logoScale;
       const drawH = logoImg.height * logoScale;
       ectx.drawImage(logoImg, logoPos.x, logoPos.y, drawW, drawH);
-      onChange(exportCanvas.toDataURL('image/png'), { pos: logoPos, scale: logoScale });
+      onChangeRef.current?.(exportCanvas.toDataURL('image/png'), { pos: logoPos, scale: logoScale });
     }, 200);
     return () => clearTimeout(timeout);
-  }, [logoImg, logoPos, logoScale, onChange]);
+  }, [logoImg, logoPos, logoScale]);
 
   const getMousePos = (e) => {
     const canvas = canvasRef.current;
